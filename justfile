@@ -10,3 +10,8 @@ push :
 
 clear :
   git  rm --cached -r .
+
+  
+
+release:
+    just push &&  git push repo  main:release s
