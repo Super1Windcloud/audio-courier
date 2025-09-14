@@ -11,7 +11,8 @@ push :
 clear :
   git  rm --cached -r .
 
-
+pull :
+   git pull repo main
 
 release:
     just push &&  git push repo  main:release

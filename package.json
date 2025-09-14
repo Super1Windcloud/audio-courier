@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "start": "pnpm tauri dev",
-    "release": "pnpm build && pnpm tauri build"
+    "release": "pnpm build && pnpm tauri build",
+    "clean": "cd src-tauri && cargo clean"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
