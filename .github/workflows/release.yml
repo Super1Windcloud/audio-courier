@@ -67,5 +67,4 @@ jobs:
           releaseBody: 'Welcome to use it, enjoy it!'
           releaseDraft: false
           prerelease: false
-          owner:  SuperWindCloud
           args: ${{ matrix.args }}
