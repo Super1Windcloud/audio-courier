@@ -43,10 +43,10 @@ jobs:
           brew install create-dmg
 
       - name: Install frontend dependencies
-        run: npm install
+        run: pnpm install
 
       - name: Build Tauri app
-        run: npm run tauri build
+        run: pnpm run tauri build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
