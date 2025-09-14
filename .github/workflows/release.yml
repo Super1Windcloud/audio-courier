@@ -19,16 +19,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 安装 Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20   # 建议用 20，稳定
           cache: 'pnpm'
 
+      # 安装 pnpm
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10 
+          version: 9          # 建议用 9，兼容 Node 20 最稳定
+          run_install: false  # 不要自动执行 install
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -48,18 +51,18 @@ jobs:
         run: |
           brew install create-dmg
 
+      # 用 pnpm 装前端依赖
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build Tauri app
-        run: pnpm run tauri build
+        run: pnpm tauri build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: tauri-build-${{ matrix.os }}
-          path: |
-            src-tauri/target/release/bundle/**
+          path: src-tauri/target/release/bundle/**
 
   release:
     name: Create Release
