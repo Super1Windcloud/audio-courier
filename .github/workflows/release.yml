@@ -65,6 +65,7 @@ jobs:
           tagName: audio-courier-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
           releaseName: 'audio-courier v__VERSION__'
           releaseBody: 'Welcome to use it, enjoy it!'
-          releaseDraft: falses
+          releaseDraft: false
           prerelease: false
+          owner:  SuperWindCloud
           args: ${{ matrix.args }}
