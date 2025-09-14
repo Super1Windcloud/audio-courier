@@ -1,6 +1,6 @@
 [package]
 name = "audio-courier"
-version = "0.1.0"
+version = "1.0.1"
 description = "A Tauri App for audio capture"
 authors = ["superwindcloud"]
 edition = "2021"
