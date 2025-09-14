@@ -17,9 +17,12 @@
         "height": 600,
         "resizable": true,
         "fullscreen": false,
-        "center": true
+        "center": true,
+        "transparent": true,
+        "visible": false
       }
     ],
+    "macOSPrivateApi": true,
     "security": {
       "csp": null
     }
