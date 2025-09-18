@@ -11,9 +11,18 @@
     "tauri": "tauri",
     "start": "pnpm tauri dev",
     "release": "pnpm build && pnpm tauri build",
-    "clean": "cd src-tauri && cargo clean"
+    "clean": "cd src-tauri && cargo clean",
+    "check": "biome check src  --write",
+    "lint": "biome lint src  --write",
+    "format": "pnpm --stream --color \"/format:/\"",
+    "format:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml",
+    "format:js": "biome format src  --write",
+    "generate:icons": "tauri icon  app-icon.png",
+    "generate:signkey": "tauri signer generate -w .tauri/${npm_package_name}_signer.key",
+    "prepare": "husky"
   },
   "dependencies": {
+    "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-slot": "^1.2.3",
     "@tailwindcss/vite": "^4.1.13",
     "@tauri-apps/api": "^2",
@@ -32,6 +41,8 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.6.2",
     "tw-animate-css": "^1.3.8",
     "typescript": "~5.8.3",
     "vite": "^7.0.4"
