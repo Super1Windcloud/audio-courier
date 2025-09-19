@@ -13,7 +13,7 @@
     "release": "pnpm build && pnpm tauri build",
     "clean": "cd src-tauri && cargo clean",
     "check": "biome check src  --write",
-    "lint": "eslint  src  --fix",
+    "lint": "eslint  src  --fix --max-warnings=0",
     "format": "pnpm --stream --color \"/format:/\"",
     "format:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml",
     "format:js": "biome format src  --write",
