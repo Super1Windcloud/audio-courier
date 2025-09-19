@@ -1,36 +1,59 @@
-import type React from "react";
+import React from "react";
+import { formatDistanceToNow } from "date-fns";
+import { Check, CheckCheck, Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { Message } from "./ChatContainer";
 
 interface MessageItemProps {
-	username: string;
-	message: string;
-	time: string;
+  message: Message;
 }
 
-const MessageItem: React.FC<MessageItemProps> = ({
-	username,
-	message,
-	time,
-}) => {
-	return (
-		<div className="flex  items-start gap-3 p-2 hover:bg-gray-50 rounded-md">
-			{/* 头像首字母 */}
-			<div className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500 text-white font-bold">
-				{username.charAt(0)}
-			</div>
+export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
+  const isUser = message.sender === "user";
 
-			{/* 消息内容 */}
-			<div className="flex-1">
-				{/* 用户名和时间 */}
-				<div className="flex items-center justify-between">
-					<span className="font-semibold text-gray-800">{username}</span>
-					<span className="text-xs text-gray-400">{time}</span>
-				</div>
+  const getStatusIcon = () => {
+    switch (message.status) {
+      case "sending":
+        return <Clock className="w-3 h-3 text-muted-foreground" />;
+      case "sent":
+        return <Check className="w-3 h-3 text-muted-foreground" />;
+      case "delivered":
+        return <CheckCheck className="w-3 h-3 text-muted-foreground" />;
+      case "read":
+        return <CheckCheck className="w-3 h-3 text-blue-500" />;
+      default:
+        return null;
+    }
+  };
 
-				{/* 消息文本 */}
-				<div className="mt-1 text-gray-700">{message}</div>
-			</div>
-		</div>
-	);
+  return (
+    <div
+      className={cn(
+        "flex w-full animate-in slide-in-from-bottom-2 duration-300",
+        isUser ? "justify-end" : "justify-start",
+      )}
+    >
+      <div
+        className={cn(
+          "relative max-w-[70%] rounded-2xl px-4 py-2 shadow-sm",
+          isUser
+            ? "bg-blue-500 text-white rounded-br-md"
+            : "bg-muted text-foreground rounded-bl-md",
+        )}
+      >
+        <p className="text-sm leading-relaxed break-words">{message.text}</p>
+        <div
+          className={cn(
+            "flex items-center justify-end space-x-1 mt-1",
+            isUser ? "text-blue-100" : "text-muted-foreground",
+          )}
+        >
+          <span className="text-xs">
+            {formatDistanceToNow(message.timestamp, { addSuffix: true })}
+          </span>
+          {isUser && getStatusIcon()}
+        </div>
+      </div>
+    </div>
+  );
 };
-
-export default MessageItem;

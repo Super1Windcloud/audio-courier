@@ -1,18 +1,13 @@
-import MessageItem from "@/components/MessageItem.tsx";
-import { invoke } from "@tauri-apps/api/core";
-import { useEffect } from "react";
-export default function App() {
-	useEffect(() => {
-		(async () => {
-			await invoke("show_window");
-		})();
-	}, []);
+import { ChatContainer } from "@/components/ChatContainer";
+import { Toaster } from "sonner";
 
-	return (
-		<MessageItem
-			username={"src-tauri"}
-			message={"jifoasejfoisejfoaisefjiaseof"}
-			time={"24.00"}
-		></MessageItem>
-	);
+function App() {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <ChatContainer />
+      <Toaster position="top-right" richColors expand closeButton />
+    </div>
+  );
 }
+
+export default App;
