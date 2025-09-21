@@ -2,6 +2,8 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{Emitter, State};
+
+
 pub struct AudioState {
     pub stream: Mutex<Option<cpal::Stream>>,
 }

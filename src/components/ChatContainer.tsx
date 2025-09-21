@@ -34,7 +34,8 @@ export const ChatContainer: React.FC = () => {
     setIsTyping(true);
 
     llmChatStreamOutput(
-      appState.currentQuestion,
+      text,
+      appState.llmPrompt,
       appState.currentSelectedModel,
       (content) => {
         setIsTyping(false);

@@ -6,7 +6,6 @@ authors = ["superwindcloud"]
 edition = "2021"
 homepage = "https://github.com/super1windcloud/audio-courier"
 repository = "https://github.com/super1windcloud/audio-courier"
-readme = "README.md"
 license = "GPL"
 
 [lib]
@@ -25,5 +24,6 @@ cpal = "0.16.0"
 tokio-stream = "0.1.17"
 reqwest = { version = "0.12.23", features = ["json", "stream"] }
 dotenv = "0.15.0"
+tokio = "1.47.1"
 
     

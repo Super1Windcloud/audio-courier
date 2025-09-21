@@ -1,18 +1,20 @@
-mod llm;
-use llm::*;
-
+mod api;
+use api::*;
 use serde_json::json;
 
+#[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FlowArgs {
+    question: String,
+    llm_prompt: String,
+}
+
 #[tauri::command]
-pub async fn siliconflow(
-    app: tauri::AppHandle,
-    question: Option<String>,
-) -> Result<String, String> {
+pub async fn siliconflow(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
     let api_key = get_env_key("Siliconflow");
-    let question = question.unwrap_or_else(|| "牛顿迭代".to_string());
     let messages = vec![
-        json!({"role":"assistant","content":"你是一个代码助手,帮我解决算法问题"}),
-        json!({"role":"user","content":question}),
+        json!({"role":"assistant","content":flow_args.llm_prompt}),
+        json!({"role":"user","content":flow_args.question}),
     ];
 
     call_model_api(
@@ -27,18 +29,15 @@ pub async fn siliconflow(
         },
     )
     .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn doubao_lite(
-    app: tauri::AppHandle,
-    question: Option<String>,
-) -> Result<String, String> {
+pub async fn doubao_lite(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
     let api_key = get_env_key("DOUBAO");
-    let question = question.unwrap_or_else(|| "牛顿迭代".to_string());
     let messages = vec![
-        json!({"role":"system","content":"你是一个代码助手 帮我解决算法问题"}),
-        json!({"role":"user","content":question}),
+        json!({"role":"system","content":flow_args.llm_prompt}),
+        json!({"role":"user","content":flow_args.question}),
     ];
 
     call_model_api(
@@ -53,15 +52,15 @@ pub async fn doubao_lite(
         },
     )
     .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn doubao_pro(app: tauri::AppHandle, question: Option<String>) -> Result<String, String> {
+pub async fn doubao_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
     let api_key = get_env_key("DOUBAO");
-    let question = question.unwrap_or_else(|| "牛顿迭代".to_string());
     let messages = vec![
-        json!({"role":"assistant","content":"你是一个代码助手 帮我解决算法问题"}),
-        json!({"role":"user","content":question}),
+        json!({"role":"assistant","content":flow_args.llm_prompt}),
+        json!({"role":"user","content":flow_args.question}),
     ];
 
     call_model_api(
@@ -76,18 +75,15 @@ pub async fn doubao_pro(app: tauri::AppHandle, question: Option<String>) -> Resu
         },
     )
     .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn doubao_deepseek(
-    app: tauri::AppHandle,
-    question: Option<String>,
-) -> Result<String, String> {
+pub async fn doubao_deepseek(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
     let api_key = get_env_key("DOUBAO");
-    let question = question.unwrap_or_else(|| "牛顿迭代".to_string());
     let messages = vec![
-        json!({"role":"system","content":"你是一个代码助手,帮我解答算法代码题"}),
-        json!({"role":"user","content":question}),
+        json!({"role":"system","content":flow_args.llm_prompt}),
+        json!({"role":"user","content":flow_args.question}),
     ];
 
     call_model_api(
@@ -102,16 +98,16 @@ pub async fn doubao_deepseek(
         },
     )
     .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 
-pub async fn kimi(app: tauri::AppHandle, question: Option<String>) -> Result<String, String> {
+pub async fn kimi(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
     let api_key = get_env_key("KIMI");
-    let question = question.unwrap_or_else(|| "牛顿迭代".to_string());
     let messages = vec![
-        json!({"role":"system","content":"你是一个代码助手,帮我解答算法代码题"}),
-        json!({"role":"user","content":question}),
+        json!({"role":"system","content":flow_args.llm_prompt}),
+        json!({"role":"user","content":flow_args.question}),
     ];
 
     call_model_api(
@@ -126,16 +122,16 @@ pub async fn kimi(app: tauri::AppHandle, question: Option<String>) -> Result<Str
         },
     )
     .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 
-pub async fn zhipu(app: tauri::AppHandle, question: Option<String>) -> Result<String, String> {
+pub async fn zhipu(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
     let api_key = get_env_key("ZHIPU");
-    let question = question.unwrap_or_else(|| "牛顿迭代".to_string());
     let messages = vec![
-        json!({"role":"system","content":"你是一个代码助手,帮我解答算法代码题 "}),
-        json!({"role":"user","content":question}),
+        json!({"role":"system","content":flow_args.llm_prompt}),
+        json!({"role":"user","content":flow_args.question}),
     ];
 
     call_model_api(
@@ -150,19 +146,16 @@ pub async fn zhipu(app: tauri::AppHandle, question: Option<String>) -> Result<St
         },
     )
     .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 
-pub async fn deepseek_api(
-    app: tauri::AppHandle,
-    question: Option<String>,
-) -> Result<String, String> {
+pub async fn deepseek_api(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
     let api_key = get_env_key("DEEPSEEK");
-    let question = question.unwrap_or_else(|| "牛顿迭代".to_string());
     let messages = vec![
-        json!({"role":"system","content":"You are a helpful Code assistant."}),
-        json!({"role":"user","content":question}),
+        json!({"role":"system","content":flow_args.llm_prompt}),
+        json!({"role":"user","content":flow_args.question}),
     ];
 
     call_model_api(
@@ -177,19 +170,16 @@ pub async fn deepseek_api(
         },
     )
     .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 
-pub async fn ali_qwen_32b(
-    app: tauri::AppHandle,
-    question: Option<String>,
-) -> Result<String, String> {
+pub async fn ali_qwen_32b(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
     let api_key = get_env_key("ALI_QWEN_QWQ");
-    let question = question.unwrap_or_else(|| "牛顿迭代".to_string());
     let messages = vec![
-        json!({"role":"system","content":"你是一个代码助手,帮我解答算法代码题"}),
-        json!({"role":"user","content":question}),
+        json!({"role":"system","content":flow_args.llm_prompt}),
+        json!({"role":"user","content":flow_args.question}),
     ];
 
     call_model_api(
@@ -204,19 +194,16 @@ pub async fn ali_qwen_32b(
         },
     )
     .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 
-pub async fn ali_qwen_2_5(
-    app: tauri::AppHandle,
-    question: Option<String>,
-) -> Result<String, String> {
+pub async fn ali_qwen_2_5(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
     let api_key = get_env_key("ALI_QWEN_QWQ");
-    let question = question.unwrap_or_else(|| "牛顿迭代".to_string());
     let messages = vec![
-        json!({"role":"system","content":"你是一个代码助手,帮我解答算法代码题"}),
-        json!({"role":"user","content":question}),
+        json!({"role":"system","content":flow_args.llm_prompt}),
+        json!({"role":"user","content":flow_args.question}),
     ];
 
     call_model_api(
@@ -231,19 +218,16 @@ pub async fn ali_qwen_2_5(
         },
     )
     .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 
-pub async fn ali_qwen_plus(
-    app: tauri::AppHandle,
-    question: Option<String>,
-) -> Result<String, String> {
+pub async fn ali_qwen_plus(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
     let api_key = get_env_key("ALI_QWEN_QWQ");
-    let question = question.unwrap_or_else(|| "牛顿迭代".to_string());
     let messages = vec![
-        json!({"role":"system","content":"你是一个代码助手,帮我解答算法代码题"}),
-        json!({"role":"user","content":question}),
+        json!({"role":"system","content":flow_args.llm_prompt}),
+        json!({"role":"user","content":flow_args.question}),
     ];
 
     call_model_api(
@@ -258,18 +242,15 @@ pub async fn ali_qwen_plus(
         },
     )
     .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn ali_qwen_max(
-    app: tauri::AppHandle,
-    question: Option<String>,
-) -> Result<String, String> {
+pub async fn ali_qwen_max(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
     let api_key = get_env_key("ALI_QWEN_QWQ");
-    let question = question.unwrap_or_else(|| "牛顿迭代".to_string());
     let messages = vec![
-        json!({"role":"system","content":"你是一个代码助手,帮我解答算法代码题"}),
-        json!({"role":"user","content":question}),
+        json!({"role":"system","content":flow_args.llm_prompt}),
+        json!({"role":"user","content":flow_args.question}),
     ];
 
     call_model_api(
@@ -284,4 +265,5 @@ pub async fn ali_qwen_max(
         },
     )
     .await
+    .map_err(|e| e.to_string())
 }
