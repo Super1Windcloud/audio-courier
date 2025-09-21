@@ -1,5 +1,9 @@
-use tauri::{App, Manager};
-use window_vibrancy::*;
+mod audio_stream;
+mod llm;
+use audio_stream::*;
+use dotenv::dotenv;
+use llm::*;
+use std::sync::Mutex;
 
 #[tauri::command]
 fn show_window(window: tauri::Window) -> Result<(), String> {
@@ -18,35 +22,33 @@ fn show_window(window: tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
-pub fn set_acrylic_theme(app: &mut App) {
-    let window = app.get_webview_window("main").unwrap();
-    #[cfg(target_os = "windows")]
-    apply_acrylic(&window, None).unwrap();
-}
-pub fn set_acrylic_theme_extra(app: &mut App) {
-    let window = app.get_webview_window("main").unwrap();
-    #[cfg(target_os = "windows")]
-    apply_acrylic(&window, Some((18, 18, 18, 125))).unwrap();
-}
-
-pub fn set_vibrancy_theme(app: &mut App) {
-    let window = app.get_webview_window("main").unwrap();
-    apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None)
-        .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    dotenv().ok();
+
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![show_window])
-        .setup(|app| {
-            #[cfg(target_os = "macos")]
-            set_vibrancy_theme(app);
-            #[cfg(target_os = "windows")]
-            set_acrylic_theme_extra(app);
-            Ok(())
+        .manage(AudioState {
+            stream: Mutex::new(None),
         })
+        .plugin(tauri_plugin_opener::init())
+        .invoke_handler(tauri::generate_handler![
+            show_window,
+            stop_recognize_audio_stream,
+            start_recognize_audio_stream,
+            siliconflow,
+            doubao_lite,
+            doubao_pro,
+            kimi,
+            zhipu,
+            deepseek_api,
+            ali_qwen_32b,
+            ali_qwen_2_5,
+            ali_qwen_plus,
+            ali_qwen_max,
+            doubao_deepseek,
+            get_audio_stream_devices_name
+        ])
+        .setup(|app| Ok(()))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
