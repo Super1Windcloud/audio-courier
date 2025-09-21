@@ -8,8 +8,11 @@ export async function llmChatStreamOutput(
   renderCallback: (chunk: string) => void,
 ) {
   await invoke(currentModel, { question });
-  await listen<string>("llm_stream", (event) => {
+  let result = "";
+    await listen<string>("llm_stream", (event) => {
     console.log("llm_stream", event.payload);
-    renderCallback(event.payload);
+    result += event.payload;
+
+    renderCallback(result);
   });
 }

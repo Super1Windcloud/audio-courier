@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 
 import {
@@ -24,7 +23,6 @@ import { MODEL_OPTIONS, ModelOption } from "@/types/llm.ts";
 import useAppStateStore from "@/stores";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button.tsx";
 
 export function MoreMenu() {
   const [currentModel, setCurrentModel] = useState<ModelOption>("siliconflow");
@@ -49,10 +47,6 @@ export function MoreMenu() {
     console.log(currentModel);
   }, [currentModel]);
 
-  const handleSubmit = () => {
-    setIsDialogOpen(false);
-  };
-
   return (
     <>
       <DropdownMenu>
@@ -76,7 +70,6 @@ export function MoreMenu() {
             data-[highlighted]:bg-gray-500
             data-[state=open]:bg-gray-500"
             >
-              {" "}
               大模型
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-48 bg-gray-600 text-white border-0">
@@ -103,7 +96,6 @@ export function MoreMenu() {
             data-[highlighted]:bg-gray-500
             data-[state=open]:bg-gray-500"
             >
-              {" "}
               选择音频通道
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-48 bg-gray-600 text-white border-0">
@@ -133,16 +125,24 @@ export function MoreMenu() {
 
           <Input
             value={appState.llmPrompt}
-            onChange={(e) => appState.updateLLMPrompt(e.target.value)}
+            defaultValue={appState.llmPrompt}
+            onChange={(e) => {
+              e.currentTarget.setSelectionRange(
+                e.currentTarget.value.length,
+                e.currentTarget.value.length,
+              );
+              appState.updateLLMPrompt(e.target.value);
+            }}
             placeholder="请输入提示词..."
             className="mt-2 w-full"
+            autoFocus={false}
+            onFocus={(e) =>
+              e.currentTarget.setSelectionRange(
+                e.currentTarget.value.length,
+                e.currentTarget.value.length,
+              )
+            }
           />
-
-          <DialogFooter className={"bg-transparent"}>
-            <Button type={"submit"} variant={"ghost"} onClick={handleSubmit}>
-              提交
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
@@ -151,8 +151,8 @@ export function MoreMenu() {
 
 interface MessageInputProps {
   onSendMessage: (text: string) => void;
-  onClearConversation?: () => void;
-  onMessageCapture: (message: string, replyId: string) => void;
+  onClearConversation: () => void;
+  onMessageCapture: (message: string) => void;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setIsTyping: (record: boolean) => void;
 }
@@ -161,7 +161,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage,
   onClearConversation,
   onMessageCapture,
-  setMessages,
   setIsTyping,
 }) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -185,7 +184,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const toggleRecording = () => {
     if (!isRecording) {
       setIsRecording(true);
-      startAudioRecognition(onMessageCapture, setMessages);
+      startAudioRecognition(onMessageCapture);
     } else {
       setIsRecording(false);
       stopAudioRecognition();
@@ -194,10 +193,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   useEffect(() => {
     setIsTyping(isRecording);
-  }, [isRecording, setIsTyping]);
+  }, [isRecording]);
+
   const handleClearConversation = () => {
     setInputText("");
-    onClearConversation?.();
+    setIsRecording(false);
+    if (isRecording) {
+      stopAudioRecognition();
+    }
+    onClearConversation();
   };
 
   return (

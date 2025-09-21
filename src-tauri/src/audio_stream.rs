@@ -89,7 +89,7 @@ fn test_get_audio_stream_channel() {
     }
     println!("所有输出设备:");
     for device in host.output_devices().unwrap() {
-        println!("  - {}", device.name().unwrap()); 
+        println!("  - {}", device.name().unwrap());
     }
 
     let devices = host.output_devices().unwrap();

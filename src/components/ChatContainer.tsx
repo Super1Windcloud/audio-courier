@@ -5,18 +5,16 @@ import { llmChatStreamOutput } from "@/lib/llm.ts";
 import useAppStateStore from "@/stores";
 
 export interface Message {
-  id: string;
+  id: number;
   text: string;
-  timestamp: Date;
   sender: "user" | "robot";
 }
 
 export const ChatContainer: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: Date.now().toString(),
+      id: 0,
       text: "你好,请开始你的语音对话",
-      timestamp: new Date(),
       sender: "robot",
     },
   ]);
@@ -25,41 +23,30 @@ export const ChatContainer: React.FC = () => {
   const appState = useAppStateStore();
 
   const handleSendMessage = (text: string) => {
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text,
-      timestamp: new Date(),
-      sender: "user",
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => {
+      const userMessage: Message = {
+        id: prev.length,
+        text,
+        sender: "user",
+      };
+      return [...prev, userMessage];
+    });
     setIsTyping(true);
-
-    const contactMessageId = (Date.now() + 1).toString();
-    const contactMessage: Message = {
-      id: contactMessageId,
-      text: "",
-      timestamp: new Date(),
-      sender: "robot",
-    };
-    setMessages((prev) => [...prev, contactMessage]);
 
     llmChatStreamOutput(
       appState.currentQuestion,
       appState.currentSelectedModel,
       (content) => {
         setIsTyping(false);
-        // 更新 robot 消息的内容
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === contactMessageId
-              ? {
-                  ...msg,
-                  text: msg.text + content,
-                }
-              : msg,
-          ),
-        );
+
+        setMessages((prev) => {
+          return prev.length > 0 && prev[prev.length - 1].sender === "robot"
+            ? [
+                ...prev.slice(0, -1), // 去掉最后一个
+                { ...prev[prev.length - 1], text: content }, // 替换最后一个
+              ]
+            : [...prev, { text: content, sender: "robot", id: prev.length }];
+        });
       },
     );
   };
@@ -67,20 +54,25 @@ export const ChatContainer: React.FC = () => {
   const handleClearConversation = () => {
     setMessages([
       {
-        id: Date.now().toString(),
+        id: 0,
         text: "你好,请开始你的语音对话",
-        timestamp: new Date(),
         sender: "robot",
       },
     ]);
     setIsTyping(false);
   };
 
-  const handleMessageCapture = (message: string, replyId: string) => {
+  const handleMessageCapture = (content: string) => {
     setIsTyping(false);
-    setMessages((prev) =>
-      prev.map((msg) => (msg.id === replyId ? { ...msg, text: message } : msg)),
-    );
+
+    setMessages((prev) => {
+      return prev.length > 0 && prev[prev.length - 1].sender === "robot"
+        ? [
+            ...prev.slice(0, -1), // 去掉最后一个
+            { ...prev[prev.length - 1], text: content }, // 替换最后一个
+          ]
+        : [...prev, { text: content, sender: "robot", id: prev.length }];
+    });
   };
 
   return (
