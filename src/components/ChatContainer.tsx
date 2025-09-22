@@ -11,7 +11,7 @@ export interface Message {
 }
 
 export const ChatContainer: React.FC = () => {
-  // 存储到本地, 消息历史
+	// 存储到本地, 消息历史
 	const [messages, setMessages] = useState<Message[]>([
 		{
 			id: 0,
