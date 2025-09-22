@@ -9,9 +9,7 @@ export const Conversation = () => {
       {question}
       <Button
         onClick={() => {
-          navigate("/", {
-            replace: true,
-          });
+          navigate("/");
         }}
       >
         Back to Home

@@ -40,7 +40,10 @@ impl std::fmt::Display for ModelError {
     }
 }
 
-pub async fn call_model_api(app: tauri::AppHandle, req: ModelRequest) -> Result<String, ModelError> {
+pub async fn call_model_api(
+    app: tauri::AppHandle,
+    req: ModelRequest,
+) -> Result<String, ModelError> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(120)) // 设置总超时时间
         .connect_timeout(Duration::from_secs(30)) // 连接超时
@@ -86,10 +89,12 @@ pub async fn call_model_api(app: tauri::AppHandle, req: ModelRequest) -> Result<
     // 检查响应内容类型
     if let Some(content_type) = response.headers().get("content-type") {
         if !content_type.to_str().unwrap_or("").contains("text/plain")
-            && !content_type.to_str().unwrap_or("").contains("text/event-stream") {
-            return Err(ModelError::InvalidResponse(
-                "响应不是流式格式".to_string(),
-            ));
+            && !content_type
+                .to_str()
+                .unwrap_or("")
+                .contains("text/event-stream")
+        {
+            return Err(ModelError::InvalidResponse("响应不是流式格式".to_string()));
         }
     }
 
@@ -130,13 +135,16 @@ pub async fn call_model_api(app: tauri::AppHandle, req: ModelRequest) -> Result<
                             Ok(json_chunk) => {
                                 // 检查是否有错误信息
                                 if let Some(error) = json_chunk.get("error") {
-                                    return Err(ModelError::InvalidResponse(
-                                        format!("API错误: {}", error),
-                                    ));
+                                    return Err(ModelError::InvalidResponse(format!(
+                                        "API错误: {}",
+                                        error
+                                    )));
                                 }
 
                                 // 提取内容
-                                if let Some(content) = json_chunk["choices"][0]["delta"]["content"].as_str() {
+                                if let Some(content) =
+                                    json_chunk["choices"][0]["delta"]["content"].as_str()
+                                {
                                     result.push_str(content);
 
                                     // 发送流式数据到前端，处理发送错误
@@ -152,9 +160,10 @@ pub async fn call_model_api(app: tauri::AppHandle, req: ModelRequest) -> Result<
                                 consecutive_errors += 1;
 
                                 if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
-                                    return Err(ModelError::JsonParseError(
-                                        format!("连续JSON解析失败次数过多: {}", e),
-                                    ));
+                                    return Err(ModelError::JsonParseError(format!(
+                                        "连续JSON解析失败次数过多: {}",
+                                        e
+                                    )));
                                 }
                             }
                         }
@@ -166,11 +175,11 @@ pub async fn call_model_api(app: tauri::AppHandle, req: ModelRequest) -> Result<
                 eprintln!("流数据接收错误: {}", e);
 
                 if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
-                    return Err(ModelError::StreamingError(
-                        format!("连续流错误次数过多: {}", e),
-                    ));
+                    return Err(ModelError::StreamingError(format!(
+                        "连续流错误次数过多: {}",
+                        e
+                    )));
                 }
-
             }
         }
     }
@@ -204,14 +213,19 @@ pub async fn call_model_api_with_retry(
             println!("重试第 {} 次...", attempt);
         }
 
-        match call_model_api(app.clone(), ModelRequest {
-            model: req.model.clone(),
-            messages: req.messages.clone(),
-            base_url: req.base_url.clone(),
-            api_key: req.api_key.clone(),
-            max_tokens: req.max_tokens,
-            temperature: req.temperature,
-        }).await {
+        match call_model_api(
+            app.clone(),
+            ModelRequest {
+                model: req.model.clone(),
+                messages: req.messages.clone(),
+                base_url: req.base_url.clone(),
+                api_key: req.api_key.clone(),
+                max_tokens: req.max_tokens,
+                temperature: req.temperature,
+            },
+        )
+        .await
+        {
             Ok(result) => return Ok(result),
             Err(e) => {
                 match &e {
