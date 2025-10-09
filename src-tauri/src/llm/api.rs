@@ -123,9 +123,7 @@ pub async fn call_model_api(
                         continue; // 跳过空行和注释行
                     }
 
-                    if line.starts_with("data: ") {
-                        let data = &line[6..]; // 去掉 "data: "
-
+                    if let Some(data) = line.strip_prefix("data: ") {
                         if data == "[DONE]" {
                             return Ok(result);
                         }
@@ -197,53 +195,4 @@ pub fn get_env_key(key_name: &str) -> String {
         eprintln!("环境变量 {} 未设置，请设置后重试", key_name);
         std::process::exit(1);
     })
-}
-
-pub async fn call_model_api_with_retry(
-    app: tauri::AppHandle,
-    req: ModelRequest,
-    max_retries: usize,
-) -> Result<String, ModelError> {
-    let mut last_error = None;
-
-    for attempt in 0..=max_retries {
-        if attempt > 0 {
-            let delay = Duration::from_millis(1000 * (2_u64.pow(attempt as u32 - 1)));
-            tokio::time::sleep(delay).await;
-            println!("重试第 {} 次...", attempt);
-        }
-
-        match call_model_api(
-            app.clone(),
-            ModelRequest {
-                model: req.model.clone(),
-                messages: req.messages.clone(),
-                base_url: req.base_url.clone(),
-                api_key: req.api_key.clone(),
-                max_tokens: req.max_tokens,
-                temperature: req.temperature,
-            },
-        )
-        .await
-        {
-            Ok(result) => return Ok(result),
-            Err(e) => {
-                match &e {
-                    // 某些错误不应该重试
-                    ModelError::Unauthorized | ModelError::JsonParseError(_) => {
-                        return Err(e);
-                    }
-                    // 其他错误可以重试
-                    _ => {
-                        last_error = Some(e);
-                        if attempt < max_retries {
-                            eprintln!("请求失败，将在延迟后重试: {}", last_error.as_ref().unwrap());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Err(last_error.unwrap_or(ModelError::NetworkError("未知错误".to_string())))
 }

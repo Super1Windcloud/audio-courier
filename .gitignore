@@ -25,4 +25,5 @@ dist-ssr
 .env
 .vscode
 macro
-
+src-tauri/vosk-model-small-cn-0.22
+src-tauri/vosk-win64-0.3.45

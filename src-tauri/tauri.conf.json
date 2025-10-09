@@ -1,41 +1,45 @@
 {
-	"$schema": "https://schema.tauri.app/config/2",
-	"productName": "audio-courier",
-	"version": "1.0.1",
-	"identifier": "com.mac.audio-courier",
-	"build": {
-		"beforeDevCommand": "pnpm dev",
-		"devUrl": "http://localhost:1420",
-		"beforeBuildCommand": "pnpm build",
-		"frontendDist": "../dist"
-	},
-	"app": {
-		"windows": [
-			{
-				"title": "audio-courier",
-				"width": 800,
-				"height": 600,
-				"resizable": true,
-				"fullscreen": false,
-				"center": true,
-				"transparent": true,
-				"visible": false
-			}
-		],
-		"macOSPrivateApi": true,
-		"security": {
-			"csp": null
-		}
-	},
-	"bundle": {
-		"active": true,
-		"targets": "all",
-		"icon": [
-			"icons/32x32.png",
-			"icons/128x128.png",
-			"icons/128x128@2x.png",
-			"icons/icon.icns",
-			"icons/icon.ico"
-		]
-	}
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Audio Courier",
+  "version": "1.0.1",
+  "identifier": "com.superwindcloud.audio-courier",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Audio Courier",
+        "width": 800,
+        "height": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "transparent": true,
+        "visible": false,
+        "contentProtected": true,
+        "skipTaskbar": true,
+        "alwaysOnTop": true,
+        "decorations": false
+      }
+    ],
+    "macOSPrivateApi": true,
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
 }

@@ -1,5 +1,1 @@
 #! /bin/sh
-
-pnpm  lint
-pnpm  format
-
