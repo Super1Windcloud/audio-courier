@@ -10,7 +10,7 @@ export async function startAudioLoopbackRecognition(
   captureInterval: number,
 ) {
   if (unlistener) {
-    await unlistener();
+    unlistener();
     unlistener = null;
   }
 
@@ -36,7 +36,7 @@ export async function stopAudioLoopbackRecognition() {
   );
 
   if (unlistener) {
-    await unlistener();
+    unlistener();
     unlistener = null;
   }
 }
