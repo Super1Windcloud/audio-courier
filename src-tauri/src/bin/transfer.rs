@@ -41,10 +41,19 @@ fn select_input_config() -> Result<cpal::StreamConfig, String> {
     let device = cpal::default_host()
         .default_output_device()
         .ok_or("没有可用的输出设备")?;
+    let input_device=cpal::default_host()
+        .default_input_device()
+        .ok_or("没有可用的输入设备")?;
     let supported_configs = device
         .supported_output_configs()
         .map_err(|_| "无法获取输入设备配置".to_string())?;
-    println!("输入设备支持的配置：");
+    {
+        println!("默认输出");
+        println!("{:?}", device.default_output_config().unwrap());
+        println!("默认输入");
+        println!("{:?}", input_device.default_input_config().unwrap());
+    }
+    println!("输出设备支持的配置：");
 
     let desired_sample_rate = cpal::SampleRate(44100);
 
@@ -68,6 +77,7 @@ fn select_input_config() -> Result<cpal::StreamConfig, String> {
         .supported_input_configs()
         .map_err(|_| "无法获取输入设备配置".to_string())?;
     println!("输入设备支持的配置：");
+
     for range in support_input {
         println!("{:?}", range);
     }
@@ -80,4 +90,10 @@ fn select_input_config() -> Result<cpal::StreamConfig, String> {
             .map_err(|_| "没有可用的输入配置".to_string())?;
         Ok(fallback.config())
     }
+}
+
+
+#[test]
+fn output_device_config() {
+    select_input_config().unwrap();
 }
