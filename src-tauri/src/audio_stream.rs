@@ -58,10 +58,6 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     device_name: Option<String>,
     capture_interval: i32,
 ) {
-    //线程间通道传递信息
-    use tauri::async_runtime::channel;
-    let (tx, mut rx) = channel::<String>(100);
-
     let device = if let Some(name) = device_name {
         if name.contains("输入") {
             "default_input"
@@ -71,6 +67,33 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     } else {
         "default"
     };
+
+    // with_channel_communication(device, capture_interval, app);
+    let params = RecordParams {
+        device: device.to_string(),
+        file_name: "".to_string(),
+        capture_interval: capture_interval as u32,
+        only_pcm: true,
+        pcm_callback: Some(Box::new(move |chunk: &str| {
+            app.emit("transcription_result", chunk).unwrap();
+        })),
+        use_drain_chunk_buffer: true,
+        use_big_model: true,
+    };
+
+    if let Ok(handle) = start_record_audio_with_writer(params) {
+        let mut guard = get_record_handle().lock().unwrap();
+        *guard = Some(handle);
+        println!("录音识别已开始 ✅");
+    } else {
+        eprintln!("录音线程启动失败 ❌");
+    }
+}
+
+#[allow(unused)]
+fn with_channel_communication(device: &str, capture_interval: i32, app: AppHandle) {
+    use tauri::async_runtime::channel;
+    let (tx, mut rx) = channel::<String>(100);
 
     let params = RecordParams {
         device: device.to_string(),

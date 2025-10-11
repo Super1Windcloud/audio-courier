@@ -88,9 +88,7 @@ pub fn run() {
                 for path in &model_paths {
                     println!("  - {}", path);
                 }
-                std::process::exit(1);
             }
-
             println!("应用启动完成");
             Ok(())
         })
