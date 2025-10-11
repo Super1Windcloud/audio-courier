@@ -269,7 +269,7 @@ fn drain_chunk_buffer_to_writer(
                     CLEAR_RECORDING.store(false, Ordering::SeqCst);
                 }
                 let partial = recognizer.partial_result().partial;
-                if is_dev(){
+                if is_dev() {
                     write_some_log(format!("Partial result: {partial}").as_str())
                 }
                 callback(partial);

@@ -58,9 +58,12 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     device_name: Option<String>,
     capture_interval: i32,
 ) {
-    let device = if device_name.is_some() {
-        let device = device_name.unwrap();
-        if device.contains("输入") {
+    //线程间通道传递信息
+    use tauri::async_runtime::channel;
+    let (tx, mut rx) = channel::<String>(100);
+
+    let device = if let Some(name) = device_name {
+        if name.contains("输入") {
             "default_input"
         } else {
             "default"
@@ -74,17 +77,8 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
         file_name: "".to_string(),
         capture_interval: capture_interval as u32,
         only_pcm: true,
-        pcm_callback: Some(Box::new({
-            let app = app.clone();
-            move |chunk: &str| {
-                let app = app.clone();
-                let chunk = chunk.to_string();
-                tauri::async_runtime::spawn(async move {
-                    if let Err(e) = app.emit("transcription_result", chunk) {
-                        eprintln!("emit失败: {e}");
-                    }
-                });
-            }
+        pcm_callback: Some(Box::new(move |chunk: &str| {
+            let _ = tx.blocking_send(chunk.to_string());
         })),
         use_drain_chunk_buffer: true,
         use_big_model: true,
@@ -97,6 +91,18 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     } else {
         eprintln!("录音线程启动失败 ❌");
     }
+
+    // ---- 主线程异步转发 ----
+    tauri::async_runtime::spawn({
+        let app = app.clone();
+        async move {
+            while let Some(text) = rx.recv().await {
+                if let Err(e) = app.emit("transcription_result", text) {
+                    eprintln!("emit失败: {e}");
+                }
+            }
+        }
+    });
 }
 
 pub fn find_model_path(big_model: bool) -> Option<String> {

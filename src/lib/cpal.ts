@@ -9,25 +9,17 @@ export async function startAudioLoopbackRecognition(
   let content = "";
   const unlistener = await listen<string>("transcription_result", (event) => {
     console.log("识别扬声器结果:", event.payload);
-    content = event.payload;
+    content = event.payload.replace(/\s/g, "");
     onMessageCapture(content);
-  });
-
-  const errorListener = await listen<string>("transcription_error", (event) => {
-    console.error("Audio Error :", event.payload);
   });
 
   invoke("start_recognize_audio_stream_from_speaker_loopback", {
     deviceName: audioDevice,
     captureInterval,
-  })
-    .catch((err) => {
-      console.error("invoke start output audio recognition failed", err);
-    })
-    .finally(() => {
-      unlistener();
-      errorListener();
-    });
+  }).catch((err) => {
+    console.error("invoke start output audio recognition failed", err);
+    unlistener();
+  });
 }
 
 export async function stopAudioLoopbackRecognition() {
