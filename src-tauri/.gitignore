@@ -6,3 +6,7 @@
 # will have schema files for capabilities auto-completion
 /gen/schemas
 target
+*.wav
+*.mp3
+
+app.log

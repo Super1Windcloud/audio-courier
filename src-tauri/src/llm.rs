@@ -35,6 +35,7 @@ pub async fn siliconflow_free(
         rng.random_range(0..FREE_MODELS.len())
     };
     let random_model = FREE_MODELS[idx];
+    // let random_model = "internlm/internlm2_5-7b-chat";
     println!("随机选择的模型: {}", random_model);
     call_model_api(
         app,

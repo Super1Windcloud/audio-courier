@@ -2,11 +2,13 @@ param(
     [switch]$Download,
     [switch]$Check,
     [string]$Version = "0.3.45",
-    [string]$ModelVersion = "vosk-model-small-cn-0.22"
+    [string]$ModelVersion = "vosk-model-small-cn-0.22",
+    [string]$LargeModelVersion = "vosk-model-cn-0.22"
 )
 
 $VoskUrl = "https://github.com/alphacep/vosk-api/releases/download/v$Version/vosk-win64-$Version.zip"
 $ModelUrl = "https://alphacephei.com/vosk/models/$ModelVersion.zip"
+$LargeModelUrl = "https://alphacephei.com/vosk/models/$LargeModelVersion.zip"
 
 $VoskDir = "vosk-win64-$Version"
 $ModelDir = $ModelVersion
@@ -14,30 +16,41 @@ $ProjectRoot = $PSScriptRoot
 
 Write-Host "=== Vosk 库设置脚本 ===" -ForegroundColor Green
 
-if ($Check) {
+if ($Check)
+{
     Write-Host "检查 Vosk 库状态..." -ForegroundColor Yellow
 
     $voskPath = Join-Path $ProjectRoot $VoskDir
-    if (Test-Path $voskPath) {
+    if (Test-Path $voskPath)
+    {
         Write-Host "✓ Vosk 目录存在: $voskPath" -ForegroundColor Green
         $dllFiles = @("libvosk.dll", "libgcc_s_seh-1.dll", "libstdc++-6.dll", "libwinpthread-1.dll")
-        foreach ($dll in $dllFiles) {
+        foreach ($dll in $dllFiles)
+        {
             $dllPath = Join-Path $voskPath $dll
-            if (Test-Path $dllPath) {
+            if (Test-Path $dllPath)
+            {
                 Write-Host "✓ 找到 DLL: $dll" -ForegroundColor Green
-            } else {
+            }
+            else
+            {
                 Write-Host "✗ 缺少 DLL: $dll" -ForegroundColor Red
             }
         }
-    } else {
+    }
+    else
+    {
         Write-Host "✗ Vosk 目录不存在: $voskPath" -ForegroundColor Red
         Write-Host "请运行: .\setup_vosk.ps1 -Download" -ForegroundColor Yellow
     }
 
     $modelPath = Join-Path $ProjectRoot $ModelDir
-    if (Test-Path $modelPath) {
+    if (Test-Path $modelPath)
+    {
         Write-Host "✓ 模型目录存在: $modelPath" -ForegroundColor Green
-    } else {
+    }
+    else
+    {
         Write-Host "✗ 模型目录不存在: $modelPath" -ForegroundColor Red
         Write-Host "请运行: .\setup_vosk.ps1 -Download" -ForegroundColor Yellow
     }
@@ -45,13 +58,16 @@ if ($Check) {
     return
 }
 
-if ($Download) {
+if ($Download)
+{
     Write-Host "下载 Vosk 库..." -ForegroundColor Yellow
 
     $voskZip = Join-Path $ProjectRoot "vosk-win64-$Version.zip"
     $modelZip = Join-Path $ProjectRoot "$ModelVersion.zip"
+    $largeModelZip = Join-Path $ProjectRoot "$LargeModelVersion.zip"
 
-    try {
+    try
+    {
         # === 下载 Vosk 库 ===
         Write-Host "从 $VoskUrl 下载 Vosk 库..." -ForegroundColor Cyan
         Invoke-WebRequest -Uri $VoskUrl -OutFile $voskZip -UseBasicParsing
@@ -66,16 +82,24 @@ if ($Download) {
         Write-Host "从 $ModelUrl 下载中文模型 ($ModelVersion) ..." -ForegroundColor Cyan
         Invoke-WebRequest -Uri $ModelUrl -OutFile $modelZip -UseBasicParsing
         Write-Host "✓ 模型下载完成" -ForegroundColor Green
+        Write-Host "从 $LargeModelUrl 下载中文模型 ($LargeModelVersion) ..." -ForegroundColor Cyan
+        Invoke-WebRequest -Uri $LargeModelUrl -OutFile $largeModelZip -UseBasicParsing
+        Write-Host "✓ 模型下载完成" -ForegroundColor Green
 
         Write-Host "解压模型..." -ForegroundColor Cyan
         Expand-Archive -Path $modelZip -DestinationPath $ProjectRoot -Force
         Write-Host "✓ 模型解压完成" -ForegroundColor Green
         Remove-Item $modelZip -Force
+        Write-Host "解压模型..." -ForegroundColor Cyan
+        Expand-Archive -Path $largeModelZip -DestinationPath $ProjectRoot -Force
+        Write-Host "✓ 模型解压完成" -ForegroundColor Green
+        Remove-Item $largeModelZip -Force
 
         Write-Host "✓ 所有资源准备完成！现在可以运行 Tauri 应用了。" -ForegroundColor Green
     }
-    catch {
-        Write-Host "✗ 下载或解压失败: $($_.Exception.Message)" -ForegroundColor Red
+    catch
+    {
+        Write-Host "✗ 下载或解压失败: $( $_.Exception.Message )" -ForegroundColor Red
         Write-Host "请手动下载并解压 Vosk 库或模型。" -ForegroundColor Yellow
     }
     return

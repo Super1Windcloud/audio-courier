@@ -7,6 +7,7 @@ edition = "2021"
 homepage = "https://github.com/super1windcloud/audio-courier"
 repository = "https://github.com/super1windcloud/audio-courier"
 license = "GPL"
+default-run = "audio-courier"
 
 [lib]
 name = "tauri_courier_ai_lib"
@@ -32,7 +33,12 @@ rand = "0.9.2"
 hound = "3.5.1"
 dirs = "6.0.0"
 dasp = "0.11.0"
+rubato = "0.16.2"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
 
+
+[[bin]]
+name = "transfer"
+path = "src/bin/transfer.rs"

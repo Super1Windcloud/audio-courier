@@ -6,11 +6,11 @@ import { Message } from "@/components/ChatContainer.tsx";
 import { startAudioRecognition, stopAudioRecognition } from "@/lib/audio.ts";
 import useAppStateStore from "@/stores";
 import { MoreMenu } from "@/components/MoreMenu.tsx";
+import { clearVoskAcceptBuffer } from "@/lib/cpal.ts";
 
 interface MessageInputProps {
   onSendMessage: (text: string) => void;
   onClearConversation: () => void;
-  onMessageCapture: (message: string) => void;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setIsTyping: (record: boolean) => void;
 }
@@ -18,7 +18,6 @@ interface MessageInputProps {
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage,
   onClearConversation,
-  onMessageCapture,
   setIsTyping,
 }) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -30,6 +29,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       appState.updateQuestion(inputText.trim());
       onSendMessage(inputText.trim());
       setInputText("");
+      if (isRecording) {
+        clearVoskAcceptBuffer().then(() => {
+        });
+      }
     }
   };
 
@@ -44,8 +47,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (!isRecording) {
       setIsRecording(true);
       await startAudioRecognition(
-        onMessageCapture,
+        setInputText,
         appState.currentAudioChannel,
+        appState.captureInterval,
       );
     } else {
       setIsRecording(false);

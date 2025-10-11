@@ -1,7 +1,7 @@
 import "./App.css";
 import { ChatContainer } from "@/components/ChatContainer";
 import { Toaster } from "sonner";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Conversation } from "@/Conversation.tsx";
@@ -17,7 +17,10 @@ function Home() {
 }
 
 function App() {
+  const didRun = useRef(false);
   useEffect(() => {
+    if (didRun.current) return;
+    didRun.current = true;
     registryGlobalShortCuts();
     invoke("show_window");
   }, []);

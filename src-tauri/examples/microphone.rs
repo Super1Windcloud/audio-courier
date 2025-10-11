@@ -95,7 +95,6 @@ fn recognize<T: Sample + ToSample<i16>>(
             println!("partial: {:#?}", recognizer.partial_result());
         }
         DecodingState::Finalized => {
-            // Result will always be multiple because we called set_max_alternatives
             println!("result: {:#?}", recognizer.result().multiple().unwrap());
         }
         DecodingState::Failed => eprintln!("error"),

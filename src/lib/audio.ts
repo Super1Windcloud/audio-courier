@@ -51,9 +51,7 @@ declare global {
   }
 }
 
-// 🔹 全局复用的 recognition 实例
 let recognitionInstance: SpeechRecognition | null = null;
-// 🔹 当前绑定的回调
 let activeCallback: ((msg: string) => void) | null = null;
 
 function getRecognition(): SpeechRecognition {
@@ -62,10 +60,8 @@ function getRecognition(): SpeechRecognition {
   const SpeechRecognitionClass =
     (window as any).SpeechRecognition ||
     (window as any).webkitSpeechRecognition;
-
-  if (!SpeechRecognitionClass) {
+  if (!SpeechRecognitionClass)
     throw new Error("当前浏览器不支持 SpeechRecognition API");
-  }
 
   const recognition = new SpeechRecognitionClass();
   recognition.lang = "zh-CN";
@@ -73,15 +69,23 @@ function getRecognition(): SpeechRecognition {
   recognition.interimResults = true;
 
   recognition.onresult = (event: SpeechRecognitionEvent) => {
-    let transcript = "";
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      transcript += event.results[i][0].transcript;
+    let finalTranscript = "";
+    let interimTranscript = "";
+
+    for (let i = 0; i < event.results.length; ++i) {
+      const result = event.results[i];
+      if (result.isFinal) {
+        finalTranscript += result[0].transcript;
+      } else {
+        interimTranscript += result[0].transcript;
+      }
     }
-    if (activeCallback) activeCallback(transcript);
+
+    if (activeCallback) activeCallback(finalTranscript + interimTranscript);
   };
 
   recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-    console.error("Audio Error:", event.error, event.message);
+    console.error("SpeechRecognition error:", event.error, event.message);
   };
 
   recognitionInstance = recognition;
@@ -91,14 +95,18 @@ function getRecognition(): SpeechRecognition {
 export async function startAudioRecognition(
   onMessageCapture: (message: string) => void,
   audioDevice: string,
+  captureInterval: number,
 ) {
   if (audioDevice.includes("输出")) {
-    return await startAudioLoopbackRecognition(onMessageCapture);
+    return await startAudioLoopbackRecognition(
+      onMessageCapture,
+      audioDevice,
+      captureInterval,
+    );
   }
 
   const recognition = getRecognition();
   activeCallback = onMessageCapture;
-
   recognition.start();
 
   return () => recognition.stop();
@@ -109,5 +117,6 @@ export async function stopAudioRecognition(device: string) {
     return await stopAudioLoopbackRecognition();
   }
   activeCallback = null;
+  recognitionInstance?.stop();
   recognitionInstance = null;
 }
