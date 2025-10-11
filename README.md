@@ -2,15 +2,13 @@
 适用于本地的实时STT应用
 
 
-# 快速开始
-- See Release
+ 
 
 # 从源码构建
 ```bash
-pnpm install
-pnpm start
+pnpm i
+cd src-tauri && ./setup_vosk.ps1
+pnpm td
 ```
 
 
----
-![img.png](img.png)

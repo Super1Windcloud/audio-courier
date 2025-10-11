@@ -137,7 +137,7 @@ export function MoreMenu() {
             onClick={() => {
               appState.updateScrollToBottom(!appState.isStartScrollToBottom);
             }}
-            className="flex items-center justify-between"
+            className="flex items-center bg-gray-600 !hover:bg-gray-600  justify-between"
           >
             <span>自动滚动到底部</span>
             <input
@@ -145,6 +145,26 @@ export function MoreMenu() {
               checked={appState.isStartScrollToBottom}
               onChange={(e) => appState.updateScrollToBottom(e.target.checked)}
             />
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={(e) => e.stopPropagation()} // 防止输入时关闭菜单
+            className="flex items-center justify-between gap-2"
+          >
+            <span
+              onClick={() =>
+                appState.updateCaptureInterval((appState.captureInterval -= 1))
+              }
+            >
+              -{" "}
+            </span>
+            <span>音频捕获间隔:{appState.captureInterval}</span>
+            <span
+              onClick={() =>
+                appState.updateCaptureInterval((appState.captureInterval += 1))
+              }
+            >
+              +{" "}
+            </span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -1,19 +1,24 @@
 mod audio_stream;
 mod llm;
 mod loopback;
+mod loopback_crossbeam;
 mod transcript;
 mod utils;
-
-use audio_stream::*;
+pub use audio_stream::*;
 use dotenv::{dotenv, from_filename};
 use llm::*;
+pub use loopback::*;
 use std::path::PathBuf;
-use tauri::LogicalSize;
+use tauri::{LogicalSize, Manager};
 use utils::*;
 #[tauri::command]
 fn show_window(window: tauri::Window) -> Result<(), String> {
     if window.is_visible().unwrap() {
         return Ok(());
+    }
+    let splash = window.get_webview_window("splashscreen");
+    if let Some(splash) = splash {
+        splash.close().unwrap();
     }
     window.center().unwrap();
     window
@@ -63,15 +68,10 @@ pub fn run() {
             get_audio_stream_devices_names,
             start_recognize_audio_stream_from_speaker_loopback,
             stop_recognize_audio_stream_from_speaker_loopback,
+            clear_vosk_accept_buffer
         ])
         .setup(|_app| {
-            // 检查模型文件
-            let model_paths = [
-                "vosk-model-small-cn-0.22",
-                "../vosk-model-small-cn-0.22",
-                "../../vosk-model-small-cn-0.22",
-                "./vosk-model-small-cn-0.22",
-            ];
+            let model_paths = ["vosk-model-small-cn-0.22", "vosk-model-cn-0.22"];
 
             let mut model_found = false;
             for path in &model_paths {
@@ -88,6 +88,7 @@ pub fn run() {
                 for path in &model_paths {
                     println!("  - {}", path);
                 }
+                std::process::exit(1);
             }
 
             println!("应用启动完成");

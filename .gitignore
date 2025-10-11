@@ -27,3 +27,4 @@ dist-ssr
 macro
 src-tauri/vosk-model-small-cn-0.22
 src-tauri/vosk-win64-0.3.45
+src-tauri/vosk-model-cn-0.22
