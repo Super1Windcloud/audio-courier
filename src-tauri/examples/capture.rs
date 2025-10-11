@@ -12,6 +12,35 @@ pub struct RecordParams {
     pub duration: u64,
 }
 
+fn select_output_config() -> Result<cpal::SupportedStreamConfig, String> {
+    let device = cpal::default_host()
+        .default_output_device()
+        .ok_or("没有可用的输出设备")?;
+
+    let supported_configs = device
+        .supported_output_configs()
+        .map_err(|_| "无法获取输出设备配置".to_string())?;
+
+    let desired_sample_rate = cpal::SampleRate(16000);
+
+    for range in supported_configs {
+        if range.min_sample_rate() <= desired_sample_rate
+            && range.max_sample_rate() >= desired_sample_rate
+        {
+            let selected = range.with_sample_rate(desired_sample_rate);
+            println!("选择输出设备配置：{:?}", selected);
+            return Ok(selected);
+        }
+    }
+
+    let fallback = device
+        .default_output_config()
+        .map_err(|_| "没有可用的输出配置".to_string())?;
+
+    println!("使用默认输出配置：{:?}", fallback);
+    Ok(fallback)
+}
+
 pub fn record_audio(params: RecordParams) -> Result<(), String> {
     let host = cpal::default_host();
 
@@ -24,16 +53,8 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
             .find(|x| x.name().map(|y| y == name).unwrap_or(false)),
     }
     .ok_or_else(|| "无法找到输出设备".to_string())?;
+    let config = select_output_config().unwrap();
 
-    println!("🎤 使用设备: {}", device.name().unwrap());
-
-    let config = device
-        .default_output_config()
-        .map_err(|_| "无法获取默认输出配置".to_string())?;
-    let allconfig = device.supported_output_configs().unwrap();
-    for config in allconfig {
-        println!("🎚️ 采样配置: {config:?}");
-    }
     const PATH_F32_STEREO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/recorded_f32_stereo.wav");
     const PATH_F32_MONO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/recorded_f32_mono.wav");
     const PATH_I16_STEREO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/recorded_i16_stereo.wav");

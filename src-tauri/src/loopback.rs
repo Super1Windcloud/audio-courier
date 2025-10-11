@@ -1,9 +1,9 @@
 #![allow(clippy::tabs_in_doc_comments)]
 
 use crate::audio_stream::find_model_path;
-use crate::utils::{is_dev, write_some_log};
+use crate::utils::{is_dev, select_output_config, write_some_log};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{FromSample, Sample};
+use cpal::{ChannelCount, FromSample, Sample};
 use dasp::sample::ToSample;
 use std::env;
 use std::fs::File;
@@ -58,11 +58,11 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
     }
 
     let config = if device.supports_input() && params.device.contains("input") {
-        device.default_input_config()
+        device.default_input_config().unwrap()
     } else {
-        device.default_output_config()
-    }
-    .map_err(|_| "Failed to get default input/output config".to_string())?;
+        select_output_config()?
+        // device.default_output_config()
+    };
     if is_dev() {
         write_some_log(format!("Output device: {}", device.name().unwrap()).as_str());
         write_some_log(format!("Output config: {:#?}", config).as_str());
@@ -118,7 +118,7 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
         write_some_log(format!("An error occurred on stream: {err}").as_str())
     };
     let chunk_size = (config.sample_rate().0 * params.capture_interval) as usize;
-
+    let channels = config.channels().clone();
     let stream = match config.sample_format() {
         cpal::SampleFormat::I16 => device
             .build_input_stream(
@@ -132,6 +132,7 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
                         &mut recognizer.lock().unwrap(),
                         chunk_size,
                         params.use_drain_chunk_buffer,
+                        channels,
                     )
                 },
                 err_fn,
@@ -150,6 +151,7 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
                         &mut recognizer.lock().unwrap(),
                         chunk_size,
                         params.use_drain_chunk_buffer,
+                        channels,
                     )
                 },
                 err_fn,
@@ -205,6 +207,7 @@ fn handle_input_data<T, U>(
     recognizer: &mut MutexGuard<Recognizer>,
     chunk_size: usize,
     use_drain_chunk_buffer: bool,
+    channels: ChannelCount,
 ) where
     T: Sample + ToSample<i16> + ToSample<f32> + FromSample<i16>,
     U: Sample + hound::Sample + FromSample<T> + FromSample<i16>,
@@ -213,8 +216,11 @@ fn handle_input_data<T, U>(
         .iter()
         .map(|&x| x.to_sample::<i16>())
         .collect::<Vec<i16>>();
-    let input_mono = stereo_to_mono_i16(&input);
-
+    let input_mono = if channels == 1 {
+        input
+    } else {
+        stereo_to_mono_i16(&input)
+    };
     if !only_pcm {
         if let Ok(mut guard) = writer.try_lock() {
             if let Some(writer) = guard.as_mut() {
