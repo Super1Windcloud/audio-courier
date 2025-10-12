@@ -41,10 +41,25 @@ fn main() {
             }
         }
         "macos" => {
+            let vosk_path = PathBuf::from("vosk-osx-0.3.42");
+
+            if !vosk_path.exists() {
+                println!("cargo:warning=Vosk macOS 库目录不存在: {:?}", vosk_path);
+                println!("cargo:warning=请将 libvosk.dylib 放在 vosk-osx/ 下");
+                return;
+            }
+            let out_dir = env::var("OUT_DIR").unwrap();
+            let target_dir = get_target_dir(&out_dir);
+            copy_dlls(&vosk_path, &target_dir);
+
+            println!("cargo:rustc-link-search=native={}", vosk_path.display());
+
             println!("cargo:rustc-link-lib=dylib=vosk");
+            println!("cargo:rustc-link-arg=-Wl,-rpath,@loader_path");
         }
         "linux" => {
-            println!("cargo:rustc-link-lib=dylib=vosk");
+            println!("cargo:rustc-link-lib=dylib=libvosk");
+            println!("cargo:rustc-link-arg=-Wl,-rpath,@loader_path");
         }
         _ => {
             println!("cargo:warning=暂时不支持的平台: {}", target_os);
@@ -120,6 +135,25 @@ fn copy_dlls(vosk_path: &Path, target_dir: &Path) {
 }
 
 #[cfg(not(windows))]
-fn copy_dlls(_vosk_path: &Path, _target_dir: &Path) {
-    // 非 Windows 平台不需要复制 DLL
+fn copy_dlls(vosk_path: &Path, target_dir: &Path) {
+    let dylib_name = "libvosk.dylib";
+    let src = vosk_path.join(dylib_name);
+    let dest = target_dir.join("debug").join(dylib_name);
+    let dest_release = target_dir.join("release").join(dylib_name);
+
+    if !src.exists() {
+        panic!(
+            "libvosk.dylib not found in {:?}, please download the macOS Vosk library",
+            vosk_path
+        );
+    }
+    std::fs::copy(&src, &dest_release).ok();
+    if let Err(e) = std::fs::copy(&src, &dest) {
+        panic!("Failed to copy {} to target: {}", dylib_name, e);
+    } else {
+        println!(
+            "Copied {} to {:?} so that the executable can load it at runtime",
+            dylib_name, target_dir
+        );
+    }
 }

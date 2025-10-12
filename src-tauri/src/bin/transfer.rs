@@ -36,12 +36,14 @@ fn main() {
     println!("录音识别已停止");
 }
 
+
+
 #[allow(dead_code)]
 fn select_input_config() -> Result<cpal::StreamConfig, String> {
     let device = cpal::default_host()
         .default_output_device()
         .ok_or("没有可用的输出设备")?;
-    let input_device=cpal::default_host()
+    let input_device = cpal::default_host()
         .default_input_device()
         .ok_or("没有可用的输入设备")?;
     let supported_configs = device
@@ -55,14 +57,12 @@ fn select_input_config() -> Result<cpal::StreamConfig, String> {
     }
     println!("输出设备支持的配置：");
 
-    let desired_sample_rate = cpal::SampleRate(44100);
+    let desired_sample_rate = cpal::SampleRate(16000);
 
     let mut best_config = None;
     for range in supported_configs {
         println!("{:?}", range);
-
-        if range.channels() == 1
-            && range.min_sample_rate() <= desired_sample_rate
+        if range.min_sample_rate() <= desired_sample_rate
             && range.max_sample_rate() >= desired_sample_rate
         {
             best_config = Some(range.with_sample_rate(desired_sample_rate).config());
@@ -83,15 +83,15 @@ fn select_input_config() -> Result<cpal::StreamConfig, String> {
     }
 
     if let Some(config) = best_config {
+        println!("选择输出设备配置：{:?}", config);
         Ok(config)
     } else {
         let fallback = device
-            .default_input_config()
+            .default_output_config()
             .map_err(|_| "没有可用的输入配置".to_string())?;
         Ok(fallback.config())
     }
 }
-
 
 #[test]
 fn output_device_config() {
