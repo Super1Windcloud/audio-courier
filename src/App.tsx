@@ -18,6 +18,17 @@ function Home() {
 
 function App() {
   const didRun = useRef(false);
+
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    document.addEventListener("contextmenu", handleContextMenu);
+    return () => {
+      document.removeEventListener("contextmenu", handleContextMenu);
+    };
+  }, []);
+
   useEffect(() => {
     if (didRun.current) return;
     didRun.current = true;

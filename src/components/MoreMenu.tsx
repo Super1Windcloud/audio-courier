@@ -147,6 +147,19 @@ export function MoreMenu() {
             />
           </DropdownMenuItem>
           <DropdownMenuItem
+            onClick={() => {
+              appState.updateUseBigModel(!appState.useBigModel);
+            }}
+            className="flex items-center bg-gray-600 !hover:bg-gray-600  justify-between"
+          >
+            <span>使用最强声学模型</span>
+            <input
+              type="checkbox"
+              checked={appState.useBigModel}
+              onChange={(e) => appState.updateUseBigModel(e.target.checked)}
+            />
+          </DropdownMenuItem>
+          <DropdownMenuItem
             onClick={(e) => e.stopPropagation()} // 防止输入时关闭菜单
             className="flex items-center justify-between gap-2"
           >

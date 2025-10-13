@@ -1,5 +1,4 @@
 use crate::loopback::{start_record_audio_with_writer, stop_recording, RecordParams};
-use crate::utils::write_some_log;
 use cpal::traits::{DeviceTrait, HostTrait};
 use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
@@ -57,6 +56,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     app: AppHandle,
     device_name: Option<String>,
     capture_interval: i32,
+    use_big_model: bool
 ) {
     let device = if let Some(name) = device_name {
         if name.contains("输入") {
@@ -78,7 +78,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
             app.emit("transcription_result", chunk).unwrap();
         })),
         use_drain_chunk_buffer: true,
-        use_big_model: true,
+        use_big_model: use_big_model,
     };
 
     if let Ok(handle) = start_record_audio_with_writer(params) {
@@ -134,11 +134,11 @@ pub fn find_model_path(big_model: bool) -> Option<String> {
     for path in &possible_paths {
         if !std::path::Path::new(path).exists() {
             eprintln!("找不到模型文件：{}", path);
-            write_some_log(format!("找不到模型文件：{}", path).as_str());
             return None;
         }
     }
     if big_model {
+        println!("使用大模型 vosk-model-cn-0.22");
         Some(possible_paths[0].to_string())
     } else {
         Some(possible_paths[1].to_string())

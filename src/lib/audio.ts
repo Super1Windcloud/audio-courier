@@ -96,12 +96,14 @@ export async function startAudioRecognition(
   onMessageCapture: (message: string) => void,
   audioDevice: string,
   captureInterval: number,
+  useBigModel: boolean,
 ) {
   if (audioDevice.includes("输出")) {
     return await startAudioLoopbackRecognition(
       onMessageCapture,
       audioDevice,
       captureInterval,
+      useBigModel
     );
   }
 

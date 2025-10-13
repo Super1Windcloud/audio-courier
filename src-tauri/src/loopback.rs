@@ -69,11 +69,9 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
     };
 
     let model_path = find_model_path(params.use_big_model).ok_or("未找到Vosk模型文件")?;
-    if is_dev() {
-        write_some_log(format!("Model path: {}", model_path).as_str());
-        if model_path == "未找到Vosk模型文件" {
-            std::process::exit(0);
-        }
+    write_some_log(format!("Model path: {}", model_path).as_str());
+    if model_path == "未找到Vosk模型文件" {
+        std::process::exit(0);
     }
 
     let model = Model::new(model_path).expect("Could not create the model");
@@ -118,7 +116,7 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
         write_some_log(format!("An error occurred on stream: {err}").as_str())
     };
     let chunk_size = (config.sample_rate().0 * params.capture_interval) as usize;
-    let channels = config.channels().clone();
+    let channels = config.channels();
     let stream = match config.sample_format() {
         cpal::SampleFormat::I16 => device
             .build_input_stream(

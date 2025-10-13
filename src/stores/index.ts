@@ -17,6 +17,8 @@ interface AppStateStore {
   updateScrollToBottom: (target: boolean) => void;
   captureInterval: number;
   updateCaptureInterval: (target: number) => void;
+  useBigModel: boolean;
+  updateUseBigModel: (target: boolean) => void;
 }
 
 const useAppStateStore = create<AppStateStore>((set) => ({
@@ -40,9 +42,13 @@ const useAppStateStore = create<AppStateStore>((set) => ({
     set({ isStartScrollToBottom: target });
   },
 
-  captureInterval: 3,
+  captureInterval: 2,
   updateCaptureInterval: (target: number) => {
     set({ captureInterval: target });
+  },
+  useBigModel: true,
+  updateUseBigModel: (target: boolean) => {
+    set({ useBigModel: target });
   },
 }));
 

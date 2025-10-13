@@ -30,8 +30,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       onSendMessage(inputText.trim());
       setInputText("");
       if (isRecording) {
-        clearVoskAcceptBuffer().then(() => {
-        });
+        clearVoskAcceptBuffer().then(() => {});
       }
     }
   };
@@ -50,6 +49,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         setInputText,
         appState.currentAudioChannel,
         appState.captureInterval,
+        appState.useBigModel
       );
     } else {
       setIsRecording(false);

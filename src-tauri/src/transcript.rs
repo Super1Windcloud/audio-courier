@@ -14,8 +14,6 @@ pub struct TranscriptionManager {
     buffer: Vec<i16>,
 }
 
-
-
 #[allow(dead_code)]
 impl TranscriptionManager {
     pub fn new_vosk(model_path: String) -> Self {

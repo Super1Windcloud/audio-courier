@@ -41,6 +41,10 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "resources": {
+      "vosk-win64-0.3.45/*.dll": "",
+      "vosk-model-small-cn-0.22": "vosk-model-small-cn-0.22"
+    }
   }
 }

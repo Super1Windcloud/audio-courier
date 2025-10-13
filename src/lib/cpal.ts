@@ -8,6 +8,7 @@ export async function startAudioLoopbackRecognition(
   onMessageCapture: (message: string) => void,
   audioDevice: string,
   captureInterval: number,
+  useBigModel: boolean,
 ) {
   if (unlistener) {
     unlistener();
@@ -24,6 +25,7 @@ export async function startAudioLoopbackRecognition(
   await invoke("start_recognize_audio_stream_from_speaker_loopback", {
     deviceName: audioDevice,
     captureInterval,
+    useBigModel,
   }).catch((err) => {
     console.error("invoke start output audio recognition failed", err);
   });
