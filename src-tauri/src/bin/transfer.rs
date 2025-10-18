@@ -1,4 +1,5 @@
 use cpal::traits::{DeviceTrait, HostTrait};
+use std::sync::Arc;
 use tauri_courier_ai_lib::{
     clear_vosk_accept_buffer, get_audio_stream_devices_names, get_record_handle,
     start_record_audio_with_writer, stop_recording, RecordParams,
@@ -10,10 +11,12 @@ fn main() {
         device: device.to_string(),
         file_name: "".to_string(),
         only_pcm: true,
-        capture_interval: 2,
-        pcm_callback: Some(Box::new(move |chunk: &str| println!("{:?}", chunk))),
+        capture_interval: 1,
+        pcm_callback: Some(Arc::new(move |chunk: &str| println!("{:?}", chunk))),
         use_drain_chunk_buffer: true,
         use_big_model: true,
+        use_remote_model: false,
+        xunfei_tx: None,
     };
 
     if let Ok(handle) = start_record_audio_with_writer(params) {
@@ -23,6 +26,7 @@ fn main() {
     } else {
         eprintln!("录音线程启动失败 ❌");
     }
+
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).unwrap();
     clear_vosk_accept_buffer();

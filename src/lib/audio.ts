@@ -97,13 +97,17 @@ export async function startAudioRecognition(
   audioDevice: string,
   captureInterval: number,
   useBigModel: boolean,
+  useRemoteModelTranscribe: boolean,
+  useResamplePCMBuffer: boolean,
 ) {
   if (audioDevice.includes("输出")) {
     return await startAudioLoopbackRecognition(
       onMessageCapture,
       audioDevice,
       captureInterval,
-      useBigModel
+      useBigModel,
+      useRemoteModelTranscribe,
+      useResamplePCMBuffer
     );
   }
 

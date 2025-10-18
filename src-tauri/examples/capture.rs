@@ -2,7 +2,11 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Sample;
 use dasp::sample::ToSample;
 use hound::WavWriter;
-use rubato::{FftFixedIn, Resampler};
+use rubato::{
+    ResampleError, Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType,
+    WindowFunction,
+};
+use samplerate_rs::{convert, ConverterType};
 use std::fs::File;
 use std::io::BufWriter;
 use std::sync::{Arc, Mutex};
@@ -53,7 +57,7 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
             .find(|x| x.name().map(|y| y == name).unwrap_or(false)),
     }
     .ok_or_else(|| "无法找到输出设备".to_string())?;
-    let config = select_output_config().unwrap();
+    let config = select_output_config()?;
 
     const PATH_F32_STEREO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/recorded_f32_stereo.wav");
     const PATH_F32_MONO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/recorded_f32_mono.wav");
@@ -130,6 +134,8 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
     )));
 
     let err_fn = |err| eprintln!("🎧 音频流错误: {err}");
+    let channels = config.channels() as usize;
+    let sample_rate = config.sample_rate().0 as usize;
 
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device.build_input_stream(
@@ -141,10 +147,12 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
                 let i16_mono = i16_mono.clone();
                 let i16_resample_stereo = i16_resample_stereo.clone();
                 let i16_resample_mono = i16_resample_mono.clone();
+                let mut audio_buffer = AudioBuffer::new(channels, sample_rate);
 
                 move |data: &[f32], _: &_| {
-                    write_all_formats(
+                    handle_audio_input(
                         data,
+                        &mut audio_buffer,
                         &f32_stereo,
                         &f32_mono,
                         &i16_stereo,
@@ -164,10 +172,12 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
                 let f32_mono = f32_mono.clone();
                 let i16_stereo = i16_stereo.clone();
                 let i16_mono = i16_mono.clone();
+                let mut audio_buffer = AudioBuffer::new(channels, sample_rate);
 
                 move |data: &[i16], _: &_| {
-                    write_all_formats(
+                    handle_audio_input(
                         data,
+                        &mut audio_buffer,
                         &f32_stereo,
                         &f32_mono,
                         &i16_stereo,
@@ -217,9 +227,10 @@ fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec 
 
 type WavWriterHandle = Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>;
 
-/// 写入所有四种格式（f32/i16 单/双通道）
-fn write_all_formats<T>(
+#[allow(clippy::too_many_arguments)]
+fn handle_audio_input<T>(
     input: &[T],
+    buffer: &mut AudioBuffer<T>,
     f32_stereo: &WavWriterHandle,
     f32_mono: &WavWriterHandle,
     i16_stereo: &WavWriterHandle,
@@ -229,71 +240,110 @@ fn write_all_formats<T>(
 ) where
     T: Sample + ToSample<f32> + ToSample<i16>,
 {
-    // 转换
+    buffer.push_samples(input);
+
+    if buffer.is_full() {
+        let chunk = buffer.drain_chunk();
+        write_all_formats(
+            &chunk,
+            f32_stereo,
+            f32_mono,
+            i16_stereo,
+            i16_mono,
+            i16_stereo_resample,
+            i16_mono_resample,
+        );
+    }
+}
+
+/// 写入所有四种格式（f32/i16 单/双通道）
+fn write_all_formats<T>(
+    input: &[T],
+    f32_stereo: &WavWriterHandle,
+    f32_mono: &WavWriterHandle,
+    i16_stereo: &WavWriterHandle,
+    i16_mono: &WavWriterHandle,
+    _i16_stereo_resample: &Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
+    i16_mono_resample: &Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
+) where
+    T: Sample + ToSample<f32> + ToSample<i16>,
+{
     let stereo_f32: Vec<f32> = input.iter().map(|s| s.to_sample::<f32>()).collect();
     let stereo_i16: Vec<i16> = input.iter().map(|s| s.to_sample::<i16>()).collect();
     let mono_f32 = stereo_to_mono_f32(&stereo_f32);
     let mono_i16 = stereo_to_mono_i16(&stereo_i16);
     let input_rate = 44100;
     let output_rate = 16000;
-    let resampled_stereo_f32 = resample_audio(&stereo_f32, input_rate, output_rate, 2);
-    let resampled_mono_f32 = resample_audio(&mono_f32, input_rate, output_rate, 1);
-
-    let resampled_stereo_i16: Vec<i16> = resampled_stereo_f32
-        .iter()
-        .map(|s| (*s * i16::MAX as f32) as i16)
-        .collect();
-    let resampled_mono_i16: Vec<i16> = resampled_mono_f32
-        .iter()
-        .map(|s| (*s * i16::MAX as f32) as i16)
-        .collect();
+    let resampled_mono_i16 =
+        resample_audio_by_samplerate(&mono_f32, input_rate, output_rate, 1).unwrap();
 
     write_samples(&stereo_f32, f32_stereo);
     write_samples(&mono_f32, f32_mono);
     write_samples(&stereo_i16, i16_stereo);
     write_samples(&mono_i16, i16_mono);
-    write_samples(&resampled_stereo_i16, i16_stereo_resample);
     write_samples(&resampled_mono_i16, i16_mono_resample);
 }
 
-fn resample_audio(
+fn resample_audio_by_samplerate(
+    input: &[f32],
+    from_rate: usize,
+    target_rate: usize,
+    channels: usize,
+) -> Result<Vec<i16>, ResampleError> {
+    let resampled = convert(
+        from_rate as u32,
+        target_rate as u32,
+        channels,
+        ConverterType::Linear,
+        input,
+    )
+    .unwrap();
+    let resampled = resampled
+        .iter()
+        .map(|&s| s.to_sample::<i16>())
+        .collect::<Vec<i16>>();
+    Ok(resampled)
+}
+
+fn resample_audio_rubato(
     input: &[f32],
     input_rate: usize,
     output_rate: usize,
     channels: usize,
-) -> Vec<f32> {
-    if input_rate == output_rate {
-        return input.to_vec();
-    }
-
-    // 将 interleaved 格式转换为 per-channel
-    let mut separated: Vec<Vec<f32>> = vec![Vec::new(); channels];
-    for frame in input.chunks(channels) {
-        for (ch, &sample) in frame.iter().enumerate() {
-            separated[ch].push(sample);
-        }
-    }
-
-    let mut resampler = FftFixedIn::<f32>::new(
-        input_rate,
-        output_rate,
-        separated[0].len(),
-        separated[0].len(),
+) -> Result<Vec<i16>, ResampleError> {
+    let params = SincInterpolationParameters {
+        sinc_len: 256,
+        f_cutoff: 0.95,
+        interpolation: SincInterpolationType::Linear,
+        oversampling_factor: 256,
+        window: WindowFunction::BlackmanHarris2,
+    };
+    let mut resampler = SincFixedIn::<f32>::new(
+        output_rate as f64 / input_rate as f64,
+        2.0,
+        params,
+        input_rate * channels,
         channels,
     )
     .unwrap();
+    let split: Vec<Vec<f32>> = (0..channels)
+        .map(|ch| {
+            input
+                .iter()
+                .skip(ch)
+                .step_by(channels)
+                .cloned()
+                .collect::<Vec<f32>>()
+        })
+        .collect();
 
-    let output = resampler.process(&separated, None).unwrap();
+    let waves_out = resampler.process(&split, None)?;
+    let resampled = waves_out
+        .iter()
+        .flat_map(|w| w.iter().map(|&s| s.to_sample::<i16>()))
+        .collect::<Vec<i16>>();
 
-    // 再次 interleave 成 [L, R, L, R, ...]
-    let mut interleaved = Vec::with_capacity(output[0].len() * channels);
-    for i in 0..output[0].len() {
-        for ch in 0..channels {
-            interleaved.push(output[ch][i]);
-        }
-    }
-
-    interleaved
+    Ok(resampled)
 }
 
 /// 写入任意类型数据
@@ -340,10 +390,44 @@ fn finalize_all(writers: &[&WavWriterHandle]) {
     }
 }
 
+/// 用于缓存音频块
+struct AudioBuffer<T> {
+    data: Vec<T>,
+    sample_rate: usize,
+    channels: usize,
+}
+
+impl<T> AudioBuffer<T>
+where
+    T: Sample + Clone + ToSample<f32> + ToSample<i16>,
+{
+    fn new(sample_rate: usize, channels: usize) -> Self {
+        Self {
+            data: Vec::with_capacity(sample_rate * channels),
+            sample_rate,
+            channels,
+        }
+    }
+
+    fn push_samples(&mut self, samples: &[T]) {
+        self.data.extend_from_slice(samples);
+    }
+
+    fn is_full(&self) -> bool {
+        self.data.len() >= self.sample_rate * self.channels
+    }
+
+    fn drain_chunk(&mut self) -> Vec<T> {
+        self.data
+            .drain(..self.sample_rate * self.channels)
+            .collect()
+    }
+}
+
 fn main() {
     let params = RecordParams {
         device: "default".into(),
-        duration: 10,
+        duration: 20,
     };
 
     if let Err(e) = record_audio(params) {

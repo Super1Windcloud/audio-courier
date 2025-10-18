@@ -9,6 +9,8 @@ export async function startAudioLoopbackRecognition(
   audioDevice: string,
   captureInterval: number,
   useBigModel: boolean,
+  useRemoteModelTranscribe: boolean,
+  useResamplePCMBuffer: boolean,
 ) {
   if (unlistener) {
     unlistener();
@@ -26,6 +28,8 @@ export async function startAudioLoopbackRecognition(
     deviceName: audioDevice,
     captureInterval,
     useBigModel,
+    useRemoteModel: useRemoteModelTranscribe,
+    useResampled: useResamplePCMBuffer,
   }).catch((err) => {
     console.error("invoke start output audio recognition failed", err);
   });

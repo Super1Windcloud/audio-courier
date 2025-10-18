@@ -1,16 +1,21 @@
+extern crate core;
+
 mod audio_stream;
 mod llm;
 mod loopback;
-mod loopback_crossbeam;
+mod loopback_resample;
 mod transcript;
 mod utils;
+mod constant;
+pub use constant::*;
 pub use audio_stream::*;
 use dotenv::{dotenv, from_filename};
-use llm::*;
+pub use llm::*;
 pub use loopback::*;
 use std::path::PathBuf;
 use tauri::{LogicalSize, Manager};
 use utils::*;
+
 #[tauri::command]
 fn show_window(window: tauri::Window) -> Result<(), String> {
     if window.is_visible().unwrap() {

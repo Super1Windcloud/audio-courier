@@ -4,9 +4,15 @@ use std::path::PathBuf;
 use vosk::{Model, Recognizer};
 
 fn main() {
+    let model_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vosk-model-small-cn-0.22");
     let model_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vosk-model-cn-0.22");
     let model_path = model_path.to_str().unwrap();
+    //Resample Time elapsed: 9.335443s
+    // Normal Time elapsed 11.8
+
     let wav_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("recorded_i16_mono.wav");
+    let wav_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("recorded_i16_mono_resample.wav");
+
     let wav_path = wav_path.to_str().unwrap();
     let mut reader =
         WavReader::open(wav_path).expect(format!("Could not open wav file: {}", wav_path).as_str());

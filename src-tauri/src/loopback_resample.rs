@@ -1,7 +1,11 @@
 #![allow(clippy::tabs_in_doc_comments)]
 
 use crate::audio_stream::find_model_path;
-use crate::utils::{is_dev, select_output_config, write_some_log};
+use crate::utils::{is_dev, resample_audio_by_samplerate, select_output_config, write_some_log};
+use crate::{
+    PcmCallback, RTASRClient, RecordParams, ACCESS_KEY_ID, ACCESS_KEY_SECRET, APP_ID,
+    CLEAR_RECORDING, RECORDING, RESAMPLE_RATE, TARGET_SAMPLE_RATE,
+};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{ChannelCount, FromSample, Sample};
 use dasp::sample::ToSample;
@@ -9,40 +13,23 @@ use std::env;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::thread::JoinHandle;
 use vosk::{Model, Recognizer};
 
-/** static 全局变量，用于控制录音线程的状态
-名称    中文含义	常用于	作用
-Relaxed	无序	计数器等简单情况	只保证原子性，不保证顺序
-Acquire	获取（读时）	加锁、读取信号	保证之后的操作不能被重排到它前面
-Release	释放（写时）	解锁、发信号	保证之前的操作不能被重排到它后面
-AcqRel	获取+释放	原子交换等	同时具有 Acquire 和 Release 效果
-SeqCst	顺序一致	强制全局顺序	所有线程都按统一顺序观察所有原子操作
- */
-pub static RECORDING: AtomicBool = AtomicBool::new(true);
-pub static CLEAR_RECORDING: AtomicBool = AtomicBool::new(false);
-
-#[derive(Default)]
-pub struct RecordParams {
-    pub device: String,
-    pub file_name: String,
-    pub only_pcm: bool,
-    pub capture_interval: u32,
-    pub pcm_callback: Option<PcmCallback>,
-    pub use_drain_chunk_buffer: bool,
-    pub use_big_model: bool,
-    pub use_remote_model: bool,
-    pub xunfei_tx: Option<Sender<Vec<i16>>>,
+thread_local! {
+    static PCM_BUFFER: Mutex<Vec<f32>> = const { Mutex::new(Vec::new()) };
 }
 
-// ARC 多线程共享
-pub type PcmCallback = Arc<dyn Fn(&str) + Send + Sync + 'static>;
+use std::sync::LazyLock;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::Sender;
 
-pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
+static TOTAL_SAMPLES_WRITTEN: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
+
+pub fn record_audio_worker_resampled(mut params: RecordParams) -> Result<(), String> {
     let host = cpal::default_host();
     RECORDING.store(true, Ordering::SeqCst);
 
@@ -100,8 +87,8 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
     }
 
     let model = Model::new(model_path).expect("Could not create the model");
-    let mut recognizer = Recognizer::new(&model, config.sample_rate().0 as f32)
-        .expect("Could not create the Recognizer");
+    let mut recognizer =
+        Recognizer::new(&model, RESAMPLE_RATE as f32).expect("Could not create the Recognizer");
 
     recognizer.set_max_alternatives(1);
     recognizer.set_partial_words(false);
@@ -111,11 +98,9 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
     let recognizer = Arc::new(Mutex::new(recognizer));
     let recognizer_clone = recognizer.clone();
 
-    let spec_f32_stereo = wav_spec_from_config(&config);
-
     let spec_i16_mono = hound::WavSpec {
         channels: 1,
-        sample_rate: spec_f32_stereo.sample_rate,
+        sample_rate: RESAMPLE_RATE,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
@@ -140,9 +125,8 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
         eprintln!("An error occurred on stream: {err}");
         write_some_log(format!("An error occurred on stream: {err}").as_str())
     };
-    let chunk_size = (config.sample_rate().0 * params.capture_interval) as usize;
+    let chunk_size = (RESAMPLE_RATE * params.capture_interval) as usize;
     let channels = config.channels();
-    let sample_rate = config.sample_rate().0;
     let stream = match config.sample_format() {
         cpal::SampleFormat::I16 => device
             .build_input_stream(
@@ -157,7 +141,7 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
                         chunk_size,
                         params.use_drain_chunk_buffer,
                         channels,
-                        sample_rate,
+                        RESAMPLE_RATE,
                         params.xunfei_tx.clone(),
                     )
                 },
@@ -178,7 +162,7 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
                         chunk_size,
                         params.use_drain_chunk_buffer,
                         channels,
-                        sample_rate,
+                        RESAMPLE_RATE,
                         params.xunfei_tx.clone(),
                     )
                 },
@@ -220,16 +204,6 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
 
     Ok(())
 }
-
-thread_local! {
-    static PCM_BUFFER: Mutex<Vec<f32>> = const { Mutex::new(Vec::new()) };
-}
-use crate::{RTASRClient, ACCESS_KEY_ID, ACCESS_KEY_SECRET, APP_ID};
-use std::sync::LazyLock;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::Sender;
-
-pub static TOTAL_SAMPLES_WRITTEN: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
 
 #[allow(clippy::too_many_arguments)]
 fn handle_input_data<T, U>(
@@ -291,8 +265,6 @@ fn handle_input_data<T, U>(
                 sample_rate,
                 xunfei_tx,
             )
-        } else {
-            use_collected_pcm_to_writer(&mut buf, chunk_size, pcm_callback, only_pcm, recognizer)
         }
     });
 }
@@ -324,10 +296,14 @@ fn drain_chunk_buffer_to_writer(
             );
         }
 
-        let chunk = chunk
-            .iter()
-            .map(|&x| x.to_sample::<i16>())
-            .collect::<Vec<i16>>();
+        let chunk = resample_audio_by_samplerate(
+            &chunk,
+            _sample_rate as usize,
+            TARGET_SAMPLE_RATE.parse().unwrap(),
+            1,
+            chunk_size,
+        )
+        .unwrap();
 
         if only_pcm {
             if let Some(ref callback) = pcm_callback {
@@ -351,47 +327,6 @@ fn drain_chunk_buffer_to_writer(
     }
 }
 
-fn use_collected_pcm_to_writer(
-    buf: &mut MutexGuard<Vec<f32>>,
-    chunk_size: usize,
-    pcm_callback: Option<PcmCallback>,
-    only_pcm: bool,
-    recognizer: &mut MutexGuard<Recognizer>,
-) {
-    if buf.len() >= chunk_size + *TOTAL_SAMPLES_WRITTEN.lock().unwrap() as usize {
-        if is_dev() {
-            *TOTAL_SAMPLES_WRITTEN.lock().unwrap() = buf.len() as i32;
-            let title = *TOTAL_SAMPLES_WRITTEN.lock().unwrap();
-            let used_kb = title as f64 / 1024.0;
-            let used_mb = used_kb / 1024.0;
-
-            println!(
-                "缓冲区当前使用: {} 个样本, {:.2} KB, {:.2} MB",
-                buf.len(),
-                used_kb,
-                used_mb
-            );
-        }
-        if only_pcm {
-            let chunk = buf
-                .iter()
-                .map(|&x| x.to_sample::<i16>())
-                .collect::<Vec<i16>>();
-            if let Some(callback) = pcm_callback {
-                recognizer.reset();
-                recognizer.accept_waveform(&chunk).unwrap();
-                if CLEAR_RECORDING.load(Ordering::SeqCst) {
-                    recognizer.reset();
-                    *TOTAL_SAMPLES_WRITTEN.lock().unwrap() = 0;
-                    buf.clear();
-                    CLEAR_RECORDING.store(false, Ordering::SeqCst);
-                }
-                let partial = recognizer.partial_result().partial;
-                callback(partial);
-            }
-        }
-    }
-}
 fn stereo_to_mono_i16(samples: &[i16]) -> Vec<i16> {
     if samples.len() < 2 {
         return samples.to_vec();
@@ -411,88 +346,15 @@ fn stereo_to_mono_f32(samples: &[f32]) -> Vec<f32> {
         .collect()
 }
 
-fn sample_format(format: cpal::SampleFormat) -> hound::SampleFormat {
-    if format.is_float() {
-        hound::SampleFormat::Float
-    } else {
-        hound::SampleFormat::Int
-    }
-}
-
-fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec {
-    hound::WavSpec {
-        channels: config.channels() as _,
-        sample_rate: config.sample_rate().0 as _,
-        bits_per_sample: (config.sample_format().sample_size() * 8) as _,
-        sample_format: sample_format(config.sample_format()),
-    }
-}
-
 type WavWriterHandle = Arc<Mutex<Option<hound::WavWriter<BufWriter<File>>>>>;
 
-pub fn stop_recording(handle: JoinHandle<()>) {
-    RECORDING.store(false, Ordering::SeqCst);
-    println!("停止信号已发送，等待录音线程退出...");
-    handle.join().expect("无法 join 录音线程");
-    println!("录音线程已退出 ✅");
-}
-
-#[tauri::command]
-pub fn clear_vosk_accept_buffer() {
-    CLEAR_RECORDING.store(true, Ordering::SeqCst);
-    println!("清空 Vosk 接受缓存");
-}
-
-pub fn start_record_audio_with_writer(params: RecordParams) -> Result<JoinHandle<()>, String> {
+pub fn start_record_audio_with_writer_resampled(
+    params: RecordParams,
+) -> Result<JoinHandle<()>, String> {
     let handle = thread::spawn(move || {
-        if let Err(e) = record_audio_worker(params) {
+        if let Err(e) = record_audio_worker_resampled(params) {
             eprintln!("录音线程出错: {e}");
         }
     });
     Ok(handle)
-}
-
-#[test]
-fn test_record_audio_with_writer() {
-    let params = RecordParams {
-        device: String::from("default"),
-        file_name: "".to_string(),
-        only_pcm: true,
-        capture_interval: 2,
-        pcm_callback: Some(Arc::new(|_pcm_data| {})),
-        use_drain_chunk_buffer: true,
-        use_big_model: true,
-        use_remote_model: false,
-        xunfei_tx: None,
-    };
-
-    if let Err(e) = start_record_audio_with_writer(params) {
-        eprintln!("Error: {e}");
-    }
-    println!("Enter to stop recording...");
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input).unwrap();
-}
-
-#[test]
-fn test_output_path() {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/recorded.wav");
-    let path = if cfg!(windows) {
-        path.replace("/", "\\")
-    } else {
-        path.to_string()
-    };
-
-    println!("Output path: {}", path);
-}
-
-#[test]
-fn output_format_config() {
-    let host = cpal::default_host();
-    let device = host.default_output_device().unwrap();
-    let input_device = host.default_input_device().unwrap();
-    let config = device.default_output_config().unwrap();
-    let input_config = input_device.default_input_config().unwrap();
-    println!("Default output config: {config:?}");
-    println!("Default input config: {input_config:?}");
 }

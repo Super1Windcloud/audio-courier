@@ -1,4 +1,7 @@
 use cpal::traits::{DeviceTrait, HostTrait};
+use cpal::Sample;
+use rubato::ResampleError;
+use samplerate_rs::{convert, ConverterType};
 use std::collections::HashMap;
 use std::env;
 use std::fs::OpenOptions;
@@ -89,4 +92,38 @@ pub fn select_output_config() -> Result<cpal::SupportedStreamConfig, String> {
 
     println!("使用默认输出配置：{:?}", fallback);
     Ok(fallback)
+}
+
+#[allow(unused)]
+pub fn resample_audio_by_samplerate(
+    input: &[f32],
+    from_rate: usize,
+    target_rate: usize,
+    channels: usize,
+    chunk_size: usize,
+) -> Result<Vec<i16>, ResampleError> {
+    if input.len() < chunk_size {
+        return Ok(vec![]);
+    }
+    let resampled = convert(
+        from_rate as u32,
+        target_rate as u32,
+        channels,
+        ConverterType::Linear,
+        input,
+    )
+    .unwrap();
+
+    if is_dev() {
+        println!(
+            "Original len: {}, Resampled len: {}, Expected len: {}",
+            input.len(),
+            resampled.len(),
+            (input.len() as f32 / from_rate as f32 * target_rate as f32) as usize
+        );
+    }
+
+    let resampled = input.iter().map(|&x| x.to_sample::<i16>()).collect();
+
+    Ok(resampled)
 }

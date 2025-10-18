@@ -10,3 +10,5 @@ target
 *.mp3
 
 app.log
+
+src/constant.rs

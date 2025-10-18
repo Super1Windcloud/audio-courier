@@ -152,11 +152,45 @@ export function MoreMenu() {
             }}
             className="flex items-center bg-gray-600 !hover:bg-gray-600  justify-between"
           >
-            <span>使用最强声学模型</span>
+            <span>启动最强声学模型</span>
             <input
               type="checkbox"
               checked={appState.useBigModel}
               onChange={(e) => appState.updateUseBigModel(e.target.checked)}
+            />
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
+              appState.updateUseRemoteModelTranscribe(
+                !appState.useRemoteModelTranscribe,
+              );
+            }}
+            className="flex items-center bg-gray-600 !hover:bg-gray-600  justify-between"
+          >
+            <span>启动远程模型</span>
+            <input
+              type="checkbox"
+              checked={appState.useRemoteModelTranscribe}
+              onChange={(e) =>
+                appState.updateUseRemoteModelTranscribe(e.target.checked)
+              }
+            />
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
+              appState.updateUseResamplePCMBuffer(
+                !appState.useResamplePCMBuffer,
+              );
+            }}
+            className="flex items-center bg-gray-600 !hover:bg-gray-600  justify-between"
+          >
+            <span>启动PCM重采样</span>
+            <input
+              type="checkbox"
+              checked={appState.useResamplePCMBuffer}
+              onChange={(e) =>
+                appState.updateUseResamplePCMBuffer(e.target.checked)
+              }
             />
           </DropdownMenuItem>
           <DropdownMenuItem

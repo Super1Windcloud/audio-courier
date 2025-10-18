@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { SendHorizontal, Mic, Trash2 } from "lucide-react";
-import { Input } from "@/components/ui/input";
 
 import { Message } from "@/components/ChatContainer.tsx";
 import { startAudioRecognition, stopAudioRecognition } from "@/lib/audio.ts";
 import useAppStateStore from "@/stores";
 import { MoreMenu } from "@/components/MoreMenu.tsx";
 import { clearVoskAcceptBuffer } from "@/lib/cpal.ts";
+import { Textarea } from "@/components/ui/textarea.tsx";
 
 interface MessageInputProps {
   onSendMessage: (text: string) => void;
@@ -23,6 +23,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [inputText, setInputText] = useState("");
   const appState = useAppStateStore();
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSend = () => {
     if (inputText.trim()) {
@@ -34,6 +35,25 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       }
     }
   };
+
+  useEffect(() => {
+    if (!inputText.trim()) return;
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(
+      () => {
+        handleSend();
+      },
+      appState.captureInterval * 1000 + 1000,
+    );
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [inputText]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -49,7 +69,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         setInputText,
         appState.currentAudioChannel,
         appState.captureInterval,
-        appState.useBigModel
+        appState.useBigModel,
+        appState.useRemoteModelTranscribe,
+        appState.useResamplePCMBuffer
       );
     } else {
       setIsRecording(false);
@@ -61,12 +83,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setIsTyping(isRecording);
   }, [isRecording]);
 
-  const handleClearConversation = async () => {
+  const handleClearConversation = () => {
     setInputText("");
-    setIsRecording(false);
-    if (isRecording) {
-      await stopAudioRecognition(appState.currentAudioChannel);
-    }
+    // setIsRecording(false);
+    // if (isRecording) {
+    //   await stopAudioRecognition(appState.currentAudioChannel);
+    // }
     onClearConversation();
   };
 
@@ -77,12 +99,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       backdrop-blur-xl  bg-white/10 border border-white/10"
     >
       <div className="flex border-none items-center space-x-2">
-        <Input
+        <Textarea
           value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
+          onChange={(e) => {
+            setInputText(e.target.value);
+            e.currentTarget.style.height = "auto"; // 先重置
+            e.currentTarget.style.height = e.currentTarget.scrollHeight + "px"; // 根据内容调整
+          }}
           onKeyDown={handleKeyPress}
           placeholder="输入消息..."
-          className="flex-1 text-white border-none focus-visible:ring-0   placeholder:text-gray-300 focus-visible:ring-offset-0"
+          rows={1}
+          className="flex-1 resize-none overflow-hidden text-white border-none focus-visible:ring-0 placeholder:text-gray-300 focus-visible:ring-offset-0 bg-transparent"
         />
 
         <span title={isRecording ? "停止语音" : "开始语音"}>

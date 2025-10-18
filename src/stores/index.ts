@@ -19,6 +19,11 @@ interface AppStateStore {
   updateCaptureInterval: (target: number) => void;
   useBigModel: boolean;
   updateUseBigModel: (target: boolean) => void;
+  useRemoteModelTranscribe: boolean;
+  updateUseRemoteModelTranscribe: (target: boolean) => void;
+
+  useResamplePCMBuffer: boolean;
+  updateUseResamplePCMBuffer: (target: boolean) => void;
 }
 
 const useAppStateStore = create<AppStateStore>((set) => ({
@@ -42,13 +47,22 @@ const useAppStateStore = create<AppStateStore>((set) => ({
     set({ isStartScrollToBottom: target });
   },
 
-  captureInterval: 2,
+  captureInterval: 1,
   updateCaptureInterval: (target: number) => {
     set({ captureInterval: target });
   },
   useBigModel: true,
   updateUseBigModel: (target: boolean) => {
     set({ useBigModel: target });
+  },
+  useRemoteModelTranscribe: false,
+  updateUseRemoteModelTranscribe: (target: boolean) => {
+    set({ useRemoteModelTranscribe: target });
+  },
+
+  useResamplePCMBuffer: false,
+  updateUseResamplePCMBuffer: (target: boolean) => {
+    set({ useResamplePCMBuffer: target });
   },
 }));
 
