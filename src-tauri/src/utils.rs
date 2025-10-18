@@ -109,7 +109,7 @@ pub fn resample_audio_by_samplerate(
         from_rate as u32,
         target_rate as u32,
         channels,
-        ConverterType::Linear,
+        ConverterType::SincBestQuality,
         input,
     )
     .unwrap();

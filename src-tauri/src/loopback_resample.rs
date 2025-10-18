@@ -4,7 +4,7 @@ use crate::audio_stream::find_model_path;
 use crate::utils::{is_dev, resample_audio_by_samplerate, select_output_config, write_some_log};
 use crate::{
     PcmCallback, RTASRClient, RecordParams, ACCESS_KEY_ID, ACCESS_KEY_SECRET, APP_ID,
-    CLEAR_RECORDING, RECORDING, RESAMPLE_RATE, TARGET_SAMPLE_RATE,
+    CLEAR_RECORDING, RECORDING, RESAMPLE_RATE,
 };
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{ChannelCount, FromSample, Sample};
@@ -85,10 +85,11 @@ pub fn record_audio_worker_resampled(mut params: RecordParams) -> Result<(), Str
             });
         });
     }
+    let sample_rate = config.sample_rate().0;
 
     let model = Model::new(model_path).expect("Could not create the model");
     let mut recognizer =
-        Recognizer::new(&model, RESAMPLE_RATE as f32).expect("Could not create the Recognizer");
+        Recognizer::new(&model, sample_rate as f32).expect("Could not create the Recognizer");
 
     recognizer.set_max_alternatives(1);
     recognizer.set_partial_words(false);
@@ -100,7 +101,7 @@ pub fn record_audio_worker_resampled(mut params: RecordParams) -> Result<(), Str
 
     let spec_i16_mono = hound::WavSpec {
         channels: 1,
-        sample_rate: RESAMPLE_RATE,
+        sample_rate: config.sample_rate().0,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
@@ -125,7 +126,7 @@ pub fn record_audio_worker_resampled(mut params: RecordParams) -> Result<(), Str
         eprintln!("An error occurred on stream: {err}");
         write_some_log(format!("An error occurred on stream: {err}").as_str())
     };
-    let chunk_size = (RESAMPLE_RATE * params.capture_interval) as usize;
+    let chunk_size = (config.sample_rate().0 * params.capture_interval) as usize;
     let channels = config.channels();
     let stream = match config.sample_format() {
         cpal::SampleFormat::I16 => device
@@ -141,7 +142,7 @@ pub fn record_audio_worker_resampled(mut params: RecordParams) -> Result<(), Str
                         chunk_size,
                         params.use_drain_chunk_buffer,
                         channels,
-                        RESAMPLE_RATE,
+                        sample_rate,
                         params.xunfei_tx.clone(),
                     )
                 },
@@ -162,7 +163,7 @@ pub fn record_audio_worker_resampled(mut params: RecordParams) -> Result<(), Str
                         chunk_size,
                         params.use_drain_chunk_buffer,
                         channels,
-                        RESAMPLE_RATE,
+                        sample_rate,
                         params.xunfei_tx.clone(),
                     )
                 },
@@ -181,7 +182,7 @@ pub fn record_audio_worker_resampled(mut params: RecordParams) -> Result<(), Str
         .map_err(|e| format!("Failed to play stream: {e}"))?;
 
     while RECORDING.load(Ordering::SeqCst) {
-        thread::sleep(std::time::Duration::from_millis(100));
+        thread::sleep(std::time::Duration::from_millis(300));
     }
 
     drop(stream);
@@ -299,7 +300,7 @@ fn drain_chunk_buffer_to_writer(
         let chunk = resample_audio_by_samplerate(
             &chunk,
             _sample_rate as usize,
-            TARGET_SAMPLE_RATE.parse().unwrap(),
+            RESAMPLE_RATE as usize,
             1,
             chunk_size,
         )
