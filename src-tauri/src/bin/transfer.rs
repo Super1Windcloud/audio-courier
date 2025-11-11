@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use cpal::traits::{DeviceTrait, HostTrait};
 use std::sync::{Arc, Mutex};
 use tauri_courier_ai_lib::{
@@ -44,65 +45,64 @@ fn main() {
     println!("录音识别已停止");
 }
 
-#[allow(dead_code)]
-fn select_input_config() -> Result<cpal::StreamConfig, String> {
-    let names = get_audio_stream_devices_names()?;
-    for (i, name) in names.iter().enumerate() {
-        println!("{}: {}", i, name);
-    }
-    let device = cpal::default_host()
-        .default_output_device()
-        .ok_or("没有可用的输出设备")?;
-    let input_device = cpal::default_host()
-        .default_input_device()
-        .ok_or("没有可用的输入设备")?;
+#[test]
+fn output_device_config() {
+    fn select_input_config() -> Result<cpal::StreamConfig, String> {
+        let names = get_audio_stream_devices_names()?;
+        for (i, name) in names.iter().enumerate() {
+            println!("{}: {}", i, name);
+        }
+        let device = cpal::default_host()
+            .default_output_device()
+            .ok_or("没有可用的输出设备")?;
+        let input_device = cpal::default_host()
+            .default_input_device()
+            .ok_or("没有可用的输入设备")?;
 
-    let supported_configs = device
-        .supported_output_configs()
-        .map_err(|_| "无法获取输入设备配置".to_string())?;
-    {
-        println!("默认输出");
-        println!("{:?}", device.default_output_config().unwrap());
-        println!("默认输入");
-        println!("{:?}", input_device.default_input_config().unwrap());
-    }
-    println!("输出设备支持的配置：");
-
-    let desired_sample_rate = cpal::SampleRate(16000);
-
-    let mut best_config = None;
-    for range in supported_configs {
-        println!("{:?}", range);
-        if range.min_sample_rate() <= desired_sample_rate
-            && range.max_sample_rate() >= desired_sample_rate
+        let supported_configs = device
+            .supported_output_configs()
+            .map_err(|_| "无法获取输入设备配置".to_string())?;
         {
-            best_config = Some(range.with_sample_rate(desired_sample_rate).config());
-            break;
-        } else if range.sample_format() == cpal::SampleFormat::I16 {
+            println!("默认输出");
+            println!("{:?}", device.default_output_config().unwrap());
+            println!("默认输入");
+            println!("{:?}", input_device.default_input_config().unwrap());
+        }
+        println!("输出设备支持的配置：");
+
+        let desired_sample_rate = cpal::SampleRate(16000);
+
+        let mut best_config = None;
+        for range in supported_configs {
+            println!("{:?}", range);
+            if range.min_sample_rate() <= desired_sample_rate
+                && range.max_sample_rate() >= desired_sample_rate
+            {
+                best_config = Some(range.with_sample_rate(desired_sample_rate).config());
+                break;
+            } else if range.sample_format() == cpal::SampleFormat::I16 {
+            }
+        }
+
+        let support_input = input_device
+            .supported_input_configs()
+            .map_err(|_| "无法获取输入设备配置".to_string())?;
+        println!("输入设备支持的配置：");
+
+        for range in support_input {
+            println!("{:?}", range);
+        }
+
+        if let Some(config) = best_config {
+            println!("选择输出设备配置：{:?}", config);
+            Ok(config)
+        } else {
+            let fallback = device
+                .default_output_config()
+                .map_err(|_| "没有可用的输入配置妈的".to_string())?;
+            Ok(fallback.config())
         }
     }
 
-    let support_input = input_device
-        .supported_input_configs()
-        .map_err(|_| "无法获取输入设备配置".to_string())?;
-    println!("输入设备支持的配置：");
-
-    for range in support_input {
-        println!("{:?}", range);
-    }
-
-    if let Some(config) = best_config {
-        println!("选择输出设备配置：{:?}", config);
-        Ok(config)
-    } else {
-        let fallback = device
-            .default_output_config()
-            .map_err(|_| "没有可用的输入配置妈的".to_string())?;
-        Ok(fallback.config())
-    }
-}
-
-#[test]
-fn output_device_config() {
     select_input_config().unwrap();
 }

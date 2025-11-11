@@ -1,17 +1,22 @@
 #![allow(clippy::tabs_in_doc_comments)]
+#![allow(clippy::collapsible_if)]
 
+use crate::transcript_vendors::TranscriptVendors;
 use crate::utils::{is_dev, select_output_config, write_some_log};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{ChannelCount, FromSample, Sample};
 use dasp::sample::ToSample;
-use std::env;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::LazyLock;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::thread::JoinHandle;
+use std::env;
+
+pub static TOTAL_SAMPLES_WRITTEN: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
 
 /** static 全局变量，用于控制录音线程的状态
 名称    中文含义	常用于	作用
@@ -37,6 +42,7 @@ pub struct RecordParams {
     pub use_resampled: bool,
     pub pcm_callback: Option<PcmCallback>,
     pub auto_chunk_buffer: bool,
+    pub selected_asr_vendor: String,
 }
 
 pub type PcmCallback = Arc<dyn Fn(&str) + Send + Sync + 'static>;
@@ -71,21 +77,8 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
         write_some_log(format!("Output selected config: {:#?}", config).as_str());
     };
 
-    if true {
-        //TODO 开启Websocket连接,接受通道的Sender的Buffer ,传入pcm_callback
-        let (tx, rx) = mpsc::channel::<Vec<i16>>(128);
+    let asr_vendor: TranscriptVendors = params.selected_asr_vendor.parse()?;
 
-        let pcm_callback_clone = params.pcm_callback.clone(); // 先 clone 防止move whole struct
-
-        thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-
-            rt.block_on(async move {});
-        });
-    }
 
     let spec_f32_stereo = wav_spec_from_config(&config);
 
@@ -190,11 +183,6 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
     Ok(())
 }
 
-use std::sync::LazyLock;
-use tokio::sync::mpsc;
-
-pub static TOTAL_SAMPLES_WRITTEN: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
-
 #[allow(clippy::too_many_arguments)]
 fn handle_input_data<T, U>(
     input: &[T],
@@ -240,10 +228,8 @@ fn handle_input_data<T, U>(
         } else {
             stereo_to_mono_i16(&input)
         };
-        if only_pcm {
-            if let Some(ref callback) = pcm_callback {
-                callback("partial");
-            }
+        if only_pcm && let Some(ref callback) = pcm_callback {
+            callback("partial");
         }
     } else {
         PCM_BUFFER.with(|buf_cell| {
@@ -359,26 +345,6 @@ pub fn start_record_audio_with_writer(params: RecordParams) -> Result<JoinHandle
         }
     });
     Ok(handle)
-}
-
-#[test]
-fn test_record_audio_with_writer() {
-    let params = RecordParams {
-        device: String::from("default"),
-        file_name: "".to_string(),
-        only_pcm: true,
-        capture_interval: 2,
-        pcm_callback: Some(Arc::new(|_pcm_data| {})),
-        auto_chunk_buffer: true,
-        use_resampled: true,
-    };
-
-    if let Err(e) = start_record_audio_with_writer(params) {
-        eprintln!("Error: {e}");
-    }
-    println!("Enter to stop recording...");
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input).unwrap();
 }
 
 #[test]

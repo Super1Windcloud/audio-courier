@@ -58,6 +58,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     capture_interval: i32,
     use_resampled: bool,
     auto_chunk_buffer: bool,
+    selected_asr_vendor : String
 ) {
     let device = if let Some(name) = device_name {
         if name.contains("输入") {
@@ -84,6 +85,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
         })),
         use_resampled,
         auto_chunk_buffer,
+        selected_asr_vendor 
     };
 
     if let Ok(handle) = start_record_audio_with_writer(params) {
