@@ -1,49 +1,49 @@
 import "./App.css";
-import { ChatContainer } from "@/components/ChatContainer";
-import { Toaster } from "sonner";
-import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { Toaster } from "sonner";
 import { Conversation } from "@/Conversation.tsx";
+import { ChatContainer } from "@/components/ChatContainer";
 import { registryGlobalShortCuts } from "@/lib/system.ts";
 
 function Home() {
-  return (
-    <div className="w-full h-screen bg-gradient-to-b from-[#724766] to-[#2C4F71]">
-      <ChatContainer />
-      <Toaster position="top-center" richColors expand closeButton />
-    </div>
-  );
+	return (
+		<div className="w-full h-screen bg-gradient-to-b from-[#724766] to-[#2C4F71]">
+			<ChatContainer />
+			<Toaster position="top-center" richColors expand closeButton />
+		</div>
+	);
 }
 
 function App() {
-  const didRun = useRef(false);
+	const didRun = useRef(false);
 
-  useEffect(() => {
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-    };
-    document.addEventListener("contextmenu", handleContextMenu);
-    return () => {
-      document.removeEventListener("contextmenu", handleContextMenu);
-    };
-  }, []);
+	useEffect(() => {
+		const handleContextMenu = (e: MouseEvent) => {
+			e.preventDefault();
+		};
+		document.addEventListener("contextmenu", handleContextMenu);
+		return () => {
+			document.removeEventListener("contextmenu", handleContextMenu);
+		};
+	}, []);
 
-  useEffect(() => {
-    if (didRun.current) return;
-    didRun.current = true;
-    registryGlobalShortCuts();
-    invoke("show_window");
-  }, []);
+	useEffect(() => {
+		if (didRun.current) return;
+		didRun.current = true;
+		registryGlobalShortCuts();
+		invoke("show_window");
+	}, []);
 
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/conversation" element={<Conversation />} />
-      </Routes>
-    </BrowserRouter>
-  );
+	return (
+		<BrowserRouter>
+			<Routes>
+				<Route path="/" element={<Home />} />
+				<Route path="/conversation" element={<Conversation />} />
+			</Routes>
+		</BrowserRouter>
+	);
 }
 
 export default App;

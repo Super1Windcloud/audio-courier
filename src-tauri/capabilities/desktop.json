@@ -1,32 +1,26 @@
 {
-  "identifier": "desktop-capability",
-  "platforms": [
-    "macOS",
-    "windows",
-    "linux"
-  ],
-  "windows": [
-    "main"
-  ],
-  "permissions": [
-    "core:default",
-    "opener:default",
-    "global-shortcut:allow-is-registered",
-    "global-shortcut:allow-register",
-    "global-shortcut:allow-unregister",
-    "core:window:allow-set-ignore-cursor-events",
-    "core:window:allow-inner-position",
-    "core:window:allow-set-size",
-    "core:window:allow-set-position",
-    "core:event:allow-listen",
-    "core:event:allow-unlisten",
-    "core:window:allow-hide",
-    "core:window:allow-show",
-    "core:window:allow-inner-size",
-    "core:window:allow-maximize",
-    "core:window:allow-minimize",
-    "core:window:allow-close",
-    "core:window:allow-unmaximize",
-    "core:window:allow-set-decorations"
-  ]
+	"identifier": "desktop-capability",
+	"platforms": ["macOS", "windows", "linux"],
+	"windows": ["main"],
+	"permissions": [
+		"core:default",
+		"opener:default",
+		"global-shortcut:allow-is-registered",
+		"global-shortcut:allow-register",
+		"global-shortcut:allow-unregister",
+		"core:window:allow-set-ignore-cursor-events",
+		"core:window:allow-inner-position",
+		"core:window:allow-set-size",
+		"core:window:allow-set-position",
+		"core:event:allow-listen",
+		"core:event:allow-unlisten",
+		"core:window:allow-hide",
+		"core:window:allow-show",
+		"core:window:allow-inner-size",
+		"core:window:allow-maximize",
+		"core:window:allow-minimize",
+		"core:window:allow-close",
+		"core:window:allow-unmaximize",
+		"core:window:allow-set-decorations"
+	]
 }

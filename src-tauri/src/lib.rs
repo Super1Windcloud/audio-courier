@@ -1,14 +1,13 @@
 extern crate core;
 
 mod audio_stream;
+mod constant;
 mod llm;
 mod loopback;
-mod loopback_resample;
-mod transcript;
+mod transcript_vendors;
 mod utils;
-mod constant;
-pub use constant::*;
 pub use audio_stream::*;
+pub use constant::*;
 use dotenv::{dotenv, from_filename};
 pub use llm::*;
 pub use loopback::*;
@@ -75,28 +74,6 @@ pub fn run() {
             stop_recognize_audio_stream_from_speaker_loopback,
             clear_vosk_accept_buffer
         ])
-        .setup(|_app| {
-            let model_paths = ["vosk-model-small-cn-0.22", "vosk-model-cn-0.22"];
-
-            let mut model_found = false;
-            for path in &model_paths {
-                if std::path::Path::new(path).exists() {
-                    println!("找到模型文件: {}", path);
-                    model_found = true;
-                    break;
-                }
-            }
-
-            if !model_found {
-                println!("警告: 未找到 Vosk 模型文件");
-                println!("请确保模型文件位于以下位置之一:");
-                for path in &model_paths {
-                    println!("  - {}", path);
-                }
-            }
-            println!("应用启动完成");
-            Ok(())
-        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

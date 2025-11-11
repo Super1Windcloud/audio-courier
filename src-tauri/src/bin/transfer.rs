@@ -1,22 +1,26 @@
 use cpal::traits::{DeviceTrait, HostTrait};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri_courier_ai_lib::{
-    clear_vosk_accept_buffer, get_audio_stream_devices_names, get_record_handle,
-    start_record_audio_with_writer, stop_recording, RecordParams,
+    RecordParams, clear_vosk_accept_buffer, get_audio_stream_devices_names, get_record_handle,
+    start_record_audio_with_writer, stop_recording,
 };
 
 fn main() {
     let device = "default";
+    let last_result = Arc::new(Mutex::new(String::new()));
     let params = RecordParams {
         device: device.to_string(),
         file_name: "".to_string(),
         only_pcm: true,
-        capture_interval: 1,
-        pcm_callback: Some(Arc::new(move |chunk: &str| println!("{:?}", chunk))),
-        use_drain_chunk_buffer: true,
-        use_big_model: true,
-        use_remote_model: false,
-        xunfei_tx: None,
+        capture_interval: 10,
+        pcm_callback: Some(Arc::new(move |chunk: &str| {
+            if !chunk.is_empty() && *last_result.lock().unwrap() != chunk {
+                *last_result.lock().unwrap() = chunk.to_string();
+                println!("partial result :{:?}", chunk);
+            }
+        })),
+        auto_chunk_buffer: false,
+        use_resampled: true,
     };
 
     if let Ok(handle) = start_record_audio_with_writer(params) {
@@ -74,6 +78,7 @@ fn select_input_config() -> Result<cpal::StreamConfig, String> {
         {
             best_config = Some(range.with_sample_rate(desired_sample_rate).config());
             break;
+        } else if range.sample_format() == cpal::SampleFormat::I16 {
         }
     }
 

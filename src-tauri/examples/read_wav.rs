@@ -5,13 +5,9 @@ use vosk::{Model, Recognizer};
 
 fn main() {
     let model_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vosk-model-small-cn-0.22");
-    let model_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vosk-model-cn-0.22");
     let model_path = model_path.to_str().unwrap();
-    //Resample Time elapsed: 9.335443s
-    // Normal Time elapsed 11.8
-
-    let wav_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("recorded_i16_mono.wav");
-    let wav_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("recorded_i16_mono_resample.wav");
+    let wav_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/recorded_i16_mono_resample.wav");
 
     let wav_path = wav_path.to_str().unwrap();
     let mut reader =
@@ -29,11 +25,11 @@ fn main() {
         .expect("Could not create the recognizer");
 
     recognizer.set_max_alternatives(1);
-    recognizer.set_partial_words(false);
-    recognizer.set_words(false);
+    recognizer.set_partial_words(true);
+    recognizer.set_words(true);
 
     let start = std::time::Instant::now();
-    for sample in samples.chunks((sample_rate.sample_rate) as usize) {
+    for sample in samples.chunks(sample_rate.sample_rate as usize) {
         recognizer.accept_waveform(sample).unwrap();
         let recognition = recognizer.partial_result();
         let content = recognition.partial;

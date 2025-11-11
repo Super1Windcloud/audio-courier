@@ -23,3 +23,6 @@ setup:
 
 clean :
    cd  src-tauri &&  cargo clean
+
+upgrade:
+    cd src-tauri &&  cargo update && cargo upgrade

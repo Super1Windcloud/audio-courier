@@ -1,6 +1,6 @@
 # audio-courier
 
-适用于本地的实时STT应用(支持Windows,Macos)
+适用于本地的实时STT应用
 
 # 从源码构建
 

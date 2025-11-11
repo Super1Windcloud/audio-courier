@@ -1,8 +1,8 @@
 use cpal::{
-    traits::{DeviceTrait, HostTrait, StreamTrait},
     ChannelCount, SampleFormat,
+    traits::{DeviceTrait, HostTrait, StreamTrait},
 };
-use dasp::{sample::ToSample, Sample};
+use dasp::{Sample, sample::ToSample};
 use std::{
     env,
     sync::{Arc, Mutex},

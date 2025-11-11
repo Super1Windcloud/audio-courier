@@ -1,10 +1,6 @@
 mod api;
-mod stt;
-mod stt_realtime;
-
-pub use stt_realtime::*; 
 use api::*;
-use rand::{rng as thread_rng, Rng};
+use rand::{Rng, rng as thread_rng};
 use serde_json::json;
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -104,7 +100,7 @@ const PRO_MODELS: [&str; 43] = [
 
 #[tauri::command]
 pub async fn siliconflow_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
-    let api_key = get_env_key("Siliconflow");
+    let api_key = get_env_key("SiliconflowVLM");
     let messages = vec![
         json!({"role":"assistant","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),

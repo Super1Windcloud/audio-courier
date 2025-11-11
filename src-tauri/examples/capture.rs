@@ -1,12 +1,13 @@
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+#![allow(clippy::collapsible_if)]
+
 use cpal::Sample;
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use dasp::sample::ToSample;
 use hound::WavWriter;
 use rubato::{
     ResampleError, Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType,
     WindowFunction,
 };
-use samplerate_rs::{convert, ConverterType};
 use std::fs::File;
 use std::io::BufWriter;
 use std::sync::{Arc, Mutex};
@@ -16,7 +17,7 @@ pub struct RecordParams {
     pub duration: u64,
 }
 
-fn select_output_config() -> Result<cpal::SupportedStreamConfig, String> {
+fn select_output_config(use_resample: bool) -> Result<cpal::SupportedStreamConfig, String> {
     let device = cpal::default_host()
         .default_output_device()
         .ok_or("没有可用的输出设备")?;
@@ -34,6 +35,18 @@ fn select_output_config() -> Result<cpal::SupportedStreamConfig, String> {
             let selected = range.with_sample_rate(desired_sample_rate);
             println!("选择输出设备配置：{:?}", selected);
             return Ok(selected);
+        }
+    }
+
+    if !use_resample {
+        let supported = device.supported_output_configs().unwrap();
+        for range in supported {
+            if range.sample_format() == cpal::SampleFormat::I16 {
+                let rate = range.min_sample_rate(); // 选该范围的最低采样率
+                let sel = range.with_sample_rate(rate);
+                println!("⚙️ 没有16kHz，选择 i16 配置: {:?}", sel);
+                return Ok(sel);
+            }
         }
     }
 
@@ -57,45 +70,20 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
             .find(|x| x.name().map(|y| y == name).unwrap_or(false)),
     }
     .ok_or_else(|| "无法找到输出设备".to_string())?;
-    let config = select_output_config()?;
+    let config = select_output_config(true)?;
 
-    const PATH_F32_STEREO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/recorded_f32_stereo.wav");
-    const PATH_F32_MONO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/recorded_f32_mono.wav");
-    const PATH_I16_STEREO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/recorded_i16_stereo.wav");
-    const PATH_I16_MONO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/recorded_i16_mono.wav");
-    const PATH_I16_STEREO_RESAMPLE: &str = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/recorded_i16_stereo_resample.wav"
-    );
+    const PATH_I16_MONO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "assets/recorded_i16_mono.wav");
+
     const PATH_I16_MONO_RESAMPLE: &str = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/recorded_i16_mono_resample.wav"
+        "assets/recorded_i16_mono_resample.wav"
     );
 
-    // ---- WAV 规格 ----
     let spec_f32_stereo = wav_spec_from_config(&config);
-    let spec_f32_mono = hound::WavSpec {
-        channels: 1,
-        sample_rate: spec_f32_stereo.sample_rate,
-        bits_per_sample: 32,
-        sample_format: hound::SampleFormat::Float,
-    };
-    let spec_i16_stereo = hound::WavSpec {
-        channels: spec_f32_stereo.channels,
-        sample_rate: spec_f32_stereo.sample_rate,
-        bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
-    };
+
     let spec_i16_mono = hound::WavSpec {
         channels: 1,
         sample_rate: spec_f32_stereo.sample_rate,
-        bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
-    };
-
-    let spec_i16_stereo_resample = hound::WavSpec {
-        channels: spec_i16_stereo.channels,
-        sample_rate: 16000,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
@@ -107,27 +95,11 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
         sample_format: hound::SampleFormat::Int,
     };
 
-    // ---- 创建写入器 ----
-    let f32_stereo = Arc::new(Mutex::new(Some(
-        hound::WavWriter::create(PATH_F32_STEREO, spec_f32_stereo)
-            .map_err(|e| format!("创建文件失败: {e}"))?,
-    )));
-    let f32_mono = Arc::new(Mutex::new(Some(
-        hound::WavWriter::create(PATH_F32_MONO, spec_f32_mono)
-            .map_err(|e| format!("创建文件失败: {e}"))?,
-    )));
-    let i16_stereo = Arc::new(Mutex::new(Some(
-        hound::WavWriter::create(PATH_I16_STEREO, spec_i16_stereo)
-            .map_err(|e| format!("创建文件失败: {e}"))?,
-    )));
     let i16_mono = Arc::new(Mutex::new(Some(
         hound::WavWriter::create(PATH_I16_MONO, spec_i16_mono)
             .map_err(|e| format!("创建文件失败: {e}"))?,
     )));
-    let i16_resample_stereo = Arc::new(Mutex::new(Some(
-        hound::WavWriter::create(PATH_I16_STEREO_RESAMPLE, spec_i16_stereo_resample)
-            .map_err(|e| format!("创建文件失败: {e}"))?,
-    )));
+
     let i16_resample_mono = Arc::new(Mutex::new(Some(
         hound::WavWriter::create(PATH_I16_MONO_RESAMPLE, spec_i16_mono_resample)
             .map_err(|e| format!("创建文件失败: {e}"))?,
@@ -141,11 +113,7 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
         cpal::SampleFormat::F32 => device.build_input_stream(
             &config.into(),
             {
-                let f32_stereo = f32_stereo.clone();
-                let f32_mono = f32_mono.clone();
-                let i16_stereo = i16_stereo.clone();
                 let i16_mono = i16_mono.clone();
-                let i16_resample_stereo = i16_resample_stereo.clone();
                 let i16_resample_mono = i16_resample_mono.clone();
                 let mut audio_buffer = AudioBuffer::new(channels, sample_rate);
 
@@ -153,12 +121,9 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
                     handle_audio_input(
                         data,
                         &mut audio_buffer,
-                        &f32_stereo,
-                        &f32_mono,
-                        &i16_stereo,
                         &i16_mono,
-                        &i16_resample_stereo,
                         &i16_resample_mono,
+                        sample_rate,
                     );
                 }
             },
@@ -168,9 +133,6 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
         cpal::SampleFormat::I16 => device.build_input_stream(
             &config.into(),
             {
-                let f32_stereo = f32_stereo.clone();
-                let f32_mono = f32_mono.clone();
-                let i16_stereo = i16_stereo.clone();
                 let i16_mono = i16_mono.clone();
                 let mut audio_buffer = AudioBuffer::new(channels, sample_rate);
 
@@ -178,12 +140,9 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
                     handle_audio_input(
                         data,
                         &mut audio_buffer,
-                        &f32_stereo,
-                        &f32_mono,
-                        &i16_stereo,
                         &i16_mono,
-                        &i16_resample_stereo,
                         &i16_resample_mono,
+                        sample_rate,
                     );
                 }
             },
@@ -200,14 +159,12 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
     std::thread::sleep(std::time::Duration::from_secs(params.duration));
     drop(stream);
 
-    finalize_all(&[&f32_stereo, &f32_mono, &i16_stereo, &i16_mono]);
+    finalize_all(&[&i16_mono]);
 
     println!(
         "✅ 录音完成:
-  - {PATH_F32_STEREO}
-  - {PATH_F32_MONO}
-  - {PATH_I16_STEREO}
-  - {PATH_I16_MONO}"
+  - {PATH_I16_MONO} 
+  - {PATH_I16_MONO_RESAMPLE} "
     );
     Ok(())
 }
@@ -231,12 +188,9 @@ type WavWriterHandle = Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>;
 fn handle_audio_input<T>(
     input: &[T],
     buffer: &mut AudioBuffer<T>,
-    f32_stereo: &WavWriterHandle,
-    f32_mono: &WavWriterHandle,
-    i16_stereo: &WavWriterHandle,
     i16_mono: &WavWriterHandle,
-    i16_stereo_resample: &Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
     i16_mono_resample: &Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
+    sample_rate: usize,
 ) where
     T: Sample + ToSample<f32> + ToSample<i16>,
 {
@@ -244,27 +198,16 @@ fn handle_audio_input<T>(
 
     if buffer.is_full() {
         let chunk = buffer.drain_chunk();
-        write_all_formats(
-            &chunk,
-            f32_stereo,
-            f32_mono,
-            i16_stereo,
-            i16_mono,
-            i16_stereo_resample,
-            i16_mono_resample,
-        );
+        write_all_formats(&chunk, i16_mono, i16_mono_resample, sample_rate);
     }
 }
 
 /// 写入所有四种格式（f32/i16 单/双通道）
 fn write_all_formats<T>(
     input: &[T],
-    f32_stereo: &WavWriterHandle,
-    f32_mono: &WavWriterHandle,
-    i16_stereo: &WavWriterHandle,
     i16_mono: &WavWriterHandle,
-    _i16_stereo_resample: &Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
     i16_mono_resample: &Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>,
+    sample_rate: usize,
 ) where
     T: Sample + ToSample<f32> + ToSample<i16>,
 {
@@ -272,37 +215,12 @@ fn write_all_formats<T>(
     let stereo_i16: Vec<i16> = input.iter().map(|s| s.to_sample::<i16>()).collect();
     let mono_f32 = stereo_to_mono_f32(&stereo_f32);
     let mono_i16 = stereo_to_mono_i16(&stereo_i16);
-    let input_rate = 44100;
-    let output_rate = 16000;
-    let resampled_mono_i16 =
-        resample_audio_by_samplerate(&mono_f32, input_rate, output_rate, 1).unwrap();
 
-    write_samples(&stereo_f32, f32_stereo);
-    write_samples(&mono_f32, f32_mono);
-    write_samples(&stereo_i16, i16_stereo);
+    let output_rate = 16000;
+    let resampled_mono_i16 = resample_audio_rubato(&mono_f32, sample_rate, output_rate, 1).unwrap();
+
     write_samples(&mono_i16, i16_mono);
     write_samples(&resampled_mono_i16, i16_mono_resample);
-}
-
-fn resample_audio_by_samplerate(
-    input: &[f32],
-    from_rate: usize,
-    target_rate: usize,
-    channels: usize,
-) -> Result<Vec<i16>, ResampleError> {
-    let resampled = convert(
-        from_rate as u32,
-        target_rate as u32,
-        channels,
-        ConverterType::Linear,
-        input,
-    )
-    .unwrap();
-    let resampled = resampled
-        .iter()
-        .map(|&s| s.to_sample::<i16>())
-        .collect::<Vec<i16>>();
-    Ok(resampled)
 }
 
 fn resample_audio_rubato(
@@ -322,7 +240,7 @@ fn resample_audio_rubato(
         output_rate as f64 / input_rate as f64,
         2.0,
         params,
-        input_rate * channels,
+        input.len() / channels,
         channels,
     )
     .unwrap();
@@ -427,7 +345,7 @@ where
 fn main() {
     let params = RecordParams {
         device: "default".into(),
-        duration: 20,
+        duration: 10,
     };
 
     if let Err(e) = record_audio(params) {
