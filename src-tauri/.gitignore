@@ -12,3 +12,4 @@ target
 app.log
 
 src/constant.rs
+.env

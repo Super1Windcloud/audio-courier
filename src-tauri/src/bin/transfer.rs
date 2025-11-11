@@ -22,6 +22,7 @@ fn main() {
         })),
         auto_chunk_buffer: false,
         use_resampled: true,
+        selected_asr_vendor: "assemblyai".to_string(),
     };
 
     if let Ok(handle) = start_record_audio_with_writer(params) {

@@ -2,19 +2,19 @@
 #![allow(clippy::collapsible_if)]
 
 use crate::transcript_vendors::TranscriptVendors;
-use crate::utils::{is_dev, select_output_config, write_some_log};
+use crate::utils::{is_dev, resample_audio_with_rubato, select_output_config, write_some_log};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{ChannelCount, FromSample, Sample};
 use dasp::sample::ToSample;
+use std::env;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::LazyLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::thread::JoinHandle;
-use std::env;
 
 pub static TOTAL_SAMPLES_WRITTEN: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
 
@@ -68,7 +68,7 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
     let config = if device.supports_input() && params.device.contains("input") {
         device.default_input_config().unwrap()
     } else {
-        select_output_config(true)?
+        select_output_config(params.use_resampled)?
     };
     if is_dev() {
         write_some_log(format!("Output device: {}", device.name().unwrap()).as_str());
@@ -78,7 +78,6 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
     };
 
     let asr_vendor: TranscriptVendors = params.selected_asr_vendor.parse()?;
-
 
     let spec_f32_stereo = wav_spec_from_config(&config);
 
@@ -127,6 +126,8 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
                         channels,
                         sample_rate,
                         params.auto_chunk_buffer,
+                        asr_vendor,
+                        params.use_resampled,
                     )
                 },
                 err_fn,
@@ -146,6 +147,8 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
                         channels,
                         sample_rate,
                         params.auto_chunk_buffer,
+                        asr_vendor,
+                        params.use_resampled,
                     )
                 },
                 err_fn,
@@ -193,21 +196,24 @@ fn handle_input_data<T, U>(
     channels: ChannelCount,
     sample_rate: u32,
     auto_chunk_buffer: bool,
+    asr_vendor: TranscriptVendors,
+    use_resample: bool,
 ) where
     T: Sample + ToSample<i16> + ToSample<f32> + FromSample<i16> + FromSample<f32>,
-    U: Sample + hound::Sample + FromSample<T> + FromSample<i16>,
+    U: Sample + hound::Sample + FromSample<T> + FromSample<i16> + FromSample<f32>,
 {
-    if !only_pcm {
-        let input = input
-            .iter()
-            .map(|&x| x.to_sample::<i16>())
-            .collect::<Vec<i16>>();
+    let input = input
+        .iter()
+        .map(|&x| x.to_sample::<f32>())
+        .collect::<Vec<f32>>();
 
-        let input_mono = if channels == 1 {
-            input
-        } else {
-            stereo_to_mono_i16(&input)
-        };
+    let input_mono = if channels == 1 {
+        input
+    } else {
+        stereo_to_mono_f32(&input)
+    };
+
+    if !only_pcm {
         if let Ok(mut guard) = writer.try_lock() {
             if let Some(writer) = guard.as_mut() {
                 for &sample in input_mono.iter() {
@@ -219,30 +225,11 @@ fn handle_input_data<T, U>(
         return;
     }
     if auto_chunk_buffer {
-        let input = input
-            .iter()
-            .map(|&x| x.to_sample::<i16>())
-            .collect::<Vec<i16>>();
-        let input_mono = if channels == 1 {
-            input
-        } else {
-            stereo_to_mono_i16(&input)
-        };
         if only_pcm && let Some(ref callback) = pcm_callback {
             callback("partial");
         }
     } else {
         PCM_BUFFER.with(|buf_cell| {
-            let input = input
-                .iter()
-                .map(|&x| x.to_sample::<f32>())
-                .collect::<Vec<f32>>();
-
-            let input_mono = if channels == 1 {
-                input
-            } else {
-                stereo_to_mono_f32(&input)
-            };
             let mut buf = buf_cell.lock().unwrap();
             buf.extend(input_mono);
             drain_chunk_buffer_to_writer(&mut buf, chunk_size, pcm_callback, only_pcm, sample_rate)

@@ -1,4 +1,9 @@
+use cpal::Sample;
 use cpal::traits::{DeviceTrait, HostTrait};
+use rubato::{
+    ResampleError, Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType,
+    WindowFunction,
+};
 use std::collections::HashMap;
 use std::env;
 use std::fs::OpenOptions;
@@ -104,4 +109,45 @@ pub fn select_output_config(use_resample: bool) -> Result<cpal::SupportedStreamC
 
     println!("使用默认输出配置：{:?}", fallback);
     Ok(fallback)
+}
+
+pub fn resample_audio_with_rubato(
+    input: &[f32],
+    input_rate: usize,
+    output_rate: usize,
+    channels: usize,
+) -> Result<Vec<i16>, ResampleError> {
+    let params = SincInterpolationParameters {
+        sinc_len: 256,
+        f_cutoff: 0.95,
+        interpolation: SincInterpolationType::Linear,
+        oversampling_factor: 256,
+        window: WindowFunction::BlackmanHarris2,
+    };
+    let mut resampler = SincFixedIn::<f32>::new(
+        output_rate as f64 / input_rate as f64,
+        2.0,
+        params,
+        input.len() / channels,
+        channels,
+    )
+    .unwrap();
+    let split: Vec<Vec<f32>> = (0..channels)
+        .map(|ch| {
+            input
+                .iter()
+                .skip(ch)
+                .step_by(channels)
+                .cloned()
+                .collect::<Vec<f32>>()
+        })
+        .collect();
+
+    let waves_out = resampler.process(&split, None)?;
+    let resampled = waves_out
+        .iter()
+        .flat_map(|w| w.iter().map(|&s| s.to_sample::<i16>()))
+        .collect::<Vec<i16>>();
+
+    Ok(resampled)
 }
