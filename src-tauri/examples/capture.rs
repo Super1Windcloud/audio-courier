@@ -69,14 +69,14 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
             .unwrap()
             .find(|x| x.name().map(|y| y == name).unwrap_or(false)),
     }
-    .ok_or_else(|| "无法找到输出设备".to_string())?;
+        .ok_or_else(|| "无法找到输出设备".to_string())?;
     let config = select_output_config(true)?;
 
     const PATH_I16_MONO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "assets/recorded_i16_mono.wav");
 
     const PATH_I16_MONO_RESAMPLE: &str = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "assets/recorded_i16_mono_resample.wav"
+    env!("CARGO_MANIFEST_DIR"),
+    "assets/recorded_i16_mono_resample.wav"
     );
 
     let spec_f32_stereo = wav_spec_from_config(&config);
@@ -151,7 +151,7 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
         ),
         other => return Err(format!("暂不支持的采样格式: {other:?}")),
     }
-    .map_err(|e| format!("创建音频输出流失败: {e}"))?;
+        .map_err(|e| format!("创建音频输出流失败: {e}"))?;
 
     println!("▶️ 开始录制 {:#?} 秒...", params.duration);
     stream.play().unwrap();
@@ -163,7 +163,7 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
 
     println!(
         "✅ 录音完成:
-  - {PATH_I16_MONO} 
+  - {PATH_I16_MONO}
   - {PATH_I16_MONO_RESAMPLE} "
     );
     Ok(())
@@ -243,7 +243,7 @@ fn resample_audio_rubato(
         input.len() / channels,
         channels,
     )
-    .unwrap();
+        .unwrap();
     let split: Vec<Vec<f32>> = (0..channels)
         .map(|ch| {
             input

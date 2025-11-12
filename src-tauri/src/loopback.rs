@@ -29,7 +29,6 @@ AcqRel	获取+释放	原子交换等	同时具有 Acquire 和 Release 效果
 SeqCst	顺序一致	强制全局顺序	所有线程都按统一顺序观察所有原子操作
  */
 pub static RECORDING: AtomicBool = AtomicBool::new(true);
-pub static CLEAR_RECORDING: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
     static PCM_BUFFER: Mutex<Vec<f32>> = const { Mutex::new(Vec::new()) };
@@ -318,12 +317,6 @@ pub fn stop_recording(handle: JoinHandle<()>) {
     println!("停止信号已发送，等待录音线程退出...");
     handle.join().expect("无法 join 录音线程");
     println!("录音线程已退出 ✅");
-}
-
-#[tauri::command]
-pub fn clear_vosk_accept_buffer() {
-    CLEAR_RECORDING.store(true, Ordering::SeqCst);
-    println!("清空 Vosk 接受缓存");
 }
 
 pub fn start_record_audio_with_writer(params: RecordParams) -> Result<JoinHandle<()>, String> {

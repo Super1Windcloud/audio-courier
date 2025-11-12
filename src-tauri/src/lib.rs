@@ -72,7 +72,6 @@ pub fn run() {
             get_audio_stream_devices_names,
             start_recognize_audio_stream_from_speaker_loopback,
             stop_recognize_audio_stream_from_speaker_loopback,
-            clear_vosk_accept_buffer
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

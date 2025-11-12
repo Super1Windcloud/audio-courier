@@ -28,7 +28,6 @@ export async function startAudioLoopbackRecognition(
 }
 
 export async function stopAudioLoopbackRecognition() {
-	await clearVoskAcceptBuffer();
 	await invoke("stop_recognize_audio_stream_from_speaker_loopback").catch(
 		(err) => console.error("invoke stop output audio recognition failed", err),
 	);
@@ -37,10 +36,4 @@ export async function stopAudioLoopbackRecognition() {
 		unlistener();
 		unlistener = null;
 	}
-}
-
-export async function clearVoskAcceptBuffer() {
-	await invoke("clear_vosk_accept_buffer").catch((err) => {
-		console.error("invoke clear vosk buffer failed", err);
-	});
 }

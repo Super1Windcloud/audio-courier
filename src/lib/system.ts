@@ -6,7 +6,7 @@ import {
 } from "@tauri-apps/plugin-global-shortcut";
 
 export async function registryGlobalShortCuts() {
-	const combo = "CommandOrControl+Alt+Q";
+	const combo = "CommandOrControl+Shift+`";
 	if (await isRegistered(combo)) {
 		await unregister(combo);
 	}

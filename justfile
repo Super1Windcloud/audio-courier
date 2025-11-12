@@ -17,9 +17,6 @@ pull :
 release:
     just push &&  git push repo  main:release
 
-setup: 
-    bash  src-tauri/setup.sh -Download
-
 
 clean :
    cd  src-tauri &&  cargo clean

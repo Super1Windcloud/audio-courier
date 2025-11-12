@@ -35,7 +35,7 @@ const useAppStateStore = create<AppStateStore>((set) => ({
 	currentAudioChannel: "",
 	updateCurrentAudioChannel: (target: string) =>
 		set({ currentAudioChannel: target }),
-	llmPrompt: import.meta.env.VITE_INTERVIEW_PROMPT || "",
+	llmPrompt: import.meta.env.VITE_PROMPT || "",
 	updateLLMPrompt: (target: string) => {
 		set({ llmPrompt: target });
 	},

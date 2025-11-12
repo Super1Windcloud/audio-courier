@@ -2,8 +2,8 @@
 use cpal::traits::{DeviceTrait, HostTrait};
 use std::sync::{Arc, Mutex};
 use tauri_courier_ai_lib::{
-    RecordParams, clear_vosk_accept_buffer, get_audio_stream_devices_names, get_record_handle,
-    start_record_audio_with_writer, stop_recording,
+    RecordParams, get_audio_stream_devices_names, get_record_handle, start_record_audio_with_writer,
+    stop_recording,
 };
 
 fn main() {
@@ -39,9 +39,6 @@ fn main() {
     }
 
     let mut input = String::new();
-    std::io::stdin().read_line(&mut input).unwrap();
-    clear_vosk_accept_buffer();
-
     std::io::stdin().read_line(&mut input).unwrap();
     if let Some(handle) = get_record_handle().lock().unwrap().take() {
         stop_recording(handle);

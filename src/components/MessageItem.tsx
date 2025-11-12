@@ -1,5 +1,4 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import type { Message } from "./ChatContainer";
 
@@ -9,15 +8,7 @@ interface MessageItemProps {
 
 export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
 	const isUser = message.sender === "user";
-	const navigate = useNavigate();
-	// @ts-ignore
-	const _skipToConversationDetail = () => {
-		navigate("/conversation", {
-			state: {
-				question: message.text,
-			},
-		});
-	};
+
 	return (
 		<div
 			className={cn(
