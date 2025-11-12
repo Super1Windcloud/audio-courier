@@ -37,8 +37,10 @@ hound = "3.5.1"
 dasp = "0.11.0"
 rubato = "0.16.2"
 base64 = "0.22.1"
-http = "0.2"
-tokio-tungstenite = "0.24.0"
+rustls = { version = "0.23.35", default-features = false, features = ["ring"] }
+tungstenite = { version = "0.28.0", default-features = false, features = ["__rustls-tls", "http", "handshake"] }
+tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+futures-util = "0.3.31"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
@@ -50,4 +52,3 @@ path = "src/bin/transfer.rs"
 
 
 [dev-dependencies]
-

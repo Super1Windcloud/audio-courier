@@ -7,7 +7,10 @@ use tauri_courier_ai_lib::{
 };
 
 fn main() {
+    dotenv::dotenv().ok();
     let device = "default";
+    let vendor = "assemblyai".to_string();
+    let use_resample = if vendor == "assemblyai" { false } else { true };
     let last_result = Arc::new(Mutex::new(String::new()));
     let params = RecordParams {
         device: device.to_string(),
@@ -20,9 +23,9 @@ fn main() {
                 println!("partial result :{:?}", chunk);
             }
         })),
-        auto_chunk_buffer: false,
-        use_resampled: true,
-        selected_asr_vendor: "assemblyai".to_string(),
+        auto_chunk_buffer: true ,
+        use_resampled: use_resample,
+        selected_asr_vendor: vendor,
     };
 
     if let Ok(handle) = start_record_audio_with_writer(params) {

@@ -1,4 +1,7 @@
 use std::str::FromStr;
+use std::sync::Arc;
+
+pub type PcmCallback = Arc<dyn Fn(&str) + Send + Sync + 'static>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TranscriptVendors {

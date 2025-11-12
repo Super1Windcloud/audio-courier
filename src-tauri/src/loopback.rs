@@ -1,8 +1,11 @@
 #![allow(clippy::tabs_in_doc_comments)]
 #![allow(clippy::collapsible_if)]
 
-use crate::transcript_vendors::TranscriptVendors;
-use crate::utils::{is_dev, resample_audio_with_rubato, select_output_config, write_some_log};
+use crate::transcript_vendors::{
+    PcmCallback, TranscriptVendors,
+    assemblyai::{AssemblyAiTranscriber, AssemblyAudioChunk},
+};
+use crate::utils::{is_dev, select_output_config, write_some_log};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{ChannelCount, FromSample, Sample};
 use dasp::sample::ToSample;
@@ -44,8 +47,6 @@ pub struct RecordParams {
     pub auto_chunk_buffer: bool,
     pub selected_asr_vendor: String,
 }
-
-pub type PcmCallback = Arc<dyn Fn(&str) + Send + Sync + 'static>;
 
 pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
     let host = cpal::default_host();
@@ -89,7 +90,7 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
     };
 
     let path = if params.file_name.trim().is_empty() {
-        concat!(env!("CARGO_MANIFEST_DIR"), "/recorded.wav")
+        concat!(env!("CARGO_MANIFEST_DIR"), "assets/recorded.wav")
     } else {
         params.file_name.as_str()
     };
@@ -108,10 +109,27 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
         eprintln!("An error occurred on stream: {err}");
         write_some_log(format!("An error occurred on stream: {err}").as_str())
     };
-    // 100ms best effect
-    let chunk_size = (config.sample_rate().0 * params.capture_interval / 10) as usize;
-    let channels = config.channels();
     let sample_rate = config.sample_rate().0;
+    // 100ms best effect
+    let chunk_size = (sample_rate * params.capture_interval / 10) as usize;
+    let channels = config.channels();
+    let assembly_sample_rate = if params.use_resampled {
+        16000
+    } else {
+        sample_rate
+    };
+    let asr_transcriber = if asr_vendor == TranscriptVendors::AssemblyAI {
+        if let Some(callback) = params.pcm_callback.clone() {
+            Some(Arc::new(
+                AssemblyAiTranscriber::start(assembly_sample_rate, callback)
+                    .map_err(|e| format!("Failed to start AssemblyAI stream: {e}"))?,
+            ))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
     let stream = match config.sample_format() {
         cpal::SampleFormat::I16 => device
             .build_input_stream(
@@ -120,14 +138,12 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
                     handle_input_data::<i16, i16>(
                         data,
                         &writer,
-                        params.pcm_callback.clone(),
                         params.only_pcm,
                         chunk_size,
                         channels,
-                        sample_rate,
                         params.auto_chunk_buffer,
-                        asr_vendor,
                         params.use_resampled,
+                        asr_transcriber.clone(),
                     )
                 },
                 err_fn,
@@ -141,14 +157,12 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
                     handle_input_data::<f32, f32>(
                         data,
                         &writer,
-                        params.pcm_callback.clone(),
                         params.only_pcm,
                         chunk_size,
                         channels,
-                        sample_rate,
                         params.auto_chunk_buffer,
-                        asr_vendor,
                         params.use_resampled,
+                        asr_transcriber.clone(),
                     )
                 },
                 err_fn,
@@ -190,14 +204,12 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
 fn handle_input_data<T, U>(
     input: &[T],
     writer: &WavWriterHandle,
-    pcm_callback: Option<PcmCallback>,
     only_pcm: bool,
     chunk_size: usize,
     channels: ChannelCount,
-    sample_rate: u32,
     auto_chunk_buffer: bool,
-    asr_vendor: TranscriptVendors,
     use_resample: bool,
+    transcriber: Option<Arc<AssemblyAiTranscriber>>,
 ) where
     T: Sample + ToSample<i16> + ToSample<f32> + FromSample<i16> + FromSample<f32>,
     U: Sample + hound::Sample + FromSample<T> + FromSample<i16> + FromSample<f32>,
@@ -225,14 +237,26 @@ fn handle_input_data<T, U>(
         return;
     }
     if auto_chunk_buffer {
-        if only_pcm && let Some(ref callback) = pcm_callback {
-            callback("partial");
+        if let Some(transcriber) = transcriber.as_ref() {
+            if use_resample {
+                if let Err(err) = transcriber.send_chunk(AssemblyAudioChunk::Float32(input_mono)) {
+                    write_some_log(format!("AssemblyAI chunk send failed: {err}").as_str());
+                }
+            } else {
+                let chunk_i16 = input_mono
+                    .iter()
+                    .map(|&x| x.to_sample::<i16>())
+                    .collect::<Vec<i16>>();
+                if let Err(err) = transcriber.send_chunk(AssemblyAudioChunk::Int16(chunk_i16)) {
+                    write_some_log(format!("AssemblyAI chunk send failed: {err}").as_str());
+                }
+            }
         }
     } else {
         PCM_BUFFER.with(|buf_cell| {
             let mut buf = buf_cell.lock().unwrap();
             buf.extend(input_mono);
-            drain_chunk_buffer_to_writer(&mut buf, chunk_size, pcm_callback, only_pcm, sample_rate)
+            drain_chunk_buffer_to_writer(&mut buf, chunk_size, use_resample, transcriber.clone())
         });
     }
 }
@@ -240,9 +264,8 @@ fn handle_input_data<T, U>(
 fn drain_chunk_buffer_to_writer(
     buf: &mut MutexGuard<Vec<f32>>,
     chunk_size: usize,
-    pcm_callback: Option<PcmCallback>,
-    only_pcm: bool,
-    _sample_rate: u32,
+    use_resampled: bool,
+    transcriber: Option<Arc<AssemblyAiTranscriber>>,
 ) {
     while buf.len() >= chunk_size {
         let chunk = buf.drain(..chunk_size).collect::<Vec<f32>>();
@@ -255,34 +278,28 @@ fn drain_chunk_buffer_to_writer(
 
             println!(
                 "缓冲区当前使用: {} 个样本, {:.2} KB, {:.2} MB",
-                buf.len(),
-                used_kb,
-                used_mb
+                title, used_kb, used_mb
             );
         }
 
-        let chunk = chunk
-            .iter()
-            .map(|&x| x.to_sample::<i16>())
-            .collect::<Vec<i16>>();
-
-        if only_pcm {
-            if let Some(ref callback) = pcm_callback {
-                callback("");
+        if let Some(transcriber) = transcriber.as_ref() {
+            if use_resampled {
+                if let Err(err) = transcriber.send_chunk(AssemblyAudioChunk::Float32(chunk)) {
+                    write_some_log(format!("AssemblyAI chunk send failed: {err}").as_str());
+                }
+            } else {
+                let chunk_i16 = chunk
+                    .iter()
+                    .map(|&x| x.to_sample::<i16>())
+                    .collect::<Vec<i16>>();
+                if let Err(err) = transcriber.send_chunk(AssemblyAudioChunk::Int16(chunk_i16)) {
+                    write_some_log(format!("AssemblyAI chunk send failed: {err}").as_str());
+                }
             }
         }
     }
 }
 
-fn stereo_to_mono_i16(samples: &[i16]) -> Vec<i16> {
-    if samples.len() < 2 {
-        return samples.to_vec();
-    }
-    samples
-        .chunks_exact(2)
-        .map(|c| ((c[0] as i32 + c[1] as i32) / 2) as i16)
-        .collect()
-}
 fn stereo_to_mono_f32(samples: &[f32]) -> Vec<f32> {
     if samples.len() < 2 {
         return samples.to_vec();
