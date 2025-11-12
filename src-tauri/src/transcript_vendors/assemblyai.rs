@@ -5,18 +5,12 @@ use std::env;
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
 use tokio::runtime::Runtime;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tungstenite::client::{ClientRequestBuilder, IntoClientRequest};
 
-#[derive(Clone)]
-pub enum AssemblyAudioChunk {
-    Int16(Vec<i16>),
-    Float32(Vec<f32>),
-}
-
 pub struct AssemblyAiTranscriber {
-    sender: mpsc::Sender<AssemblyAudioChunk>,
+    sender: mpsc::Sender<Vec<i16>>,
     shutdown: Option<oneshot::Sender<()>>,
     handle: Option<JoinHandle<()>>,
 }
@@ -26,7 +20,7 @@ impl AssemblyAiTranscriber {
         let api_key = env::var("ASSEMBLY_API_KEY")
             .map_err(|e| format!("Missing ASSEMBLY_API_KEY environment variable: {e}"))?;
 
-        let (sender, receiver) = mpsc::channel::<AssemblyAudioChunk>(64);
+        let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
         let callback_clone = callback.clone();
 
@@ -50,7 +44,7 @@ impl AssemblyAiTranscriber {
         })
     }
 
-    pub fn send_chunk(&self, chunk: AssemblyAudioChunk) -> Result<(), String> {
+    pub fn send_chunk(&self, chunk: Vec<i16>) -> Result<(), String> {
         self.sender
             .blocking_send(chunk)
             .map_err(|e| format!("Failed to queue PCM chunk for AssemblyAI: {e}"))
@@ -77,7 +71,7 @@ async fn run_stream(
     api_key: String,
     sample_rate: u32,
     callback: PcmCallback,
-    mut audio_rx: mpsc::Receiver<AssemblyAudioChunk>,
+    mut audio_rx: mpsc::Receiver<Vec<i16>>,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), String> {
     const BASE_URL: &str = "wss://streaming.assemblyai.com/v3/ws";
@@ -99,23 +93,23 @@ async fn run_stream(
         .map_err(|e| format!("Failed to connect to AssemblyAI: {e}"))?;
 
     let (mut sink, mut stream) = ws_stream.split();
+    let (termination_tx, mut termination_rx) = watch::channel(false);
 
     let send_audio = async {
         loop {
             tokio::select! {
                 _ = &mut shutdown_rx => break,
+                result = termination_rx.changed() => {
+                    if result.is_err() || *termination_rx.borrow() {
+                        break;
+                    }
+                },
                 chunk = audio_rx.recv() => match chunk {
-                    Some(chunk) => {
-                        let audio_bytes = match chunk {
-                            AssemblyAudioChunk::Int16(samples) => samples
-                                .iter()
-                                .flat_map(|sample| sample.to_le_bytes())
-                                .collect::<Vec<u8>>(),
-                            AssemblyAudioChunk::Float32(samples) => samples
-                                .iter()
-                                .flat_map(|sample| sample.to_le_bytes())
-                                .collect::<Vec<u8>>(),
-                        };
+                    Some(samples) => {
+                        let audio_bytes = samples
+                            .iter()
+                            .flat_map(|sample| sample.to_le_bytes())
+                            .collect::<Vec<u8>>();
 
                         sink.send(Message::Binary(audio_bytes.into()))
                             .await
@@ -139,32 +133,55 @@ async fn run_stream(
         Ok::<(), String>(())
     };
 
-    let receive_events = async {
+    let receive_events = {
         let callback = callback.clone();
+        let termination_tx = termination_tx.clone();
 
-        while let Some(message) = stream.next().await {
-            let message = message.map_err(|e| format!("AssemblyAI receive error: {e}"))?;
-            if let Message::Text(payload) = message {
-                if let Ok(value) = serde_json::from_str::<Value>(&payload) {
-                    if let Some(kind) = value.get("type").and_then(|v| v.as_str()) {
-                        match kind {
+        async move {
+            while let Some(message) = stream.next().await {
+                let message = message.map_err(|e| {
+                    let _ = termination_tx.send(true);
+                    format!("AssemblyAI receive error: {e}")
+                })?;
+                if let Message::Text(payload) = message {
+                    if let Ok(value) = serde_json::from_str::<Value>(&payload) {
+                        if let Some(kind) = value.get("type").and_then(|v| v.as_str()) {
+                            match kind {
                             "Turn" => {
-                                if let Some(text) = value.get("transcript").and_then(|t| t.as_str())
-                                {
-                                    if !text.trim().is_empty() {
+                                let transcript = value
+                                    .get("transcript")
+                                    .and_then(|t| t.as_str())
+                                    .map(str::trim);
+
+                                let turn_is_final = value
+                                    .get("turn_is_final")
+                                    .and_then(|flag| flag.as_bool())
+                                    .or_else(|| {
+                                        value
+                                            .get("turn_is_formatted")
+                                            .and_then(|flag| flag.as_bool())
+                                    });
+
+                                if let (Some(text), Some(true)) = (transcript, turn_is_final) {
+                                    if !text.is_empty() {
                                         callback(text);
                                     }
                                 }
                             }
-                            "Termination" => break,
-                            _ => {}
+                                "Termination" => {
+                                    let _ = termination_tx.send(true);
+                                    break;
+                                }
+                                _ => {}
+                            }
                         }
                     }
                 }
             }
-        }
 
-        Ok::<(), String>(())
+            let _ = termination_tx.send(true);
+            Ok::<(), String>(())
+        }
     };
 
     try_join(send_audio, receive_events).await?;

@@ -18,7 +18,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
-import useAppStateStore from "@/stores";
+import useAppStateStore, { TranscribeVendor } from "@/stores";
 import { HOTKEYS, MODEL_OPTIONS, ModelOption } from "@/types/llm.ts";
 
 export function MoreMenu() {
@@ -27,6 +27,20 @@ export function MoreMenu() {
 	const appState = useAppStateStore();
 	const [audioChannels, setAudioChannels] = useState<string[]>([]);
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
+	const TRANSCRIBE_VENDORS: TranscribeVendor[] = [
+		"assemblyai",
+		"deepgram",
+		"gladia",
+		"revai",
+		"speechmatics",
+	];
+	const VENDOR_LABELS: Record<TranscribeVendor, string> = {
+		assemblyai: "AssemblyAI",
+		deepgram: "DeepGram",
+		gladia: "GlaDia",
+		revai: "RevAI",
+		speechmatics: "Speechmatics",
+	};
 
 	useEffect(() => {
 		invoke("get_audio_stream_devices_names").then((result) => {
@@ -110,6 +124,34 @@ export function MoreMenu() {
 					<DropdownMenuSub>
 						<DropdownMenuSubTrigger
 							className="
+              bg-gray-600 text-white
+             data-[highlighted]:bg-gray-500
+             data-[state=open]:bg-gray-500"
+						>
+							转录厂商
+						</DropdownMenuSubTrigger>
+						<DropdownMenuSubContent className="w-48 bg-gray-600 text-white border-0">
+							{TRANSCRIBE_VENDORS.map((vendor) => (
+								<DropdownMenuItem
+									key={vendor}
+									className={`data-[highlighted]:bg-gray-500 ${
+										appState.useRemoteModelTranscribe === vendor
+											? "font-bold"
+											: ""
+									}`}
+									onClick={() => appState.updateRemoteModelTranscribe(vendor)}
+								>
+									{VENDOR_LABELS[vendor]}
+									{appState.useRemoteModelTranscribe === vendor && (
+										<span className="ml-2 text-green-400">✔</span>
+									)}
+								</DropdownMenuItem>
+							))}
+						</DropdownMenuSubContent>
+					</DropdownMenuSub>
+					<DropdownMenuSub>
+						<DropdownMenuSubTrigger
+							className="
              bg-gray-600 text-white
             data-[highlighted]:bg-gray-500
             data-[state=open]:bg-gray-500"
@@ -146,88 +188,7 @@ export function MoreMenu() {
 							onChange={(e) => appState.updateScrollToBottom(e.target.checked)}
 						/>
 					</DropdownMenuItem>
-					<DropdownMenuItem
-						onClick={() => {
-							appState.updateUseBigModel(!appState.useBigModel);
-						}}
-						className="flex items-center bg-gray-600 !hover:bg-gray-600  justify-between"
-					>
-						<span>启动最强声学模型</span>
-						<input
-							type="checkbox"
-							checked={appState.useBigModel}
-							onChange={(e) => appState.updateUseBigModel(e.target.checked)}
-						/>
-					</DropdownMenuItem>
-					<DropdownMenuItem
-						onClick={() => {
-							appState.updateUseRemoteModelTranscribe(
-								!appState.useRemoteModelTranscribe,
-							);
-						}}
-						className="flex items-center bg-gray-600 !hover:bg-gray-600  justify-between"
-					>
-						<span>启动远程模型</span>
-						<input
-							type="checkbox"
-							checked={appState.useRemoteModelTranscribe}
-							onChange={(e) =>
-								appState.updateUseRemoteModelTranscribe(e.target.checked)
-							}
-						/>
-					</DropdownMenuItem>
-					<DropdownMenuItem
-						onClick={() => {
-							appState.updateUseAutoChunkBuffer(!appState.useAutoChunkBuffer);
-						}}
-						className="flex items-center bg-gray-600 !hover:bg-gray-600  justify-between"
-					>
-						<span>启用自动buffer切分</span>
-						<input
-							type="checkbox"
-							checked={appState.useAutoChunkBuffer}
-							onChange={(e) =>
-								appState.updateUseAutoChunkBuffer(e.target.checked)
-							}
-						/>
-					</DropdownMenuItem>
-					<DropdownMenuItem
-						onClick={() => {
-							appState.updateUseResamplePCMBuffer(
-								!appState.useResamplePCMBuffer,
-							);
-						}}
-						className="flex items-center bg-gray-600 !hover:bg-gray-600  justify-between"
-					>
-						<span>启动PCM重采样</span>
-						<input
-							type="checkbox"
-							checked={appState.useResamplePCMBuffer}
-							onChange={(e) =>
-								appState.updateUseResamplePCMBuffer(e.target.checked)
-							}
-						/>
-					</DropdownMenuItem>
-					<DropdownMenuItem
-						onClick={(e) => e.stopPropagation()} // 防止输入时关闭菜单
-						className="flex items-center justify-between gap-2"
-					>
-						<span
-							onClick={() =>
-								appState.updateCaptureInterval((appState.captureInterval -= 1))
-							}
-						>
-							-{" "}
-						</span>
-						<span>音频捕获间隔:{appState.captureInterval}</span>
-						<span
-							onClick={() =>
-								appState.updateCaptureInterval((appState.captureInterval += 1))
-							}
-						>
-							+{" "}
-						</span>
-					</DropdownMenuItem>
+
 				</DropdownMenuContent>
 			</DropdownMenu>
 			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

@@ -10,21 +10,23 @@ fn main() {
     dotenv::dotenv().ok();
     let device = "default";
     let vendor = "assemblyai".to_string();
-    let use_resample = if vendor == "assemblyai" { false } else { true };
+    let use_resampled = if vendor == "assemblyai" { false } else { true };
     let last_result = Arc::new(Mutex::new(String::new()));
+    let auto_chunk_buffer = if vendor == "assemblyai" { false } else { true };
+    let capture_interval = if vendor == "assemblyai" { 5 } else { 10 };
     let params = RecordParams {
         device: device.to_string(),
         file_name: "".to_string(),
         only_pcm: true,
-        capture_interval: 10,
+        capture_interval,
         pcm_callback: Some(Arc::new(move |chunk: &str| {
             if !chunk.is_empty() && *last_result.lock().unwrap() != chunk {
-                *last_result.lock().unwrap() = chunk.to_string();
-                println!("partial result :{:?}", chunk);
+                *last_result.lock().unwrap() += chunk;
+                println!("partial result :{:?}", *last_result.lock().unwrap());
             }
         })),
-        auto_chunk_buffer: true ,
-        use_resampled: use_resample,
+        auto_chunk_buffer,
+        use_resampled,
         selected_asr_vendor: vendor,
     };
 

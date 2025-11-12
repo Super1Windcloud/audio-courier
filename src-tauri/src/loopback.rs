@@ -2,8 +2,7 @@
 #![allow(clippy::collapsible_if)]
 
 use crate::transcript_vendors::{
-    PcmCallback, TranscriptVendors,
-    assemblyai::{AssemblyAiTranscriber, AssemblyAudioChunk},
+    PcmCallback, TranscriptVendors, assemblyai::AssemblyAiTranscriber,
 };
 use crate::utils::{is_dev, select_output_config, write_some_log};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -118,6 +117,7 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
     } else {
         sample_rate
     };
+
     let asr_transcriber = if asr_vendor == TranscriptVendors::AssemblyAI {
         if let Some(callback) = params.pcm_callback.clone() {
             Some(Arc::new(
@@ -142,7 +142,6 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
                         chunk_size,
                         channels,
                         params.auto_chunk_buffer,
-                        params.use_resampled,
                         asr_transcriber.clone(),
                     )
                 },
@@ -161,7 +160,6 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
                         chunk_size,
                         channels,
                         params.auto_chunk_buffer,
-                        params.use_resampled,
                         asr_transcriber.clone(),
                     )
                 },
@@ -208,7 +206,6 @@ fn handle_input_data<T, U>(
     chunk_size: usize,
     channels: ChannelCount,
     auto_chunk_buffer: bool,
-    use_resample: bool,
     transcriber: Option<Arc<AssemblyAiTranscriber>>,
 ) where
     T: Sample + ToSample<i16> + ToSample<f32> + FromSample<i16> + FromSample<f32>,
@@ -238,25 +235,19 @@ fn handle_input_data<T, U>(
     }
     if auto_chunk_buffer {
         if let Some(transcriber) = transcriber.as_ref() {
-            if use_resample {
-                if let Err(err) = transcriber.send_chunk(AssemblyAudioChunk::Float32(input_mono)) {
-                    write_some_log(format!("AssemblyAI chunk send failed: {err}").as_str());
-                }
-            } else {
-                let chunk_i16 = input_mono
-                    .iter()
-                    .map(|&x| x.to_sample::<i16>())
-                    .collect::<Vec<i16>>();
-                if let Err(err) = transcriber.send_chunk(AssemblyAudioChunk::Int16(chunk_i16)) {
-                    write_some_log(format!("AssemblyAI chunk send failed: {err}").as_str());
-                }
+            let chunk_i16 = input_mono
+                .iter()
+                .map(|&x| x.to_sample::<i16>())
+                .collect::<Vec<i16>>();
+            if let Err(err) = transcriber.send_chunk(chunk_i16) {
+                write_some_log(format!("AssemblyAI chunk send failed: {err}").as_str());
             }
         }
     } else {
         PCM_BUFFER.with(|buf_cell| {
             let mut buf = buf_cell.lock().unwrap();
             buf.extend(input_mono);
-            drain_chunk_buffer_to_writer(&mut buf, chunk_size, use_resample, transcriber.clone())
+            drain_chunk_buffer_to_writer(&mut buf, chunk_size, transcriber.clone())
         });
     }
 }
@@ -264,7 +255,6 @@ fn handle_input_data<T, U>(
 fn drain_chunk_buffer_to_writer(
     buf: &mut MutexGuard<Vec<f32>>,
     chunk_size: usize,
-    use_resampled: bool,
     transcriber: Option<Arc<AssemblyAiTranscriber>>,
 ) {
     while buf.len() >= chunk_size {
@@ -283,18 +273,12 @@ fn drain_chunk_buffer_to_writer(
         }
 
         if let Some(transcriber) = transcriber.as_ref() {
-            if use_resampled {
-                if let Err(err) = transcriber.send_chunk(AssemblyAudioChunk::Float32(chunk)) {
-                    write_some_log(format!("AssemblyAI chunk send failed: {err}").as_str());
-                }
-            } else {
-                let chunk_i16 = chunk
-                    .iter()
-                    .map(|&x| x.to_sample::<i16>())
-                    .collect::<Vec<i16>>();
-                if let Err(err) = transcriber.send_chunk(AssemblyAudioChunk::Int16(chunk_i16)) {
-                    write_some_log(format!("AssemblyAI chunk send failed: {err}").as_str());
-                }
+            let chunk_i16 = chunk
+                .iter()
+                .map(|&x| x.to_sample::<i16>())
+                .collect::<Vec<i16>>();
+            if let Err(err) = transcriber.send_chunk(chunk_i16) {
+                write_some_log(format!("AssemblyAI chunk send failed: {err}").as_str());
             }
         }
     }

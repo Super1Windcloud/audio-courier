@@ -1,3 +1,5 @@
+#![allow(clippy::needless_bool)]
+
 use crate::loopback::{RecordParams, start_record_audio_with_writer, stop_recording};
 use cpal::traits::{DeviceTrait, HostTrait};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -55,10 +57,7 @@ pub fn stop_recognize_audio_stream_from_speaker_loopback() {
 pub fn start_recognize_audio_stream_from_speaker_loopback(
     app: AppHandle,
     device_name: Option<String>,
-    capture_interval: i32,
-    use_resampled: bool,
-    auto_chunk_buffer: bool,
-    selected_asr_vendor : String
+    selected_asr_vendor: String,
 ) {
     let device = if let Some(name) = device_name {
         if name.contains("输入") {
@@ -70,12 +69,28 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
         "default"
     };
 
+    let use_resampled = if selected_asr_vendor == "assemblyai" {
+        false
+    } else {
+        true
+    };
+    let auto_chunk_buffer = if selected_asr_vendor == "assemblyai" {
+        false
+    } else {
+        true
+    };
+    let capture_interval = if selected_asr_vendor == "assemblyai" {
+        5
+    } else {
+        10
+    };
+
     let last_result = Arc::new(Mutex::new(String::new()));
 
     let params = RecordParams {
         device: device.to_string(),
         file_name: "".to_string(),
-        capture_interval: capture_interval as u32,
+        capture_interval,
         only_pcm: true,
         pcm_callback: Some(Arc::new(move |chunk: &str| {
             if !chunk.is_empty() && *last_result.lock().unwrap() != chunk {
@@ -85,7 +100,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
         })),
         use_resampled,
         auto_chunk_buffer,
-        selected_asr_vendor 
+        selected_asr_vendor,
     };
 
     if let Ok(handle) = start_record_audio_with_writer(params) {
