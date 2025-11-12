@@ -5,7 +5,7 @@ let nodeFetch: (
 	url: URL | RequestInfo,
 	init?: RequestInit,
 ) => Promise<Response>;
-let nodeWebSocket: any;
+let nodeWebSocket: typeof import("ws")["WebSocket"] | undefined;
 
 const isNode =
 	typeof process !== "undefined" &&

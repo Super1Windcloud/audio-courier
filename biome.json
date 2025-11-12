@@ -3,6 +3,11 @@
 	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
 	"files": { "includes": ["**", "!!**/dist"] },
 	"formatter": { "enabled": true, "indentStyle": "tab" },
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	},
 	"linter": {
 		"enabled": true,
 		"rules": { "recommended": false },

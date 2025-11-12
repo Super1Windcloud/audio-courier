@@ -11,7 +11,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
 	const isUser = message.sender === "user";
 	const navigate = useNavigate();
 	// @ts-ignore
-	const skipToConversationDetail = () => {
+	const _skipToConversationDetail = () => {
 		navigate("/conversation", {
 			state: {
 				question: message.text,

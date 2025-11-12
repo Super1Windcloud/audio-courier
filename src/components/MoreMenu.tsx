@@ -188,7 +188,6 @@ export function MoreMenu() {
 							onChange={(e) => appState.updateScrollToBottom(e.target.checked)}
 						/>
 					</DropdownMenuItem>
-
 				</DropdownMenuContent>
 			</DropdownMenu>
 			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

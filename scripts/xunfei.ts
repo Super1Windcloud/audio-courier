@@ -34,8 +34,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 function randUuidHex() {
 	// 简单生成 32 字符 hex uuid
 	// 浏览器环境用 crypto.randomUUID()（若有），否则 fallback
-	if ("randomUUID" in crypto)
-		return (crypto as any).randomUUID().replace(/-/g, "");
+	if ("randomUUID" in crypto) return crypto.randomUUID().replace(/-/g, "");
 	const arr = new Uint8Array(16);
 	// @ts-ignore
 	crypto.getRandomValues(arr);
@@ -108,7 +107,10 @@ class RTASRClientTS {
 		console.log(msg);
 		try {
 			this.logFn(msg);
-		} catch {}
+		} catch (error) {
+			// Ignore errors thrown by the logging callback.
+			void error;
+		}
 	}
 
 	private urlEncodeSortedParams(params: Record<string, string>) {
@@ -210,13 +212,21 @@ class RTASRClientTS {
 						this.log("【连接超时】未在 15s 内建立连接");
 						try {
 							this.ws?.close();
-						} catch {}
+						} catch (error) {
+							void error;
+						}
 						resolve(false);
 					}
 				}, 15000);
 			});
-		} catch (e: any) {
-			this.log(`【连接异常】${e?.message ?? e}`);
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: typeof error === "string"
+						? error
+						: JSON.stringify(error);
+			this.log(`【连接异常】${message}`);
 			return false;
 		}
 	}
@@ -231,7 +241,7 @@ class RTASRClientTS {
 					this.sessionId = json.data.sessionId;
 					this.log(`【会话更新】sessionId=${this.sessionId}`);
 				}
-			} catch (e) {
+			} catch (_e) {
 				this.log("【接收异常】非 JSON 文本消息：" + String(ev.data));
 			}
 		} else if (ev.data instanceof ArrayBuffer) {
@@ -344,14 +354,20 @@ class RTASRClientTS {
 			}
 
 			// 发送结束标记
-			const endMsg: any = { end: true };
+			const endMsg: { end: true; sessionId?: string } = { end: true };
 			if (this.sessionId) endMsg.sessionId = this.sessionId;
 			const endStr = JSON.stringify(endMsg);
 			this.ws.send(endStr);
 			this.log(`【发送结束】已发送结束标记：${endStr}`);
 			return true;
-		} catch (e: any) {
-			this.log("【发送异常】" + (e?.message ?? e));
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: typeof error === "string"
+						? error
+						: JSON.stringify(error);
+			this.log("【发送异常】" + message);
 			this.close();
 			return false;
 		} finally {

@@ -12,7 +12,7 @@ const openai = new OpenAI({
 });
 
 // @ts-ignore
-async function getSTTResult() {
+async function _getSTTResult() {
 	const transcription = await openai.audio.transcriptions.create({
 		file: fs.createReadStream("../src-tauri/recorded.wav"),
 		model: "gpt-4o-transcribe",
@@ -40,7 +40,7 @@ async function createFile(filePath: string) {
 }
 
 // @ts-ignore
-async function getImageResult() {
+async function _getImageResult() {
 	const fileId = await createFile("../img.png");
 
 	const response = await openai.responses.create({
