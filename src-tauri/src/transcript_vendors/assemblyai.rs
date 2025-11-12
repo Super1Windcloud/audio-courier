@@ -1,3 +1,5 @@
+#![allow(clippy::collapsible_if)]
+
 use crate::transcript_vendors::PcmCallback;
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use serde_json::{Value, json};
@@ -147,27 +149,27 @@ async fn run_stream(
                     if let Ok(value) = serde_json::from_str::<Value>(&payload) {
                         if let Some(kind) = value.get("type").and_then(|v| v.as_str()) {
                             match kind {
-                            "Turn" => {
-                                let transcript = value
-                                    .get("transcript")
-                                    .and_then(|t| t.as_str())
-                                    .map(str::trim);
+                                "Turn" => {
+                                    let transcript = value
+                                        .get("transcript")
+                                        .and_then(|t| t.as_str())
+                                        .map(str::trim);
 
-                                let turn_is_final = value
-                                    .get("turn_is_final")
-                                    .and_then(|flag| flag.as_bool())
-                                    .or_else(|| {
-                                        value
-                                            .get("turn_is_formatted")
-                                            .and_then(|flag| flag.as_bool())
-                                    });
+                                    let turn_is_final = value
+                                        .get("turn_is_final")
+                                        .and_then(|flag| flag.as_bool())
+                                        .or_else(|| {
+                                            value
+                                                .get("turn_is_formatted")
+                                                .and_then(|flag| flag.as_bool())
+                                        });
 
-                                if let (Some(text), Some(true)) = (transcript, turn_is_final) {
-                                    if !text.is_empty() {
-                                        callback(text);
+                                    if let (Some(text), Some(true)) = (transcript, turn_is_final) {
+                                        if !text.is_empty() {
+                                            callback(text);
+                                        }
                                     }
                                 }
-                            }
                                 "Termination" => {
                                     let _ = termination_tx.send(true);
                                     break;

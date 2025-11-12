@@ -15,4 +15,4 @@ export const MODEL_OPTIONS = [
 
 export type ModelOption = (typeof MODEL_OPTIONS)[number];
 
-export const HOTKEYS = ["显示/隐藏 Ctrl+Alt+Q"];
+export const HOTKEYS = ["显示/隐藏 Ctrl+Shift+`"];

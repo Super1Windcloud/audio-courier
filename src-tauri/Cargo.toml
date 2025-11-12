@@ -35,7 +35,6 @@ rand = "0.9.2"
 hound = "3.5.1"
 dasp = "0.11.0"
 rubato = "0.16.2"
-base64 = "0.22.1"
 rustls = { version = "0.23.35", default-features = false, features = ["ring"] }
 tungstenite = { version = "0.28.0", default-features = false, features = ["__rustls-tls", "http", "handshake"] }
 tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
