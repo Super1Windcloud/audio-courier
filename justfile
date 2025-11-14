@@ -9,7 +9,7 @@ push :
 
 
 clear :
-  git  rm --cached -r .
+  git  rm --cached -r . && just push
 
 pull :
    git pull repo main
