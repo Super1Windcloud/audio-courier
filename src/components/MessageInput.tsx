@@ -40,9 +40,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       clearTimeout(timeoutRef.current);
     }
 
+    let timeout: number;
+    if (appState.useRemoteModelTranscribe === "assemblyai") {
+      timeout = 1500;
+    } else {
+      timeout = 1000;
+    }
     timeoutRef.current = setTimeout(() => {
       handleSend();
-    }, 500);
+    }, timeout);
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -78,10 +84,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   const handleClearConversation = () => {
     setInputText("");
-    // setIsRecording(false);
-    // if (isRecording) {
-    //   await stopAudioRecognition(appState.currentAudioChannel);
-    // }
+
     onClearConversation();
   };
 

@@ -24,7 +24,7 @@ export const ChatContainer: React.FC = () => {
     if (didRun.current) return;
     didRun.current = true;
     if (import.meta.env.VITE_INIT_MESSAGE) {
-      handleSendMessage(import.meta.env.VITE_INIT_MESSAGE, true);
+      handleSendMessage(import.meta.env.VITE_INIT_MESSAGE, true).then();
     }
   }, []);
 
