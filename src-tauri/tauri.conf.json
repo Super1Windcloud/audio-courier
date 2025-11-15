@@ -15,7 +15,7 @@
 				"label": "main",
 				"title": "Audio Courier",
 				"width": 800,
-				"height": 600,
+				"height": 900,
 				"resizable": true,
 				"fullscreen": false,
 				"center": true,

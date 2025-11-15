@@ -8,131 +8,152 @@ import { startAudioRecognition, stopAudioRecognition } from "@/lib/audio.ts";
 import useAppStateStore from "@/stores";
 
 interface MessageInputProps {
-	onSendMessage: (text: string) => void;
-	onClearConversation: () => void;
-	setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-	setIsTyping: (record: boolean) => void;
+  onSendMessage: (text: string) => void;
+  onClearConversation: () => void;
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  setIsTyping: (record: boolean) => void;
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
-	onSendMessage,
-	onClearConversation,
-	setIsTyping,
+  onSendMessage,
+  onClearConversation,
+  setIsTyping,
 }) => {
-	const [isRecording, setIsRecording] = useState(false);
-	const [inputText, setInputText] = useState("");
-	const appState = useAppStateStore();
-	const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [inputText, setInputText] = useState("");
+  const recordingState = useAppStateStore((state) => state.isRecording);
+  const updateRecordingState = useAppStateStore(
+    (state) => state.updateIsRecording,
+  );
+  const captureInterval = useAppStateStore((state) => state.captureInterval);
+  const updateQuestionState = useAppStateStore((state) => state.updateQuestion);
+  const remoteModelVendor = useAppStateStore(
+    (state) => state.useRemoteModelTranscribe,
+  );
+  const currentAudioChannel = useAppStateStore(
+    (state) => state.currentAudioChannel,
+  );
 
-	const handleSend = () => {
-		if (inputText.trim()) {
-			appState.updateQuestion(inputText.trim());
-			onSendMessage(inputText.trim());
-			setInputText("");
-		}
-	};
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-	useEffect(() => {
-		if (!isRecording) return () => undefined;
-		if (!inputText.trim()) return;
+  const handleSend = () => {
+    if (inputText.trim()) {
+      updateQuestionState(inputText.trim());
+      onSendMessage(inputText.trim());
+      setInputText("");
+    }
+  };
 
-		if (timeoutRef.current) {
-			clearTimeout(timeoutRef.current);
-		}
+  useEffect(() => {
+    if (!recordingState) return () => undefined;
+    if (!inputText.trim()) return;
 
-		let timeout: number;
-		if (appState.useRemoteModelTranscribe === "assemblyai") {
-			timeout = 1500;
-		} else {
-			timeout = 1000;
-		}
-		timeoutRef.current = setTimeout(() => {
-			handleSend();
-		}, timeout);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
 
-		return () => {
-			if (timeoutRef.current) clearTimeout(timeoutRef.current);
-		};
-	}, [inputText, isRecording]);
+    let timeout: number;
+    if (remoteModelVendor === "assemblyai") {
+      timeout = 1500;
+    } else {
+      timeout = 1000;
+    }
+    timeoutRef.current = setTimeout(() => {
+      handleSend();
+    }, timeout);
 
-	const handleKeyPress = (e: React.KeyboardEvent) => {
-		if (e.key === "Enter" && !e.shiftKey) {
-			e.preventDefault();
-			handleSend();
-		}
-	};
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [inputText, recordingState]);
 
-	const toggleRecording = async () => {
-		if (!isRecording) {
-			setIsRecording(true);
-			const selectedAsrVendor = appState.useRemoteModelTranscribe;
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
-			await startAudioRecognition(
-				setInputText,
-				appState.currentAudioChannel,
-				selectedAsrVendor,
-			);
-		} else {
-			setIsRecording(false);
-			await stopAudioRecognition(appState.currentAudioChannel);
-		}
-	};
+  const toggleRecording = async () => {
+    if (!recordingState) {
+      updateRecordingState(true);
 
-	useEffect(() => {
-		setIsTyping(isRecording);
-	}, [isRecording]);
+      await startAudioRecognition(
+        setInputText,
+        currentAudioChannel,
+        remoteModelVendor,
+        captureInterval,
+      );
+    } else {
+      updateRecordingState(false);
+      await stopAudioRecognition(currentAudioChannel);
+    }
+  };
 
-	const handleClearConversation = () => {
-		setInputText("");
+  useEffect(() => {
+    setIsTyping(recordingState);
+    if (recordingState) {
+      startAudioRecognition(
+        setInputText,
+        currentAudioChannel,
+        remoteModelVendor,
+        captureInterval,
+      ).then();
+    } else {
+      stopAudioRecognition(currentAudioChannel).then();
+    }
+  }, [recordingState]);
 
-		onClearConversation();
-	};
+  const handleClearConversation = () => {
+    setInputText("");
 
-	return (
-		<div
-			className="p-4
+    onClearConversation();
+  };
+
+  return (
+    <div
+      className="p-4
       relative   px-4 py-2 shadow-sm
       backdrop-blur-xl  bg-white/10 border border-white/10"
-		>
-			<div className="flex border-none items-center space-x-2">
-				<Textarea
-					value={inputText}
-					onChange={(e) => {
-						setInputText(e.target.value);
-						e.currentTarget.style.height = "auto"; // 先重置
-						e.currentTarget.style.height = e.currentTarget.scrollHeight + "px"; // 根据内容调整
-					}}
-					onKeyDown={handleKeyPress}
-					placeholder="输入消息..."
-					rows={1}
-					className="flex-1 resize-none overflow-hidden text-white border-none focus-visible:ring-0 placeholder:text-gray-300 focus-visible:ring-offset-0 bg-transparent"
-				/>
+    >
+      <div className="flex border-none items-center space-x-2">
+        <Textarea
+          value={inputText}
+          onChange={(e) => {
+            setInputText(e.target.value);
+            e.currentTarget.style.height = "auto"; // 先重置
+            e.currentTarget.style.height = e.currentTarget.scrollHeight + "px"; // 根据内容调整
+          }}
+          onKeyDown={handleKeyPress}
+          placeholder="输入消息..."
+          rows={1}
+          className="flex-1 resize-none overflow-hidden text-white border-none focus-visible:ring-0 placeholder:text-gray-300 focus-visible:ring-offset-0 bg-transparent"
+        />
 
-				<span title={isRecording ? "停止语音" : "开始语音"}>
-					<Mic
-						onClick={toggleRecording}
-						className={`cursor-pointer ${isRecording ? "text-red-500" : "text-gray-400"}`}
-					/>
-				</span>
+        <span title={recordingState ? "停止语音" : "开始语音"}>
+          <Mic
+            onClick={toggleRecording}
+            className={`cursor-pointer ${recordingState ? "text-red-500" : "text-gray-400"}`}
+          />
+        </span>
 
-				<span title="清空会话">
-					<Trash2
-						onClick={handleClearConversation}
-						className="cursor-pointer text-gray-400"
-					/>
-				</span>
+        <span title="清空会话">
+          <Trash2
+            onClick={handleClearConversation}
+            className="cursor-pointer text-gray-400"
+          />
+        </span>
 
-				<span title="发送消息">
-					<SendHorizontal
-						onClick={handleSend}
-						className="text-gray-400 cursor-pointer"
-					/>
-				</span>
+        <span title="发送消息">
+          <SendHorizontal
+            onClick={handleSend}
+            className="text-gray-400 cursor-pointer"
+          />
+        </span>
 
-				<span title="更多选项">
-					<MoreMenu />
-				</span>
-			</div>
-		</div>
-	);
+        <span title="更多选项">
+          <MoreMenu />
+        </span>
+      </div>
+    </div>
+  );
 };

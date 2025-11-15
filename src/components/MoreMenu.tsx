@@ -188,6 +188,32 @@ export function MoreMenu() {
 							onChange={(e) => appState.updateScrollToBottom(e.target.checked)}
 						/>
 					</DropdownMenuItem>
+					<DropdownMenuSub>
+						<DropdownMenuSubTrigger
+							className="
+             bg-gray-600 text-white
+            data-[highlighted]:bg-gray-500
+            data-[state=open]:bg-gray-500"
+						>
+							捕获间隔
+						</DropdownMenuSubTrigger>
+						<DropdownMenuSubContent className="w-48 bg-gray-600 text-white border-0">
+							{[1, 2, 3, 5, 10].map((interval) => (
+								<DropdownMenuItem
+									key={interval}
+									className={`data-[highlighted]:bg-gray-500 ${
+										appState.captureInterval === interval ? "font-bold" : ""
+									}`}
+									onClick={() => appState.updateCaptureInterval(interval)}
+								>
+									{interval}
+									{appState.captureInterval === interval && (
+										<span className="ml-2 text-green-400">✔</span>
+									)}
+								</DropdownMenuItem>
+							))}
+						</DropdownMenuSubContent>
+					</DropdownMenuSub>
 				</DropdownMenuContent>
 			</DropdownMenu>
 			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

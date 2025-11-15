@@ -1,4 +1,4 @@
-use crate::transcript_vendors::{PcmCallback, StreamingTranscriber};
+use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use speechmatics::realtime::{ReadMessage, RealtimeSession, SessionConfig, models};
 use std::env;
 use std::io;
@@ -15,7 +15,11 @@ pub struct SpeechmaticsTranscriber {
 }
 
 impl SpeechmaticsTranscriber {
-    pub fn start(sample_rate: u32, callback: PcmCallback) -> Result<Self, String> {
+    pub fn start(
+        sample_rate: u32,
+        callback: PcmCallback,
+        status_callback: Option<StatusCallback>,
+    ) -> Result<Self, String> {
         let api_key = env::var("SPEECHMATICS_API_KEY")
             .map_err(|e| format!("Missing SPEECHMATICS_API_KEY environment variable: {e}"))?;
         let language = env::var("SPEECHMATICS_LANGUAGE")
@@ -27,6 +31,7 @@ impl SpeechmaticsTranscriber {
 
         let (sender, receiver) = mpsc::channel::<Vec<u8>>(64);
         let callback_clone = callback.clone();
+        let status_callback_clone = status_callback.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
@@ -38,6 +43,9 @@ impl SpeechmaticsTranscriber {
                 callback_clone,
                 receiver,
             )) {
+                if let Some(cb) = status_callback_clone.as_ref() {
+                    cb(format!("speechmatics: {err}"));
+                }
                 eprintln!("Speechmatics streaming error: {err}");
             }
         });
@@ -82,6 +90,10 @@ impl Drop for SpeechmaticsTranscriber {
 impl StreamingTranscriber for SpeechmaticsTranscriber {
     fn queue_chunk(&self, chunk: Vec<i16>) -> Result<(), String> {
         self.enqueue_chunk(chunk)
+    }
+
+    fn get_vendor_name(&self) -> String {
+        "SpeechMatics".to_string()
     }
 }
 

@@ -1,6 +1,6 @@
 #![allow(clippy::collapsible_if)]
 
-use crate::transcript_vendors::{PcmCallback, StreamingTranscriber};
+use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 #[cfg(target_os = "windows")]
 use native_tls::TlsConnector;
@@ -30,7 +30,11 @@ pub struct RevAiTranscriber {
 }
 
 impl RevAiTranscriber {
-    pub fn start(sample_rate: u32, callback: PcmCallback) -> Result<Self, String> {
+    pub fn start(
+        sample_rate: u32,
+        callback: PcmCallback,
+        status_callback: Option<StatusCallback>,
+    ) -> Result<Self, String> {
         let api_key = env::var("REVAI_API_KEY")
             .map_err(|e| format!("Missing REVAI_API_KEY environment variable: {e}"))?;
         let metadata = env::var("REVAI_METADATA").ok();
@@ -39,6 +43,7 @@ impl RevAiTranscriber {
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
         let callback_clone = callback.clone();
+        let status_callback_clone = status_callback.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
@@ -51,6 +56,9 @@ impl RevAiTranscriber {
                 receiver,
                 shutdown_rx,
             )) {
+                if let Some(cb) = status_callback_clone.as_ref() {
+                    cb(format!("revai: {err}"));
+                }
                 eprintln!("RevAI streaming error: {err}");
             }
         });
@@ -89,6 +97,10 @@ impl StreamingTranscriber for RevAiTranscriber {
     fn queue_chunk(&self, chunk: Vec<i16>) -> Result<(), String> {
         self.enqueue_chunk(chunk)
     }
+
+    fn get_vendor_name(&self) -> String {
+        "RevAI".to_string()
+    }
 }
 
 async fn run_stream(
@@ -102,8 +114,9 @@ async fn run_stream(
 ) -> Result<(), String> {
     const BASE_URL: &str = "wss://api.rev.ai/speechtotext/v1/stream";
 
-    let content_type =
-        format!("audio/x-raw;layout=interleaved;rate={sample_rate};format=S16LE;channels=1");
+    let content_type = format!(
+        "audio/x-raw;layout=interleaved;rate={sample_rate};format=S16LE;channels=1;max_connection_wait_seconds=540"
+    );
 
     let mut params = vec![
         ("access_token".to_string(), api_key),

@@ -1,6 +1,6 @@
 #![allow(clippy::collapsible_if)]
 
-use crate::transcript_vendors::{PcmCallback, StreamingTranscriber};
+use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use bytes::{BufMut, Bytes, BytesMut};
 use deepgram::{
     Deepgram,
@@ -24,19 +24,31 @@ pub struct DeepgramTranscriber {
 }
 
 impl DeepgramTranscriber {
-    pub fn start(sample_rate: u32, callback: PcmCallback) -> Result<Self, String> {
+    pub fn start(
+        sample_rate: u32,
+        callback: PcmCallback,
+        status_callback: Option<StatusCallback>,
+    ) -> Result<Self, String> {
         let api_key = env::var("DEEPGRAM_API_KEY")
             .map_err(|e| format!("Missing DEEPGRAM_API_KEY environment variable: {e}"))?;
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
         let callback_clone = callback.clone();
+        let status_callback_clone = status_callback.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
-            if let Err(err) =
-                runtime.block_on(run_stream(api_key, sample_rate, callback_clone, receiver, shutdown_rx))
-            {
+            if let Err(err) = runtime.block_on(run_stream(
+                api_key,
+                sample_rate,
+                callback_clone,
+                receiver,
+                shutdown_rx,
+            )) {
+                if let Some(cb) = status_callback_clone.as_ref() {
+                    cb(format!("deepgram: {err}"));
+                }
                 eprintln!("Deepgram streaming error: {err}");
             }
         });
@@ -75,6 +87,10 @@ impl StreamingTranscriber for DeepgramTranscriber {
     fn queue_chunk(&self, chunk: Vec<i16>) -> Result<(), String> {
         self.enqueue_chunk(chunk)
     }
+
+    fn get_vendor_name(&self) -> String {
+        "Deepgram".to_string()
+    }
 }
 
 async fn run_stream(
@@ -84,8 +100,8 @@ async fn run_stream(
     mut audio_rx: mpsc::Receiver<Vec<i16>>,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), String> {
-    let deepgram = Deepgram::new(&api_key)
-        .map_err(|e| format!("Failed to construct Deepgram client: {e}"))?;
+    let deepgram =
+        Deepgram::new(&api_key).map_err(|e| format!("Failed to construct Deepgram client: {e}"))?;
 
     let transcription = deepgram.transcription();
     let mut builder = transcription
@@ -141,9 +157,7 @@ async fn run_stream(
     while let Some(message) = responses.next().await {
         match message {
             Ok(StreamResponse::TranscriptResponse {
-                channel,
-                is_final,
-                ..
+                channel, is_final, ..
             }) => {
                 if let Some(entry) = channel.alternatives.first() {
                     let transcript = entry.transcript.trim();
@@ -186,7 +200,10 @@ fn build_stream_options() -> Options {
     let punctuate = parse_bool_env("DEEPGRAM_PUNCTUATE").unwrap_or(true);
     builder = builder.punctuate(punctuate);
 
-    if let Some(value) = env::var("DEEPGRAM_QUERY_PARAMS").ok().filter(|v| !v.trim().is_empty()) {
+    if let Some(value) = env::var("DEEPGRAM_QUERY_PARAMS")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+    {
         let params = value
             .split('&')
             .filter_map(|pair| pair.split_once('='))
@@ -214,8 +231,7 @@ fn language_from_env() -> Option<Language> {
 fn match_language(value: &str) -> Language {
     let cleaned = value
         .trim()
-        .replace('-', "_")
-        .replace(' ', "_")
+        .replace(['-', ' '], "_")
         .to_lowercase();
 
     match cleaned.as_str() {

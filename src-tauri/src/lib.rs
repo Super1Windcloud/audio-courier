@@ -26,7 +26,7 @@ fn show_window(window: tauri::Window) -> Result<(), String> {
     }
     window.center().unwrap();
     window
-        .set_size(LogicalSize::<i32>::from((800, 600)))
+        .set_size(LogicalSize::<i32>::from((800, 900)))
         .unwrap();
     window
         .set_focus()

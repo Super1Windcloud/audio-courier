@@ -58,6 +58,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     app: AppHandle,
     device_name: Option<String>,
     selected_asr_vendor: String,
+    capture_interval: u32,
 ) {
     let device = if let Some(name) = device_name {
         if name.contains("输入") {
@@ -69,29 +70,30 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
         "default"
     };
 
-    let capture_interval = if selected_asr_vendor == "assemblyai" {
-        1
-    } else {
-        10
-    };
-
     let last_result = Arc::new(Mutex::new(String::new()));
-
+    let transcript_app = app.clone();
+    let error_app = app.clone();
+    let status_callback = Arc::new(move |message: String| {
+        if let Err(err) = error_app.emit("transcription_error", message) {
+            eprintln!("Failed to emit transcription error: {err}");
+        }
+    });
     let params = RecordParams {
         device: device.to_string(),
-        file_name: "".to_string(),
+        file_name: String::new(),
         capture_interval,
         only_pcm: true,
         pcm_callback: Some(Arc::new(move |chunk: &str| {
             if !chunk.is_empty() && *last_result.lock().unwrap() != chunk {
                 *last_result.lock().unwrap() = chunk.to_string();
-                app.emit("transcription_result", chunk).unwrap();
+                transcript_app.emit("transcription_result", chunk).unwrap();
             }
         })),
 
         use_resampled: true,
         auto_chunk_buffer: false,
         selected_asr_vendor,
+        status_callback: Some(status_callback),
     };
 
     if let Ok(handle) = start_record_audio_with_writer(params) {

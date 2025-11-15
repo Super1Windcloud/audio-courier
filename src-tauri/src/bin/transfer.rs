@@ -6,6 +6,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::iter::Rev;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tauri_courier_ai_lib::{
     RESAMPLE_RATE, RecordParams, get_audio_stream_devices_names, get_record_handle,
     start_record_audio_with_writer, stop_recording,
@@ -13,6 +14,7 @@ use tauri_courier_ai_lib::{
 
 fn main() {
     dotenv::dotenv().ok();
+    let start = Instant::now();
     let device = "default";
     let vendor = Select::new(
         "请选择语音服务提供商:",
@@ -23,12 +25,13 @@ fn main() {
 
     let last_result = Arc::new(Mutex::new(String::new()));
 
-    let capture_interval = 1;
+    let capture_interval = 2;
     let params = RecordParams {
         device: device.to_string(),
-        file_name: "".to_string(),
+        file_name: String::new(),
         only_pcm: true,
         capture_interval,
+        use_resampled: true,
         pcm_callback: Some(Arc::new(move |chunk: &str| {
             if !chunk.is_empty() && *last_result.lock().unwrap() != chunk {
                 *last_result.lock().unwrap() += chunk;
@@ -37,8 +40,8 @@ fn main() {
             }
         })),
         auto_chunk_buffer: false,
-        use_resampled: true,
         selected_asr_vendor: vendor.to_string(),
+        status_callback: None,
     };
 
     if let Ok(handle) = start_record_audio_with_writer(params) {
@@ -57,6 +60,8 @@ fn main() {
         println!("没有正在运行的录音线程");
     }
     println!("录音识别已停止");
+    let duration = start.elapsed();
+    println!("duration : {duration:? }");
 }
 
 fn write_log(msg: &str) {

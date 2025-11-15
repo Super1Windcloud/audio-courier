@@ -3,9 +3,9 @@
 
 use crate::RESAMPLE_RATE;
 use crate::transcript_vendors::{
-    PcmCallback, StreamingTranscriber, TranscriptVendors, assemblyai::AssemblyAiTranscriber,
-    deepgram::DeepgramTranscriber, gladia::GladiaTranscriber, revai::RevAiTranscriber,
-    speechmatics::SpeechmaticsTranscriber,
+    PcmCallback, StatusCallback, StreamingTranscriber, TranscriptVendors,
+    assemblyai::AssemblyAiTranscriber, deepgram::DeepgramTranscriber, gladia::GladiaTranscriber,
+    revai::RevAiTranscriber, speechmatics::SpeechmaticsTranscriber,
 };
 use crate::utils::{is_dev, resample_audio_with_rubato, select_output_config, write_some_log};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -46,6 +46,7 @@ pub struct RecordParams {
     pub pcm_callback: Option<PcmCallback>,
     pub auto_chunk_buffer: bool,
     pub selected_asr_vendor: String,
+    pub status_callback: Option<StatusCallback>,
 }
 
 pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
@@ -115,34 +116,43 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
     };
 
     let callback = params.pcm_callback.clone();
+    let status_callback = params.status_callback.clone();
     let asr_transcriber: Option<Arc<dyn StreamingTranscriber>> = match (asr_vendor, callback) {
         (TranscriptVendors::AssemblyAI, Some(callback)) => {
-            let transcriber = AssemblyAiTranscriber::start(stream_sample_rate, callback)
-                .map_err(|e| format!("Failed to start AssemblyAI stream: {e}"))?;
+            let transcriber =
+                AssemblyAiTranscriber::start(stream_sample_rate, callback, status_callback.clone())
+                    .map_err(|e| format!("Failed to start AssemblyAI stream: {e}"))?;
             let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
             Some(transcriber)
         }
         (TranscriptVendors::RevAI, Some(callback)) => {
-            let transcriber = RevAiTranscriber::start(stream_sample_rate, callback)
-                .map_err(|e| format!("Failed to start RevAI stream: {e}"))?;
+            let transcriber =
+                RevAiTranscriber::start(stream_sample_rate, callback, status_callback.clone())
+                    .map_err(|e| format!("Failed to start RevAI stream: {e}"))?;
             let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
             Some(transcriber)
         }
         (TranscriptVendors::DeepGram, Some(callback)) => {
-            let transcriber = DeepgramTranscriber::start(stream_sample_rate, callback)
-                .map_err(|e| format!("Failed to start Deepgram stream: {e}"))?;
+            let transcriber =
+                DeepgramTranscriber::start(stream_sample_rate, callback, status_callback.clone())
+                    .map_err(|e| format!("Failed to start Deepgram stream: {e}"))?;
             let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
             Some(transcriber)
         }
         (TranscriptVendors::SpeechMatics, Some(callback)) => {
-            let transcriber = SpeechmaticsTranscriber::start(stream_sample_rate, callback)
-                .map_err(|e| format!("Failed to start Speechmatics stream: {e}"))?;
+            let transcriber = SpeechmaticsTranscriber::start(
+                stream_sample_rate,
+                callback,
+                status_callback.clone(),
+            )
+            .map_err(|e| format!("Failed to start Speechmatics stream: {e}"))?;
             let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
             Some(transcriber)
         }
         (TranscriptVendors::GlaDia, Some(callback)) => {
-            let transcriber = GladiaTranscriber::start(stream_sample_rate, callback)
-                .map_err(|e| format!("Failed to start Gladia stream: {e}"))?;
+            let transcriber =
+                GladiaTranscriber::start(stream_sample_rate, callback, status_callback.clone())
+                    .map_err(|e| format!("Failed to start Gladia stream: {e}"))?;
             let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
             Some(transcriber)
         }
@@ -295,17 +305,21 @@ fn drain_chunk_buffer_to_writer(
             let title = *TOTAL_SAMPLES_WRITTEN.lock().unwrap();
             let used_kb = title as f64 / 1024.0;
             let used_mb = used_kb / 1024.0;
+            let title = title as usize;
 
-            println!(
-                "缓冲区当前使用: {} 个样本, {:.2} KB, {:.2} MB",
-                title, used_kb, used_mb
-            );
+            if title.is_multiple_of(input_sample_rate) {
+                println!(
+                    "缓冲区当前使用: {} 个样本, {:.2} KB, {:.2} MB",
+                    title, used_kb, used_mb
+                );
+            }
         }
 
         if let Some(transcriber) = transcriber.as_ref() {
+            let vendor = transcriber.get_vendor_name();
             let chunk_i16 = prepare_chunk_for_transcriber(&chunk, use_resampled, input_sample_rate);
             if let Err(err) = transcriber.queue_chunk(chunk_i16) {
-                write_some_log(format!("Streaming chunk send failed: {err}").as_str());
+                write_some_log(format!("{vendor:?} Streaming chunk send failed: {err}").as_str());
             }
         }
     }

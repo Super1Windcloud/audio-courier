@@ -1,4 +1,4 @@
-use crate::transcript_vendors::{PcmCallback, StreamingTranscriber};
+use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,11 @@ pub struct GladiaTranscriber {
 }
 
 impl GladiaTranscriber {
-    pub fn start(sample_rate: u32, callback: PcmCallback) -> Result<Self, String> {
+    pub fn start(
+        sample_rate: u32,
+        callback: PcmCallback,
+        status_callback: Option<StatusCallback>,
+    ) -> Result<Self, String> {
         let api_key = env::var("GLADIA_API_KEY")
             .map_err(|e| format!("Missing GLADIA_API_KEY environment variable: {e}"))?;
         let language = env::var("GLADIA_LANGUAGE").ok();
@@ -31,6 +35,7 @@ impl GladiaTranscriber {
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
         let callback_clone = callback.clone();
+        let status_callback_clone = status_callback.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
@@ -42,6 +47,9 @@ impl GladiaTranscriber {
                 receiver,
                 shutdown_rx,
             )) {
+                if let Some(cb) = status_callback_clone.as_ref() {
+                    cb(format!("gladia: {err}"));
+                }
                 eprintln!("Gladia streaming error: {err}");
             }
         });
@@ -79,6 +87,10 @@ impl Drop for GladiaTranscriber {
 impl StreamingTranscriber for GladiaTranscriber {
     fn queue_chunk(&self, chunk: Vec<i16>) -> Result<(), String> {
         self.enqueue_chunk(chunk)
+    }
+
+    fn get_vendor_name(&self) -> String {
+        "Gladia".to_string()
     }
 }
 
