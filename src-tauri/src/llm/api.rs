@@ -43,7 +43,6 @@ impl std::fmt::Display for ModelError {
     }
 }
 
-
 pub async fn call_model_api(
     app: tauri::AppHandle,
     req: ModelRequest,

@@ -1,3 +1,5 @@
+#![allow(clippy::collapsible_if)]
+
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use reqwest::Client;
@@ -34,8 +36,6 @@ impl GladiaTranscriber {
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
-        let callback_clone = callback.clone();
-        let status_callback_clone = status_callback.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
@@ -43,11 +43,11 @@ impl GladiaTranscriber {
                 api_key,
                 language,
                 sample_rate,
-                callback_clone,
+                callback,
                 receiver,
                 shutdown_rx,
             )) {
-                if let Some(cb) = status_callback_clone.as_ref() {
+                if let Some(cb) = status_callback.as_ref() {
                     cb(format!("gladia: {err}"));
                 }
                 eprintln!("Gladia streaming error: {err}");
