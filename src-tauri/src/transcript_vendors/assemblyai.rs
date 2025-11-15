@@ -204,6 +204,6 @@ impl StreamingTranscriber for AssemblyAiTranscriber {
     }
 
     fn get_vendor_name(&self) -> String {
-         "AssemblyAI".to_string()
+        "AssemblyAI".to_string()
     }
 }

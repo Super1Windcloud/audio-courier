@@ -1,3 +1,6 @@
+#![allow(clippy::collapsible_if)]
+
+use crate::utils::write_some_log;
 use serde_json::json;
 use std::env;
 use std::time::Duration;
@@ -148,7 +151,9 @@ pub async fn call_model_api(
                                     // 发送流式数据到前端，处理发送错误
                                     if let Err(e) = app.emit("llm_stream", content) {
                                         eprintln!("警告: 无法发送流式数据到前端: {}", e);
-                                        // 这里可以选择继续执行而不是返回错误
+                                        write_some_log(
+                                            format!(" 无法发送流式数据到前端: {}", e).as_str(),
+                                        )
                                     }
                                 }
                             }

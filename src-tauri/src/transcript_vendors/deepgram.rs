@@ -229,10 +229,7 @@ fn language_from_env() -> Option<Language> {
 }
 
 fn match_language(value: &str) -> Language {
-    let cleaned = value
-        .trim()
-        .replace(['-', ' '], "_")
-        .to_lowercase();
+    let cleaned = value.trim().replace(['-', ' '], "_").to_lowercase();
 
     match cleaned.as_str() {
         "bg" => Language::bg,

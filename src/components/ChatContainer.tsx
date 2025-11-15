@@ -13,13 +13,16 @@ export interface Message {
 
 export const ChatContainer: React.FC = () => {
   const didRun = useRef(false);
-  const [messages, setMessages] = useState<Message[]>([
+  // 用 ref 存消息，避免 React 状态更新导致未更新完成的旧的状态丢失
+  const messagesRef = useRef<Message[]>([
     {
       id: 0,
       text: "你好,请开始你的语音对话",
       sender: "robot",
     },
   ]);
+
+  const [messages, setMessages] = useState<Message[]>(messagesRef.current);
   useEffect(() => {
     if (didRun.current) return;
     didRun.current = true;
@@ -35,14 +38,25 @@ export const ChatContainer: React.FC = () => {
   );
 
   const handleSendMessage = async (text: string, introduceSelf?: boolean) => {
-    setMessages((prev) => {
-      const userMessage: Message = {
-        id: prev.length,
-        text,
-        sender: "user",
-      };
-      return [...prev, userMessage];
-    });
+    const userMsg: Message = {
+      id: messagesRef.current.length,
+      text,
+      sender: "user",
+    };
+    messagesRef.current.push(userMsg);
+
+    // 添加机器人占位
+    const botMsg: Message = {
+      id: messagesRef.current.length,
+      text: "",
+      sender: "robot",
+    };
+    messagesRef.current.push(botMsg);
+
+    setMessages([...messagesRef.current]);
+
+    const thisBotId = botMsg.id; // ← 记录本轮机器人消息 ID
+
     setIsTyping(true);
 
     await llmInterviewChatStreamOutput(
@@ -51,27 +65,34 @@ export const ChatContainer: React.FC = () => {
       currentSelectedModel,
       (content) => {
         setIsTyping(false);
-
-        setMessages((prev) => {
-          return prev.length > 0 && prev[prev.length - 1].sender === "robot"
-            ? [
-                ...prev.slice(0, -1), // 去掉最后一个
-                { ...prev[prev.length - 1], text: content }, // 替换最后一个
-              ]
-            : [...prev, { text: content, sender: "robot", id: prev.length }];
-        });
+        updateSpecificBotMessage(thisBotId, content); // ← 更新特定机器人消息
       },
     );
   };
 
+  function updateSpecificBotMessage(id: number, content: string) {
+    const msgs = messagesRef.current;
+    const idx = msgs.findIndex((msg) => msg.id === id);
+
+    if (idx === -1) return;
+
+    msgs[idx] = {
+      ...msgs[idx],
+      text: content,
+    };
+
+    setMessages([...msgs]);
+  }
+
   const handleClearConversation = () => {
-    setMessages([
+    messagesRef.current = [
       {
         id: 0,
         text: "你好,请开始你的语音对话",
         sender: "robot",
       },
-    ]);
+    ];
+    setMessages([...messagesRef.current]);
     setIsTyping(false);
   };
 
