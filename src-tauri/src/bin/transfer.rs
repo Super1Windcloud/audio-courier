@@ -22,20 +22,8 @@ fn main() {
     .expect("选择失败");
 
     let last_result = Arc::new(Mutex::new(String::new()));
-    let auto_chunk_buffer = if vendor == "assemblyai" {
-        false
-    } else if vendor == "revai" {
-        false
-    } else if vendor == "speechmatics" {
-        false
-    } else if vendor == "gladia" {
-        false
-    } else if vendor == "deepgram" {
-        true
-    } else {
-        false
-    };
-    let capture_interval = if vendor == "assemblyai" { 1 } else { 10 };
+
+    let capture_interval = 1;
     let params = RecordParams {
         device: device.to_string(),
         file_name: "".to_string(),
@@ -48,7 +36,7 @@ fn main() {
                 write_log(chunk);
             }
         })),
-        auto_chunk_buffer,
+        auto_chunk_buffer: false,
         use_resampled: true,
         selected_asr_vendor: vendor.to_string(),
     };

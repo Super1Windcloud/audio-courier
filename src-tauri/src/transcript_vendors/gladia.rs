@@ -146,7 +146,7 @@ async fn run_stream(
             }
         }
 
-        sink.send(Message::Text(r#"{"type":"stop"}"#.into()))
+        sink.send(Message::Text(r#"{"type":"stop_recording"}"#.into()))
             .await
             .map_err(|e| format!("Failed to send Gladia stop message: {e}"))?;
 
@@ -214,6 +214,30 @@ fn build_start_message(language: String, sample_rate: u32) -> String {
 
 fn parse_transcript(payload: &str) -> Option<String> {
     let value: Value = serde_json::from_str(payload).ok()?;
+    let event_type = value.get("type").and_then(|v| v.as_str())?;
+
+    match event_type {
+        "transcript" => {
+            if let Some(data) = value.get("data") {
+                let is_final = data
+                    .get("is_final")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                if !is_final {
+                    return None;
+                }
+                return extract_text_from_data(data);
+            }
+            parse_legacy_transcript(&value)
+        }
+        "post_transcript" | "post_final_transcript" => {
+            value.get("data").and_then(extract_text_from_data)
+        }
+        _ => None,
+    }
+}
+
+fn parse_legacy_transcript(value: &Value) -> Option<String> {
     if value.get("type").and_then(|v| v.as_str())? != "transcript" {
         return None;
     }
@@ -224,14 +248,48 @@ fn parse_transcript(payload: &str) -> Option<String> {
     if !is_final {
         return None;
     }
+
     if let Some(text) = value.get("transcript").and_then(|v| v.as_str()) {
         let trimmed = text.trim();
         if !trimmed.is_empty() {
             return Some(trimmed.to_string());
         }
     }
+
     value
         .get("alternatives")
+        .and_then(|alts| alts.as_array())
+        .and_then(|alts| alts.first())
+        .and_then(|first| first.get("transcript"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+}
+
+fn extract_text_from_data(data: &Value) -> Option<String> {
+    if let Some(utterance) = data.get("utterance") {
+        if let Some(text) = utterance.get("text").and_then(|v| v.as_str()) {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+
+    if let Some(text) = data.get("text").and_then(|v| v.as_str()) {
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    if let Some(transcript) = data.get("transcript").and_then(|v| v.as_str()) {
+        let trimmed = transcript.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    data.get("alternatives")
         .and_then(|alts| alts.as_array())
         .and_then(|alts| alts.first())
         .and_then(|first| first.get("transcript"))

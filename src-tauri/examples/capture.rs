@@ -218,7 +218,7 @@ fn write_all_formats<T>(
     let mono_f32 = stereo_to_mono_f32(&stereo_f32);
     let mono_i16 = stereo_to_mono_i16(&stereo_i16);
 
-    let output_rate = RESAMPLE_RATE;
+    let output_rate = RESAMPLE_RATE as usize;
     let resampled_mono_i16 = resample_audio_rubato(&mono_f32, sample_rate, output_rate, 1).unwrap();
 
     write_samples(&mono_i16, i16_mono);

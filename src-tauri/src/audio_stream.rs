@@ -70,7 +70,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     };
 
     let capture_interval = if selected_asr_vendor == "assemblyai" {
-        5
+        1
     } else {
         10
     };
