@@ -3,6 +3,10 @@ use std::sync::Arc;
 
 pub type PcmCallback = Arc<dyn Fn(&str) + Send + Sync + 'static>;
 
+pub trait StreamingTranscriber: Send + Sync {
+    fn queue_chunk(&self, chunk: Vec<i16>) -> Result<(), String>;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TranscriptVendors {
     DeepGram,

@@ -69,16 +69,6 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
         "default"
     };
 
-    let use_resampled = if selected_asr_vendor == "assemblyai" {
-        false
-    } else {
-        true
-    };
-    let auto_chunk_buffer = if selected_asr_vendor == "assemblyai" {
-        false
-    } else {
-        true
-    };
     let capture_interval = if selected_asr_vendor == "assemblyai" {
         5
     } else {
@@ -98,8 +88,9 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
                 app.emit("transcription_result", chunk).unwrap();
             }
         })),
-        use_resampled,
-        auto_chunk_buffer,
+
+        use_resampled: true,
+        auto_chunk_buffer: false,
         selected_asr_vendor,
     };
 

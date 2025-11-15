@@ -1,10 +1,14 @@
+use crate::RESAMPLE_RATE;
+use cpal::Sample;
 use cpal::traits::{DeviceTrait, HostTrait};
-use rubato::{ResampleError, Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction};
+use rubato::{
+    ResampleError, Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType,
+    WindowFunction,
+};
 use std::collections::HashMap;
 use std::env;
 use std::fs::OpenOptions;
 use std::io::Write;
-use cpal::Sample;
 
 pub fn is_dev() -> bool {
     cfg!(debug_assertions)
@@ -75,7 +79,7 @@ pub fn select_output_config(use_resample: bool) -> Result<cpal::SupportedStreamC
         .supported_output_configs()
         .map_err(|_| "无法获取输出设备配置".to_string())?;
 
-    let desired_sample_rate = cpal::SampleRate(16000);
+    let desired_sample_rate = cpal::SampleRate(RESAMPLE_RATE);
 
     for range in supported_configs {
         if range.min_sample_rate() <= desired_sample_rate

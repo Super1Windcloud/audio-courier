@@ -1,17 +1,18 @@
 #![allow(clippy::tabs_in_doc_comments)]
 #![allow(clippy::collapsible_if)]
 
+use crate::RESAMPLE_RATE;
 use crate::transcript_vendors::{
-    PcmCallback, TranscriptVendors, assemblyai::AssemblyAiTranscriber,
+    PcmCallback, StreamingTranscriber, TranscriptVendors, assemblyai::AssemblyAiTranscriber,
+    gladia::GladiaTranscriber, revai::RevAiTranscriber, speechmatics::SpeechmaticsTranscriber,
 };
-use crate::utils::{is_dev, select_output_config, write_some_log};
+use crate::utils::{is_dev, resample_audio_with_rubato, select_output_config, write_some_log};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{ChannelCount, FromSample, Sample};
 use dasp::sample::ToSample;
 use std::env;
 use std::fs::File;
 use std::io::BufWriter;
-use std::path::Path;
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -46,7 +47,7 @@ pub struct RecordParams {
     pub selected_asr_vendor: String,
 }
 
-pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
+pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
     let host = cpal::default_host();
     RECORDING.store(true, Ordering::SeqCst);
 
@@ -64,70 +65,81 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
         write_some_log(format!("Input device: {}", device.name().unwrap()).as_str());
     }
 
+    if !params.only_pcm {
+        params.use_resampled = false;
+        params.auto_chunk_buffer = true;
+    }
+
     let config = if device.supports_input() && params.device.contains("input") {
         device.default_input_config().unwrap()
     } else {
         select_output_config(params.use_resampled)?
     };
-    if is_dev() {
-        write_some_log(format!("Output device: {}", device.name().unwrap()).as_str());
-        write_some_log(format!("Output config: {:#?}", config).as_str());
-    } else {
-        write_some_log(format!("Output selected config: {:#?}", config).as_str());
-    };
+
+    write_some_log(format!("Output selected config: {:#?}", config).as_str());
 
     let asr_vendor: TranscriptVendors = params.selected_asr_vendor.parse()?;
 
-    let spec_f32_stereo = wav_spec_from_config(&config);
-
-    let spec_i16_mono = hound::WavSpec {
+    let config_sample_rate = config.sample_rate().0;
+    let spec = hound::WavSpec {
         channels: 1,
-        sample_rate: spec_f32_stereo.sample_rate,
+        sample_rate: config_sample_rate,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
-
     let path = if params.file_name.trim().is_empty() {
-        concat!(env!("CARGO_MANIFEST_DIR"), "assets/recorded.wav")
+        concat!(env!("CARGO_MANIFEST_DIR"), "/assets/transfer_recorded.wav")
     } else {
         params.file_name.as_str()
     };
 
-    let writer = if params.file_name.trim().is_empty() {
-        Arc::new(Mutex::new(None))
-    } else {
-        let path = Path::new(params.file_name.as_str());
-        let writer = hound::WavWriter::create(path, spec_i16_mono)
-            .map_err(|e| format!("Failed to create WAV writer: {e}"))?;
-        Arc::new(Mutex::new(Some(writer)))
-    };
+    let writer = hound::WavWriter::create(path, spec)
+        .map_err(|e| format!("Failed to create WAV writer: {e}"))?;
+    let writer = Arc::new(Mutex::new(Some(writer)));
 
     let writer_clone = writer.clone();
     let err_fn = move |err| {
         eprintln!("An error occurred on stream: {err}");
         write_some_log(format!("An error occurred on stream: {err}").as_str())
     };
-    let sample_rate = config.sample_rate().0;
+    let sample_rate_u32 = config_sample_rate;
+    let sample_rate = sample_rate_u32 as usize;
     // 100ms best effect
-    let chunk_size = (sample_rate * params.capture_interval / 10) as usize;
+    let chunk_size = (sample_rate_u32 * params.capture_interval / 10) as usize;
     let channels = config.channels();
-    let assembly_sample_rate = if params.use_resampled {
-        16000
+    let stream_sample_rate = if params.use_resampled {
+        RESAMPLE_RATE
     } else {
-        sample_rate
+        sample_rate_u32
     };
 
-    let asr_transcriber = if asr_vendor == TranscriptVendors::AssemblyAI {
-        if let Some(callback) = params.pcm_callback.clone() {
-            Some(Arc::new(
-                AssemblyAiTranscriber::start(assembly_sample_rate, callback)
-                    .map_err(|e| format!("Failed to start AssemblyAI stream: {e}"))?,
-            ))
-        } else {
-            None
+    let callback = params.pcm_callback.clone();
+    let asr_transcriber: Option<Arc<dyn StreamingTranscriber>> = match (asr_vendor, callback) {
+        (TranscriptVendors::AssemblyAI, Some(callback)) => {
+            let transcriber = AssemblyAiTranscriber::start(stream_sample_rate, callback)
+                .map_err(|e| format!("Failed to start AssemblyAI stream: {e}"))?;
+            let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
+            Some(transcriber)
         }
-    } else {
-        None
+        (TranscriptVendors::RevAI, Some(callback)) => {
+            let transcriber = RevAiTranscriber::start(stream_sample_rate, callback)
+                .map_err(|e| format!("Failed to start RevAI stream: {e}"))?;
+            let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
+            Some(transcriber)
+        }
+        (TranscriptVendors::SpeechMatics, Some(callback)) => {
+            let transcriber = SpeechmaticsTranscriber::start(stream_sample_rate, callback)
+                .map_err(|e| format!("Failed to start Speechmatics stream: {e}"))?;
+            let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
+            Some(transcriber)
+        }
+        (TranscriptVendors::GlaDia, Some(callback)) => {
+            let transcriber = GladiaTranscriber::start(stream_sample_rate, callback)
+                .map_err(|e| format!("Failed to start Gladia stream: {e}"))?;
+            let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
+            Some(transcriber)
+        }
+        _ => None,
     };
     let stream = match config.sample_format() {
         cpal::SampleFormat::I16 => device
@@ -142,6 +154,8 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
                         channels,
                         params.auto_chunk_buffer,
                         asr_transcriber.clone(),
+                        params.use_resampled,
+                        sample_rate,
                     )
                 },
                 err_fn,
@@ -152,7 +166,7 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
             .build_input_stream(
                 &config.into(),
                 move |data, _: &_| {
-                    handle_input_data::<f32, f32>(
+                    handle_input_data::<f32, i16>(
                         data,
                         &writer,
                         params.only_pcm,
@@ -160,6 +174,8 @@ pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
                         channels,
                         params.auto_chunk_buffer,
                         asr_transcriber.clone(),
+                        params.use_resampled,
+                        sample_rate,
                     )
                 },
                 err_fn,
@@ -205,7 +221,9 @@ fn handle_input_data<T, U>(
     chunk_size: usize,
     channels: ChannelCount,
     auto_chunk_buffer: bool,
-    transcriber: Option<Arc<AssemblyAiTranscriber>>,
+    transcriber: Option<Arc<dyn StreamingTranscriber>>,
+    use_resampled: bool,
+    input_sample_rate: usize,
 ) where
     T: Sample + ToSample<i16> + ToSample<f32> + FromSample<i16> + FromSample<f32>,
     U: Sample + hound::Sample + FromSample<T> + FromSample<i16> + FromSample<f32>,
@@ -234,19 +252,23 @@ fn handle_input_data<T, U>(
     }
     if auto_chunk_buffer {
         if let Some(transcriber) = transcriber.as_ref() {
-            let chunk_i16 = input_mono
-                .iter()
-                .map(|&x| x.to_sample::<i16>())
-                .collect::<Vec<i16>>();
-            if let Err(err) = transcriber.send_chunk(chunk_i16) {
-                write_some_log(format!("AssemblyAI chunk send failed: {err}").as_str());
+            let chunk_i16 =
+                prepare_chunk_for_transcriber(&input_mono, use_resampled, input_sample_rate);
+            if let Err(err) = transcriber.queue_chunk(chunk_i16) {
+                write_some_log(format!("Streaming chunk send failed: {err}").as_str());
             }
         }
     } else {
         PCM_BUFFER.with(|buf_cell| {
             let mut buf = buf_cell.lock().unwrap();
             buf.extend(input_mono);
-            drain_chunk_buffer_to_writer(&mut buf, chunk_size, transcriber.clone())
+            drain_chunk_buffer_to_writer(
+                &mut buf,
+                chunk_size,
+                transcriber.clone(),
+                use_resampled,
+                input_sample_rate,
+            )
         });
     }
 }
@@ -254,7 +276,9 @@ fn handle_input_data<T, U>(
 fn drain_chunk_buffer_to_writer(
     buf: &mut MutexGuard<Vec<f32>>,
     chunk_size: usize,
-    transcriber: Option<Arc<AssemblyAiTranscriber>>,
+    transcriber: Option<Arc<dyn StreamingTranscriber>>,
+    use_resampled: bool,
+    input_sample_rate: usize,
 ) {
     while buf.len() >= chunk_size {
         let chunk = buf.drain(..chunk_size).collect::<Vec<f32>>();
@@ -272,14 +296,29 @@ fn drain_chunk_buffer_to_writer(
         }
 
         if let Some(transcriber) = transcriber.as_ref() {
-            let chunk_i16 = chunk
-                .iter()
-                .map(|&x| x.to_sample::<i16>())
-                .collect::<Vec<i16>>();
-            if let Err(err) = transcriber.send_chunk(chunk_i16) {
-                write_some_log(format!("AssemblyAI chunk send failed: {err}").as_str());
+            let chunk_i16 = prepare_chunk_for_transcriber(&chunk, use_resampled, input_sample_rate);
+            if let Err(err) = transcriber.queue_chunk(chunk_i16) {
+                write_some_log(format!("Streaming chunk send failed: {err}").as_str());
             }
         }
+    }
+}
+
+fn prepare_chunk_for_transcriber(
+    input: &[f32],
+    use_resampled: bool,
+    input_sample_rate: usize,
+) -> Vec<i16> {
+    if use_resampled {
+        match resample_audio_with_rubato(input, input_sample_rate, RESAMPLE_RATE as usize, 1) {
+            Ok(resampled) => resampled,
+            Err(err) => {
+                write_some_log(format!("Resample failed, fallback to raw chunk: {err}").as_str());
+                input.iter().map(|&x| x.to_sample::<i16>()).collect()
+            }
+        }
+    } else {
+        input.iter().map(|&x| x.to_sample::<i16>()).collect()
     }
 }
 
@@ -291,23 +330,6 @@ fn stereo_to_mono_f32(samples: &[f32]) -> Vec<f32> {
         .chunks_exact(2)
         .map(|c| (c[0] + c[1]) / 2.0)
         .collect()
-}
-
-fn sample_format(format: cpal::SampleFormat) -> hound::SampleFormat {
-    if format.is_float() {
-        hound::SampleFormat::Float
-    } else {
-        hound::SampleFormat::Int
-    }
-}
-
-fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec {
-    hound::WavSpec {
-        channels: config.channels() as _,
-        sample_rate: config.sample_rate().0 as _,
-        bits_per_sample: (config.sample_format().sample_size() * 8) as _,
-        sample_format: sample_format(config.sample_format()),
-    }
 }
 
 type WavWriterHandle = Arc<Mutex<Option<hound::WavWriter<BufWriter<File>>>>>;

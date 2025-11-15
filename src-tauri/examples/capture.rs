@@ -11,6 +11,7 @@ use rubato::{
 use std::fs::File;
 use std::io::BufWriter;
 use std::sync::{Arc, Mutex};
+use tauri_courier_ai_lib::RESAMPLE_RATE;
 
 pub struct RecordParams {
     pub device: String,
@@ -26,7 +27,7 @@ fn select_output_config(use_resample: bool) -> Result<cpal::SupportedStreamConfi
         .supported_output_configs()
         .map_err(|_| "无法获取输出设备配置".to_string())?;
 
-    let desired_sample_rate = cpal::SampleRate(16000);
+    let desired_sample_rate = cpal::SampleRate(RESAMPLE_RATE);
 
     for range in supported_configs {
         if range.min_sample_rate() <= desired_sample_rate
@@ -69,14 +70,15 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
             .unwrap()
             .find(|x| x.name().map(|y| y == name).unwrap_or(false)),
     }
-        .ok_or_else(|| "无法找到输出设备".to_string())?;
+    .ok_or_else(|| "无法找到输出设备".to_string())?;
     let config = select_output_config(true)?;
 
-    const PATH_I16_MONO: &str = concat!(env!("CARGO_MANIFEST_DIR"), "assets/recorded_i16_mono.wav");
+    const PATH_I16_MONO: &str =
+        concat!(env!("CARGO_MANIFEST_DIR"), "/assets/recorded_i16_mono.wav");
 
     const PATH_I16_MONO_RESAMPLE: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "assets/recorded_i16_mono_resample.wav"
+        env!("CARGO_MANIFEST_DIR"),
+        "/assets/recorded_i16_mono_resample.wav"
     );
 
     let spec_f32_stereo = wav_spec_from_config(&config);
@@ -90,7 +92,7 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
 
     let spec_i16_mono_resample = hound::WavSpec {
         channels: 1,
-        sample_rate: 16000,
+        sample_rate: RESAMPLE_RATE,
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
@@ -151,7 +153,7 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
         ),
         other => return Err(format!("暂不支持的采样格式: {other:?}")),
     }
-        .map_err(|e| format!("创建音频输出流失败: {e}"))?;
+    .map_err(|e| format!("创建音频输出流失败: {e}"))?;
 
     println!("▶️ 开始录制 {:#?} 秒...", params.duration);
     stream.play().unwrap();
@@ -216,7 +218,7 @@ fn write_all_formats<T>(
     let mono_f32 = stereo_to_mono_f32(&stereo_f32);
     let mono_i16 = stereo_to_mono_i16(&stereo_i16);
 
-    let output_rate = 16000;
+    let output_rate = RESAMPLE_RATE;
     let resampled_mono_i16 = resample_audio_rubato(&mono_f32, sample_rate, output_rate, 1).unwrap();
 
     write_samples(&mono_i16, i16_mono);
@@ -243,7 +245,7 @@ fn resample_audio_rubato(
         input.len() / channels,
         channels,
     )
-        .unwrap();
+    .unwrap();
     let split: Vec<Vec<f32>> = (0..channels)
         .map(|ch| {
             input

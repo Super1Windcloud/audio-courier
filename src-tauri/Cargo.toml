@@ -36,12 +36,20 @@ hound = "3.5.1"
 dasp = "0.11.0"
 rubato = "0.16.2"
 rustls = { version = "0.23.35", default-features = false, features = ["ring"] }
-tungstenite = { version = "0.28.0", default-features = false, features = ["__rustls-tls", "http", "handshake"] }
-tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+
+tungstenite = { version = "0.28.0", default-features = false, features = ["__rustls-tls", "http", "handshake", "rustls-tls-native-roots", "rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["connect", "rustls-tls-webpki-roots", "rustls-tls-native-roots"] }
 futures-util = "0.3.31"
+inquire = "0.9.1"
+speechmatics = { version = "0.4.0", default-features = false, features = ["realtime", "batch"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
+
+[target.'cfg(windows)'.dependencies]
+native-tls = "0.2"
+tungstenite = { version = "0.28.0", default-features = false, features = ["native-tls"] }
+tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["native-tls"] }
 
 
 [[bin]]

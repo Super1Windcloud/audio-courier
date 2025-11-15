@@ -1,6 +1,6 @@
 #![allow(clippy::collapsible_if)]
 
-use crate::transcript_vendors::PcmCallback;
+use crate::transcript_vendors::{PcmCallback, StreamingTranscriber};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use serde_json::{Value, json};
 use std::env;
@@ -46,7 +46,7 @@ impl AssemblyAiTranscriber {
         })
     }
 
-    pub fn send_chunk(&self, chunk: Vec<i16>) -> Result<(), String> {
+    pub fn enqueue_chunk(&self, chunk: Vec<i16>) -> Result<(), String> {
         self.sender
             .blocking_send(chunk)
             .map_err(|e| format!("Failed to queue PCM chunk for AssemblyAI: {e}"))
@@ -188,4 +188,10 @@ async fn run_stream(
 
     try_join(send_audio, receive_events).await?;
     Ok(())
+}
+
+impl StreamingTranscriber for AssemblyAiTranscriber {
+    fn queue_chunk(&self, chunk: Vec<i16>) -> Result<(), String> {
+        self.enqueue_chunk(chunk)
+    }
 }
