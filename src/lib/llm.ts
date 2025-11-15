@@ -11,23 +11,28 @@ export async function llmInterviewChatStreamOutput(
   console.log("currentModel", currentModel);
   console.log("currentQuestion", question);
   console.log("llmPrompt", llmPrompt);
-  let _llmPrompt = "回答问题";
   let result = "";
-  const unlisten = await listen<string>("llm_stream", (event) => {
+
+  const requestId = Math.random().toString(36).substring(2, 15);
+  const eventName = `llm_stream_${requestId}`;
+
+  const unlisten = await listen<string>(eventName, (event) => {
     result += event.payload;
     renderCallback(result);
   });
-  invoke(currentModel,  {
+
+  invoke(currentModel, {
     flowArgs: {
       question,
-      llmPrompt: _llmPrompt,
+      llmPrompt,
+      requestId,
     },
   })
-    .then((final: unknown) => {
-      console.warn(question === "go" ? "go result :" : "rust result", final);
+    .then((_final: unknown) => {
+      // console.warn(question === "go" ? "go result :" : "rust result", _final);
     })
     .catch((err) => {
-      console.error("invoke llmModel", err);
+      console.error("invoke llmModel Error", err);
     })
     .finally(() => {
       unlisten();

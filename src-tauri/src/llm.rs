@@ -7,6 +7,7 @@ use serde_json::json;
 pub struct FlowArgs {
     question: String,
     llm_prompt: String,
+    request_id: Option<String>,
 }
 
 const FREE_MODELS: [&str; 8] = [
@@ -47,6 +48,7 @@ pub async fn siliconflow_free(
             max_tokens: 4096,
             temperature: 0.7,
         },
+        flow_args.request_id,
     )
     .await
     .map_err(|e| e.to_string())
@@ -122,6 +124,7 @@ pub async fn siliconflow_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Resu
             max_tokens: 4096,
             temperature: 0.7,
         },
+        flow_args.request_id,
     )
     .await
     .map_err(|e| e.to_string())
@@ -145,6 +148,7 @@ pub async fn doubao_lite(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<S
             max_tokens: 4096,
             temperature: 0.7,
         },
+        flow_args.request_id,
     )
     .await
     .map_err(|e| e.to_string())
@@ -168,6 +172,7 @@ pub async fn doubao_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<St
             max_tokens: 4096,
             temperature: 0.7,
         },
+        flow_args.request_id,
     )
     .await
     .map_err(|e| e.to_string())
@@ -194,6 +199,7 @@ pub async fn doubao_seed_flash(
             max_tokens: 4096,
             temperature: 0.7,
         },
+        flow_args.request_id,
     )
     .await
     .map_err(|e| e.to_string())
@@ -217,6 +223,7 @@ pub async fn doubao_seed(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<S
             max_tokens: 4096,
             temperature: 0.7,
         },
+        flow_args.request_id,
     )
     .await
     .map_err(|e| e.to_string())
@@ -241,6 +248,7 @@ pub async fn kimi(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, 
             max_tokens: 4096,
             temperature: 0.7,
         },
+        flow_args.request_id,
     )
     .await
     .map_err(|e| e.to_string())
@@ -265,6 +273,7 @@ pub async fn zhipu(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String,
             max_tokens: 4096,
             temperature: 0.618,
         },
+        flow_args.request_id,
     )
     .await
     .map_err(|e| e.to_string())
@@ -289,6 +298,7 @@ pub async fn deepseek_api(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<
             max_tokens: 4096,
             temperature: 0.7,
         },
+        flow_args.request_id,
     )
     .await
     .map_err(|e| e.to_string())
@@ -313,6 +323,7 @@ pub async fn ali_qwen_2_5(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<
             max_tokens: 4096,
             temperature: 0.7,
         },
+        flow_args.request_id,
     )
     .await
     .map_err(|e| e.to_string())
@@ -339,6 +350,7 @@ pub async fn ali_qwen_plus_latest(
             max_tokens: 4096,
             temperature: 0.7,
         },
+        flow_args.request_id,
     )
     .await
     .map_err(|e| e.to_string())
@@ -362,6 +374,7 @@ pub async fn ali_qwen_max(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<
             max_tokens: 4096,
             temperature: 0.7,
         },
+        flow_args.request_id,
     )
     .await
     .map_err(|e| e.to_string())

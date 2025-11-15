@@ -43,9 +43,11 @@ impl std::fmt::Display for ModelError {
     }
 }
 
+
 pub async fn call_model_api(
     app: tauri::AppHandle,
     req: ModelRequest,
+    request_id: Option<String>,
 ) -> Result<String, ModelError> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(120)) // 设置总超时时间
@@ -106,6 +108,13 @@ pub async fn call_model_api(
     let mut consecutive_errors = 0;
     const MAX_CONSECUTIVE_ERRORS: usize = 5;
 
+    // 确定事件名称 - 如果有请求ID则使用带ID的事件名
+    let event_name = if let Some(id) = &request_id {
+        format!("llm_stream_{}", id)
+    } else {
+        "llm_stream".to_string()
+    };
+
     while let Some(item) = stream.next().await {
         match item {
             Ok(chunk) => {
@@ -149,7 +158,7 @@ pub async fn call_model_api(
                                     result.push_str(content);
 
                                     // 发送流式数据到前端，处理发送错误
-                                    if let Err(e) = app.emit("llm_stream", content) {
+                                    if let Err(e) = app.emit(&event_name, content) {
                                         eprintln!("警告: 无法发送流式数据到前端: {}", e);
                                         write_some_log(
                                             format!(" 无法发送流式数据到前端: {}", e).as_str(),
