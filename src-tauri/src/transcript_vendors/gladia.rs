@@ -182,8 +182,8 @@ async fn run_stream(
 
                 match message {
                     Message::Text(payload) => {
-                        if let Some(text) = parse_transcript(&payload) {
-                            if !text.is_empty() {
+                        if let Some((kind, text)) = parse_transcript(&payload) {
+                            if matches!(kind, TranscriptKind::Partial) && !text.is_empty() {
                                 callback(text.as_str());
                             }
                         } else if is_error_payload(&payload) {
@@ -224,57 +224,78 @@ fn build_start_message(language: String, sample_rate: u32) -> String {
     .to_string()
 }
 
-fn parse_transcript(payload: &str) -> Option<String> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TranscriptKind {
+    Partial,
+    Final,
+}
+
+fn parse_transcript(payload: &str) -> Option<(TranscriptKind, String)> {
     let value: Value = serde_json::from_str(payload).ok()?;
     let event_type = value.get("type").and_then(|v| v.as_str())?;
 
     match event_type {
         "transcript" => {
             if let Some(data) = value.get("data") {
-                let is_final = data
-                    .get("is_final")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                if !is_final {
-                    return None;
-                }
-                return extract_text_from_data(data);
+                return extract_text_from_data(data).map(|text| {
+                    let kind = transcript_kind(data);
+                    (kind, text)
+                });
             }
             parse_legacy_transcript(&value)
         }
-        "post_transcript" | "post_final_transcript" => {
-            value.get("data").and_then(extract_text_from_data)
-        }
+        "post_transcript" | "post_final_transcript" => value
+            .get("data")
+            .and_then(extract_text_from_data)
+            .map(|text| (TranscriptKind::Final, text)),
         _ => None,
     }
 }
 
-fn parse_legacy_transcript(value: &Value) -> Option<String> {
+fn parse_legacy_transcript(value: &Value) -> Option<(TranscriptKind, String)> {
     if value.get("type").and_then(|v| v.as_str())? != "transcript" {
         return None;
     }
-    let is_final = value
-        .get("is_final")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    if !is_final {
-        return None;
-    }
+    let kind = transcript_kind(value);
 
     if let Some(text) = value.get("transcript").and_then(|v| v.as_str()) {
         let trimmed = text.trim();
         if !trimmed.is_empty() {
-            return Some(trimmed.to_string());
+            return Some((kind, trimmed.to_string()));
         }
     }
 
-    value
+    let transcript = value
         .get("alternatives")
         .and_then(|alts| alts.as_array())
         .and_then(|alts| alts.first())
         .and_then(|first| first.get("transcript"))
         .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string())
+        .map(|s| s.trim().to_string())?;
+
+    Some((kind, transcript))
+}
+
+fn transcript_kind(value: &Value) -> TranscriptKind {
+    if let Some(kind) = value.get("type").and_then(|v| v.as_str()) {
+        if kind.eq_ignore_ascii_case("final") || kind.contains("final") {
+            return TranscriptKind::Final;
+        }
+        if kind.eq_ignore_ascii_case("partial") {
+            return TranscriptKind::Partial;
+        }
+    }
+
+    if value
+        .get("is_final")
+        .or_else(|| value.get("final"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
+        TranscriptKind::Final
+    } else {
+        TranscriptKind::Partial
+    }
 }
 
 fn extract_text_from_data(data: &Value) -> Option<String> {
@@ -334,13 +355,11 @@ async fn create_live_session(
         encoding: "wav/pcm",
         bit_depth: 16,
         sample_rate,
-        endpointing: 0.5,
         channels: 1,
         model,
         language_config,
-        maximum_duration_without_endpointing: 60,
         messages_config: MessagesConfig {
-            receive_partial_transcripts: false,
+            receive_partial_transcripts: true,
             receive_final_transcripts: true,
         },
     };
@@ -379,13 +398,11 @@ struct LiveSessionRequest {
     encoding: &'static str,
     bit_depth: u8,
     sample_rate: u32,
-    endpointing: f32,
     channels: u8,
     model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     language_config: Option<LanguageConfig>,
     messages_config: MessagesConfig,
-    maximum_duration_without_endpointing: u32,
 }
 
 #[derive(Serialize)]
