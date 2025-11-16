@@ -6,13 +6,14 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::thread::{self, JoinHandle};
+use std::sync::Mutex;
 use tokio::io::{AsyncRead, ReadBuf};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
 pub struct SpeechmaticsTranscriber {
-    sender: Option<mpsc::Sender<Vec<u8>>>,
-    handle: Option<JoinHandle<()>>,
+    sender: Mutex<Option<mpsc::Sender<Vec<u8>>>>,
+    handle: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl SpeechmaticsTranscriber {
@@ -50,15 +51,18 @@ impl SpeechmaticsTranscriber {
         });
 
         Ok(Self {
-            sender: Some(sender),
-            handle: Some(handle),
+            sender: Mutex::new(Some(sender)),
+            handle: Mutex::new(Some(handle)),
         })
     }
 
     pub fn enqueue_chunk(&self, chunk: Vec<i16>) -> Result<(), String> {
         let sender = self
             .sender
+            .lock()
+            .unwrap()
             .as_ref()
+            .cloned()
             .ok_or_else(|| "Speechmatics transcriber is not running".to_string())?;
 
         let mut bytes = Vec::with_capacity(chunk.len() * 2);
@@ -71,10 +75,10 @@ impl SpeechmaticsTranscriber {
             .map_err(|e| format!("Failed to queue PCM chunk for Speechmatics: {e}"))
     }
 
-    pub fn stop(&mut self) {
-        self.sender.take();
+    pub fn stop(&self) {
+        self.sender.lock().unwrap().take();
 
-        if let Some(handle) = self.handle.take() {
+        if let Some(handle) = self.handle.lock().unwrap().take() {
             let _ = handle.join();
         }
     }
@@ -93,6 +97,11 @@ impl StreamingTranscriber for SpeechmaticsTranscriber {
 
     fn get_vendor_name(&self) -> String {
         "SpeechMatics".to_string()
+    }
+
+    fn shutdown(&self) {
+        self.stop();
+        println!("Speechmatics websocket shutdown invoked");
     }
 }
 

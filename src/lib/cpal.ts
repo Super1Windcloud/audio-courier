@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 import useAppStateStore from "@/stores";
+import { convertTraditionalChinese } from "../../scripts/opencc.ts";
 
 let unlistener: UnlistenFn | null = null;
 let errorUnlistener: UnlistenFn | null = null;
@@ -30,6 +31,8 @@ export async function startAudioLoopbackRecognition(
       selectedAsrVendor.toLowerCase() === "revai"
     ) {
       content = event.payload;
+    } else if (selectedAsrVendor.toLowerCase() === "gladia") {
+      content += convertTraditionalChinese(event.payload);
     } else {
       content += event.payload;
     }

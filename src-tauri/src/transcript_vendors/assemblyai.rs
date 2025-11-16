@@ -4,6 +4,7 @@ use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscribe
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use serde_json::{Value, json};
 use std::env;
+use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
 use tokio::runtime::Runtime;
@@ -13,8 +14,8 @@ use tungstenite::client::{ClientRequestBuilder, IntoClientRequest};
 
 pub struct AssemblyAiTranscriber {
     sender: mpsc::Sender<Vec<i16>>,
-    shutdown: Option<oneshot::Sender<()>>,
-    handle: Option<JoinHandle<()>>,
+    shutdown: Mutex<Option<oneshot::Sender<()>>>,
+    handle: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl AssemblyAiTranscriber {
@@ -47,8 +48,8 @@ impl AssemblyAiTranscriber {
 
         Ok(Self {
             sender,
-            shutdown: Some(shutdown),
-            handle: Some(handle),
+            shutdown: Mutex::new(Some(shutdown)),
+            handle: Mutex::new(Some(handle)),
         })
     }
 
@@ -58,12 +59,12 @@ impl AssemblyAiTranscriber {
             .map_err(|e| format!("Failed to queue PCM chunk for AssemblyAI: {e}"))
     }
 
-    pub fn stop(&mut self) {
-        if let Some(shutdown) = self.shutdown.take() {
+    pub fn stop(&self) {
+        if let Some(shutdown) = self.shutdown.lock().unwrap().take() {
             let _ = shutdown.send(());
         }
 
-        if let Some(handle) = self.handle.take() {
+        if let Some(handle) = self.handle.lock().unwrap().take() {
             let _ = handle.join();
         }
     }
@@ -84,9 +85,7 @@ async fn run_stream(
 ) -> Result<(), String> {
     const BASE_URL: &str = "wss://streaming.assemblyai.com/v3/ws";
 
-    let query = format!(
-        "sample_rate={sample_rate}&format_turns=true&min_end_of_turn_silence_when_confident=1000"
-    );
+    let query = format!("sample_rate={sample_rate}&format_turns=true");
     let url = format!("{BASE_URL}?{query}");
 
     let uri: Uri = url
@@ -140,6 +139,8 @@ async fn run_stream(
         sink.close()
             .await
             .map_err(|e| format!("Failed to close AssemblyAI socket: {e}"))?;
+
+        println!("AssemblyAI websocket stop completed!");
 
         Ok::<(), String>(())
     };
@@ -308,5 +309,10 @@ impl StreamingTranscriber for AssemblyAiTranscriber {
 
     fn get_vendor_name(&self) -> String {
         "AssemblyAI".to_string()
+    }
+
+    fn shutdown(&self) {
+        self.stop();
+        println!("AssemblyAI websocket shutdown invoked");
     }
 }

@@ -6,6 +6,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::env;
+use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
 use tokio::runtime::Runtime;
@@ -20,8 +21,8 @@ use tokio_tungstenite::{
 
 pub struct GladiaTranscriber {
     sender: mpsc::Sender<Vec<i16>>,
-    shutdown: Option<oneshot::Sender<()>>,
-    handle: Option<JoinHandle<()>>,
+    shutdown: Mutex<Option<oneshot::Sender<()>>>,
+    handle: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl GladiaTranscriber {
@@ -56,8 +57,8 @@ impl GladiaTranscriber {
 
         Ok(Self {
             sender,
-            shutdown: Some(shutdown),
-            handle: Some(handle),
+            shutdown: Mutex::new(Some(shutdown)),
+            handle: Mutex::new(Some(handle)),
         })
     }
 
@@ -67,12 +68,12 @@ impl GladiaTranscriber {
             .map_err(|e| format!("Failed to queue PCM chunk for Gladia: {e}"))
     }
 
-    pub fn stop(&mut self) {
-        if let Some(shutdown) = self.shutdown.take() {
+    pub fn stop(&self) {
+        if let Some(shutdown) = self.shutdown.lock().unwrap().take() {
             let _ = shutdown.send(());
         }
 
-        if let Some(handle) = self.handle.take() {
+        if let Some(handle) = self.handle.lock().unwrap().take() {
             let _ = handle.join();
         }
     }
@@ -91,6 +92,11 @@ impl StreamingTranscriber for GladiaTranscriber {
 
     fn get_vendor_name(&self) -> String {
         "Gladia".to_string()
+    }
+
+    fn shutdown(&self) {
+        self.stop();
+        println!("Gladia websocket shutdown invoked");
     }
 }
 
@@ -166,6 +172,7 @@ async fn run_stream(
             .await
             .map_err(|e| format!("Failed to close Gladia socket: {e}"))?;
 
+        println!("Gladia websock streaming stop completely!");
         Ok::<(), String>(())
     };
 

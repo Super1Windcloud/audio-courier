@@ -14,13 +14,14 @@ use futures_util::{SinkExt, StreamExt};
 use std::env;
 use std::fmt;
 use std::thread::{self, JoinHandle};
+use std::sync::Mutex;
 use tokio::runtime::Runtime;
 use tokio::sync::{mpsc, oneshot};
 
 pub struct DeepgramTranscriber {
     sender: mpsc::Sender<Vec<i16>>,
-    shutdown: Option<oneshot::Sender<()>>,
-    handle: Option<JoinHandle<()>>,
+    shutdown: Mutex<Option<oneshot::Sender<()>>>,
+    handle: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl DeepgramTranscriber {
@@ -53,8 +54,8 @@ impl DeepgramTranscriber {
 
         Ok(Self {
             sender,
-            shutdown: Some(shutdown),
-            handle: Some(handle),
+            shutdown: Mutex::new(Some(shutdown)),
+            handle: Mutex::new(Some(handle)),
         })
     }
 
@@ -64,12 +65,12 @@ impl DeepgramTranscriber {
             .map_err(|e| format!("Failed to queue PCM chunk for Deepgram: {e}"))
     }
 
-    pub fn stop(&mut self) {
-        if let Some(shutdown) = self.shutdown.take() {
+    pub fn stop(&self) {
+        if let Some(shutdown) = self.shutdown.lock().unwrap().take() {
             let _ = shutdown.send(());
         }
 
-        if let Some(handle) = self.handle.take() {
+        if let Some(handle) = self.handle.lock().unwrap().take() {
             let _ = handle.join();
         }
     }
@@ -88,6 +89,11 @@ impl StreamingTranscriber for DeepgramTranscriber {
 
     fn get_vendor_name(&self) -> String {
         "Deepgram".to_string()
+    }
+
+    fn shutdown(&self) {
+        self.stop();
+        println!("Deepgram websocket shutdown invoked");
     }
 }
 
