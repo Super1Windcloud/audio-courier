@@ -5,7 +5,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use deepgram::{
     Deepgram,
     common::{
-        options::{Encoding, Endpointing, Language, Options},
+        options::{Encoding, Language, Options},
         stream_response::StreamResponse,
     },
 };
@@ -34,19 +34,17 @@ impl DeepgramTranscriber {
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
-        let callback_clone = callback.clone();
-        let status_callback_clone = status_callback.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
             if let Err(err) = runtime.block_on(run_stream(
                 api_key,
                 sample_rate,
-                callback_clone,
+                callback,
                 receiver,
                 shutdown_rx,
             )) {
-                if let Some(cb) = status_callback_clone.as_ref() {
+                if let Some(cb) = status_callback.as_ref() {
                     cb(format!("deepgram: {err}"));
                 }
                 eprintln!("Deepgram streaming error: {err}");
@@ -104,20 +102,15 @@ async fn run_stream(
         Deepgram::new(&api_key).map_err(|e| format!("Failed to construct Deepgram client: {e}"))?;
 
     let transcription = deepgram.transcription();
-    let mut builder = transcription
+
+    let builder = transcription
         .stream_request_with_options(build_stream_options())
         .keep_alive()
         .encoding(Encoding::Linear16)
         .sample_rate(sample_rate)
         .channels(1);
 
-    if let Some(ms) = parse_u32_env("DEEPGRAM_ENDPOINTING_MS") {
-        builder = builder.endpointing(Endpointing::CustomDurationMs(ms));
-    } else {
-        builder = builder.endpointing(Endpointing::CustomDurationMs(500));
-    }
-
-    let emit_partials = parse_bool_env("DEEPGRAM_EMIT_PARTIALS").unwrap_or(false);
+    let emit_partials = true;
     let (mut stream_tx, stream_rx) = futures_mpsc::channel::<Result<Bytes, StreamBridgeError>>(32);
 
     let bridge = tokio::spawn(async move {
@@ -185,11 +178,10 @@ fn build_stream_options() -> Options {
         builder = builder.language(language);
     }
 
-    let smart_format = parse_bool_env("DEEPGRAM_SMART_FORMAT").unwrap_or(true);
-    builder = builder.smart_format(smart_format);
+    builder = builder.smart_format(true);
+    builder = builder.dictation(true);
 
-    let punctuate = parse_bool_env("DEEPGRAM_PUNCTUATE").unwrap_or(true);
-    builder = builder.punctuate(punctuate);
+    builder = builder.punctuate(true);
 
     if let Some(value) = env::var("DEEPGRAM_QUERY_PARAMS")
         .ok()
@@ -228,25 +220,6 @@ fn match_language(value: &str) -> Language {
         "zh_cn" | "zhcn" => Language::zh_CN,
         _ => Language::Other(value.trim().to_string()),
     }
-}
-
-fn parse_bool_env(key: &str) -> Option<bool> {
-    let raw = env::var(key).ok()?;
-    let normalized = raw.trim().to_lowercase();
-    match normalized.as_str() {
-        "1" | "true" | "yes" | "on" => Some(true),
-        "0" | "false" | "no" | "off" => Some(false),
-        _ => None,
-    }
-}
-
-fn parse_u32_env(key: &str) -> Option<u32> {
-    env::var(key).ok()?.trim().parse().ok()
-}
-
-#[allow(dead_code)]
-fn parse_u16_env(key: &str) -> Option<u16> {
-    env::var(key).ok()?.trim().parse().ok()
 }
 
 #[derive(Debug)]

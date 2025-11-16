@@ -28,19 +28,17 @@ impl AssemblyAiTranscriber {
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
-        let callback_clone = callback.clone();
-        let status_callback_clone = status_callback.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
             if let Err(err) = runtime.block_on(run_stream(
                 api_key,
                 sample_rate,
-                callback_clone,
+                callback,
                 receiver,
                 shutdown_rx,
             )) {
-                if let Some(cb) = status_callback_clone.as_ref() {
+                if let Some(cb) = status_callback.as_ref() {
                     cb(format!("assemblyai: {err}"));
                 }
                 eprintln!("AssemblyAI streaming error: {err}");
@@ -85,8 +83,9 @@ async fn run_stream(
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), String> {
     const BASE_URL: &str = "wss://streaming.assemblyai.com/v3/ws";
+
     let query = format!(
-        "sample_rate={sample_rate}&format_turns=true&min_end_of_turn_silence_when_confident=500"
+        "sample_rate={sample_rate}&format_turns=true&min_end_of_turn_silence_when_confident=1000"
     );
     let url = format!("{BASE_URL}?{query}");
 
@@ -157,34 +156,16 @@ async fn run_stream(
                 })?;
                 if let Message::Text(payload) = message {
                     if let Ok(value) = serde_json::from_str::<Value>(&payload) {
-                        if let Some(kind) = value.get("type").and_then(|v| v.as_str()) {
-                            match kind {
-                                "Turn" => {
-                                    let transcript = value
-                                        .get("transcript")
-                                        .and_then(|t| t.as_str())
-                                        .map(str::trim);
-
-                                    let turn_is_final = value
-                                        .get("turn_is_final")
-                                        .and_then(|flag| flag.as_bool())
-                                        .or_else(|| {
-                                            value
-                                                .get("turn_is_formatted")
-                                                .and_then(|flag| flag.as_bool())
-                                        });
-
-                                    if let (Some(text), Some(true)) = (transcript, turn_is_final) {
-                                        if !text.is_empty() {
-                                            callback(text);
-                                        }
-                                    }
+                        match resolve_event_type(&value) {
+                            Some("Termination") => {
+                                let _ = termination_tx.send(true);
+                                break;
+                            }
+                            _ => {
+                                let transcripts = extract_final_transcripts(&value);
+                                for transcript in transcripts {
+                                    callback(&transcript);
                                 }
-                                "Termination" => {
-                                    let _ = termination_tx.send(true);
-                                    break;
-                                }
-                                _ => {}
                             }
                         }
                     }
@@ -198,6 +179,126 @@ async fn run_stream(
 
     try_join(send_audio, receive_events).await?;
     Ok(())
+}
+
+fn extract_final_transcripts(value: &Value) -> Vec<String> {
+    let mut transcripts = Vec::new();
+    let event_type = resolve_event_type(value);
+
+    match event_type {
+        Some("Turn") => transcripts.extend(extract_turn_transcripts(value)),
+        Some("FinalTranscript") => transcripts.extend(extract_plain_transcripts(value, true)),
+        Some("PartialTranscript") => transcripts.extend(extract_plain_transcripts(value, false)),
+        Some("Transcript") => transcripts.extend(extract_plain_transcripts(value, false)),
+        _ => transcripts.extend(extract_plain_transcripts(value, false)),
+    }
+
+    if transcripts.is_empty() {
+        transcripts.extend(extract_nested_turns(value));
+    }
+
+    transcripts
+}
+
+fn resolve_event_type(value: &Value) -> Option<&str> {
+    value
+        .get("type")
+        .or_else(|| value.get("message_type"))
+        .and_then(|entry| entry.as_str())
+}
+
+fn extract_turn_transcripts(value: &Value) -> Vec<String> {
+    if !bool_flag(
+        value,
+        &["end_of_turn", "turn_is_final", "turn_is_formatted"],
+        false,
+    ) {
+        return Vec::new();
+    }
+
+    first_non_empty_text(value, &["utterance", "transcript"])
+        .map(|text| vec![text.to_string()])
+        .unwrap_or_default()
+}
+
+fn extract_plain_transcripts(value: &Value, treat_type_as_final: bool) -> Vec<String> {
+    let is_final = if treat_type_as_final {
+        true
+    } else {
+        bool_flag(
+            value,
+            &[
+                "is_final",
+                "final",
+                "end_of_turn",
+                "turn_is_final",
+                "turn_is_formatted",
+            ],
+            false,
+        )
+    };
+
+    if !is_final {
+        return Vec::new();
+    }
+
+    first_non_empty_text(value, &["text", "transcript", "utterance"])
+        .map(|text| vec![text.to_string()])
+        .unwrap_or_default()
+}
+
+fn extract_nested_turns(value: &Value) -> Vec<String> {
+    let turns = value
+        .get("conversation")
+        .or_else(|| value.get("turns"))
+        .and_then(|turns| turns.as_array());
+
+    let mut transcripts = Vec::new();
+    if let Some(turns) = turns {
+        for turn in turns {
+            if bool_flag(
+                turn,
+                &[
+                    "turn_is_final",
+                    "turn_is_formatted",
+                    "is_final",
+                    "end_of_turn",
+                ],
+                true,
+            ) {
+                if let Some(text) = first_non_empty_text(
+                    turn,
+                    &[
+                        "utterance",
+                        "transcript",
+                        "formatted_text",
+                        "formatted_transcript",
+                        "text",
+                    ],
+                ) {
+                    transcripts.push(text.to_string());
+                }
+            }
+        }
+    }
+
+    transcripts
+}
+
+fn bool_flag(value: &Value, keys: &[&str], default: bool) -> bool {
+    keys.iter()
+        .find_map(|key| value.get(*key).and_then(|flag| flag.as_bool()))
+        .unwrap_or(default)
+}
+
+fn first_non_empty_text<'a>(value: &'a Value, fields: &[&str]) -> Option<&'a str> {
+    fields.iter().find_map(|field| {
+        value
+            .get(*field)
+            .and_then(|entry| entry.as_str())
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+    })
 }
 
 impl StreamingTranscriber for AssemblyAiTranscriber {
