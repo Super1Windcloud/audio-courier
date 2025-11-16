@@ -101,6 +101,7 @@ export async function startAudioRecognition(
 	audioDevice: string,
 	selectedAsrVendor: TranscribeVendor,
 	captureInterval: number,
+	isUsePreRecorded: boolean,
 ) {
 	if (audioDevice.includes("输出")) {
 		return await startAudioLoopbackRecognition(
@@ -108,6 +109,7 @@ export async function startAudioRecognition(
 			audioDevice,
 			selectedAsrVendor,
 			captureInterval,
+			isUsePreRecorded,
 		);
 	}
 

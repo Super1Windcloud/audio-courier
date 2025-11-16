@@ -13,8 +13,8 @@ use futures::channel::mpsc as futures_mpsc;
 use futures_util::{SinkExt, StreamExt};
 use std::env;
 use std::fmt;
-use std::thread::{self, JoinHandle};
 use std::sync::Mutex;
+use std::thread::{self, JoinHandle};
 use tokio::runtime::Runtime;
 use tokio::sync::{mpsc, oneshot};
 
@@ -166,6 +166,7 @@ async fn run_stream(
     }
 
     let _ = bridge.await;
+    println!("Deepgram websocket closed");
     Ok(())
 }
 

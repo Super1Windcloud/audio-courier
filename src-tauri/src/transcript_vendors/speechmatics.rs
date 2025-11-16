@@ -4,9 +4,9 @@ use speechmatics::realtime::{ReadMessage, RealtimeSession, SessionConfig, models
 use std::env;
 use std::io;
 use std::pin::Pin;
+use std::sync::Mutex;
 use std::task::{Context, Poll};
 use std::thread::{self, JoinHandle};
-use std::sync::Mutex;
 use tokio::io::{AsyncRead, ReadBuf};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
@@ -158,6 +158,7 @@ async fn run_session(
     }
 
     let _ = message_task.await;
+    println!("Speechmatics websocket closed");
     Ok(())
 }
 

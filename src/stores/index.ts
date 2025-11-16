@@ -31,9 +31,16 @@ interface AppStateStore {
 
 	isRecording: boolean;
 	updateIsRecording: (target: boolean) => void;
+
+	isUsePreRecorded: boolean;
+	updatePreRecorded: (target: boolean) => void;
 }
 
 const useAppStateStore = create<AppStateStore>((set) => ({
+	isUsePreRecorded: false,
+	updatePreRecorded: (target: boolean) => {
+		set({ isUsePreRecorded: target });
+	},
 	currentSelectedModel: "siliconflow_free",
 	updateCurrentSelectedModel: (target: ModelOption) =>
 		set({ currentSelectedModel: target }),
