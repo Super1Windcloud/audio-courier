@@ -42,8 +42,6 @@ impl RevAiTranscriber {
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
-        let callback_clone = callback.clone();
-        let status_callback_clone = status_callback.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
@@ -52,11 +50,11 @@ impl RevAiTranscriber {
                 metadata,
                 language,
                 sample_rate,
-                callback_clone,
+                callback,
                 receiver,
                 shutdown_rx,
             )) {
-                if let Some(cb) = status_callback_clone.as_ref() {
+                if let Some(cb) = status_callback.as_ref() {
                     cb(format!("revai: {err}"));
                 }
                 eprintln!("RevAI streaming error: {err}");
@@ -222,8 +220,8 @@ async fn run_stream(
 
                 match message {
                     Message::Text(payload) => {
-                        if let Some(result) = parse_transcript(&payload) {
-                            if !result.is_empty() {
+                        if let Some((kind, result)) = parse_transcript(&payload) {
+                            if kind == TranscriptKind::Partial && !result.is_empty() {
                                 callback(result.as_str());
                             }
                         } else if is_revai_error(&payload) {
@@ -283,16 +281,63 @@ async fn connect_revai_socket(
     connect_async(request).await
 }
 
-fn parse_transcript(payload: &str) -> Option<String> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TranscriptKind {
+    Partial,
+    Final,
+}
+
+fn parse_transcript(payload: &str) -> Option<(TranscriptKind, String)> {
     let value: Value = serde_json::from_str(payload).ok()?;
     let kind = value.get("type").and_then(|v| v.as_str())?;
-    if kind != "final" {
-        return None;
+    let kind = match kind {
+        "partial" => TranscriptKind::Partial,
+        "final" => TranscriptKind::Final,
+        _ => return None,
+    };
+
+    let transcript = match kind {
+        TranscriptKind::Partial => extract_partial_text(&value),
+        TranscriptKind::Final => extract_final_text(&value),
+    }?;
+
+    Some((kind, transcript))
+}
+
+fn extract_final_text(value: &Value) -> Option<String> {
+    value
+        .get("elements")
+        .and_then(|elements| elements.as_array())
+        .and_then(|elements| collect_elements_text(elements))
+}
+
+fn extract_partial_text(value: &Value) -> Option<String> {
+    if let Some(text) = value
+        .get("elements")
+        .and_then(|elements| elements.as_array())
+        .and_then(|elements| collect_elements_text(elements))
+    {
+        if !text.is_empty() {
+            return Some(text);
+        }
     }
 
-    let elements = value.get("elements")?.as_array()?;
-    let mut buffer = String::new();
+    for field in ["value", "text", "transcript"] {
+        if let Some(text) = value
+            .get(field)
+            .and_then(|entry| entry.as_str())
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+        {
+            return Some(text.to_string());
+        }
+    }
 
+    None
+}
+
+fn collect_elements_text(elements: &[Value]) -> Option<String> {
+    let mut buffer = String::new();
     for element in elements {
         let text = element
             .get("value")
