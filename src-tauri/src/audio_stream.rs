@@ -62,7 +62,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
 ) {
     let device = if let Some(name) = device_name {
         if name.contains("输入") {
-            "default_input" 
+            "default_input"
         } else {
             "default"
         }
