@@ -334,9 +334,11 @@ async fn create_live_session(
         encoding: "wav/pcm",
         bit_depth: 16,
         sample_rate,
+        endpointing: 0.5,
         channels: 1,
         model,
         language_config,
+        maximum_duration_without_endpointing: 60,
         messages_config: MessagesConfig {
             receive_partial_transcripts: false,
             receive_final_transcripts: true,
@@ -377,11 +379,13 @@ struct LiveSessionRequest {
     encoding: &'static str,
     bit_depth: u8,
     sample_rate: u32,
+    endpointing: f32,
     channels: u8,
     model: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     language_config: Option<LanguageConfig>,
     messages_config: MessagesConfig,
+    maximum_duration_without_endpointing: u32,
 }
 
 #[derive(Serialize)]

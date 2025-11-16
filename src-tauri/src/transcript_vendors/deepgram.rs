@@ -109,21 +109,12 @@ async fn run_stream(
         .keep_alive()
         .encoding(Encoding::Linear16)
         .sample_rate(sample_rate)
-        .channels(1)
-        .interim_results(parse_bool_env("DEEPGRAM_INTERIM_RESULTS").unwrap_or(true))
-        .no_delay(parse_bool_env("DEEPGRAM_NO_DELAY").unwrap_or(true))
-        .vad_events(parse_bool_env("DEEPGRAM_VAD_EVENTS").unwrap_or(true));
+        .channels(1);
 
     if let Some(ms) = parse_u32_env("DEEPGRAM_ENDPOINTING_MS") {
         builder = builder.endpointing(Endpointing::CustomDurationMs(ms));
     } else {
-        builder = builder.endpointing(Endpointing::CustomDurationMs(300));
-    }
-
-    if let Some(ms) = parse_u16_env("DEEPGRAM_UTTERANCE_END_MS") {
-        builder = builder.utterance_end_ms(ms);
-    } else {
-        builder = builder.utterance_end_ms(1000);
+        builder = builder.endpointing(Endpointing::CustomDurationMs(500));
     }
 
     let emit_partials = parse_bool_env("DEEPGRAM_EMIT_PARTIALS").unwrap_or(false);
@@ -232,61 +223,9 @@ fn match_language(value: &str) -> Language {
     let cleaned = value.trim().replace(['-', ' '], "_").to_lowercase();
 
     match cleaned.as_str() {
-        "bg" => Language::bg,
-        "ca" => Language::ca,
-        "cs" => Language::cs,
-        "da" => Language::da,
-        "de" => Language::de,
-        "de_ch" => Language::de_CH,
-        "el" => Language::el,
         "en" => Language::en,
-        "en_au" => Language::en_AU,
-        "en_gb" => Language::en_GB,
-        "en_in" => Language::en_IN,
-        "en_nz" => Language::en_NZ,
-        "en_us" => Language::en_US,
-        "es" => Language::es,
-        "es_419" | "es419" => Language::es_419,
-        "es_latam" | "eslatam" => Language::es_LATAM,
-        "et" => Language::et,
-        "fi" => Language::fi,
-        "fr" => Language::fr,
-        "fr_ca" | "frca" => Language::fr_CA,
-        "hi" => Language::hi,
-        "hi_latn" | "hilatn" => Language::hi_Latn,
-        "hu" => Language::hu,
-        "id" => Language::id,
-        "it" => Language::it,
-        "ja" => Language::ja,
-        "ko" => Language::ko,
-        "ko_kr" | "kokr" => Language::ko_KR,
-        "lv" => Language::lv,
-        "lt" => Language::lt,
-        "ms" => Language::ms,
-        "multi" => Language::multi,
-        "nl" => Language::nl,
-        "nl_be" | "nlbe" => Language::nl_BE,
-        "no" => Language::no,
-        "pl" => Language::pl,
-        "pt" => Language::pt,
-        "pt_br" | "ptbr" => Language::pt_BR,
-        "ro" => Language::ro,
-        "ru" => Language::ru,
-        "sk" => Language::sk,
-        "sv" => Language::sv,
-        "sv_se" | "svse" => Language::sv_SE,
-        "ta" => Language::ta,
-        "taq" => Language::taq,
-        "th" => Language::th,
-        "th_th" | "thth" => Language::th_TH,
-        "tr" => Language::tr,
-        "uk" => Language::uk,
-        "vi" => Language::vi,
         "zh" => Language::zh,
         "zh_cn" | "zhcn" => Language::zh_CN,
-        "zh_hans" => Language::zh_Hans,
-        "zh_hant" => Language::zh_Hant,
-        "zh_tw" | "zhtw" => Language::zh_TW,
         _ => Language::Other(value.trim().to_string()),
     }
 }
@@ -305,6 +244,7 @@ fn parse_u32_env(key: &str) -> Option<u32> {
     env::var(key).ok()?.trim().parse().ok()
 }
 
+#[allow(dead_code)]
 fn parse_u16_env(key: &str) -> Option<u16> {
     env::var(key).ok()?.trim().parse().ok()
 }

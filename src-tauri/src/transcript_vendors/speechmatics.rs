@@ -1,4 +1,5 @@
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
+use speechmatics::realtime::models::ConversationConfig;
 use speechmatics::realtime::{ReadMessage, RealtimeSession, SessionConfig, models};
 use std::env;
 use std::io;
@@ -25,9 +26,7 @@ impl SpeechmaticsTranscriber {
         let language = env::var("SPEECHMATICS_LANGUAGE")
             .ok()
             .filter(|value| !value.is_empty());
-        let url = env::var("SPEECHMATICS_RT_URL")
-            .ok()
-            .filter(|value| !value.is_empty());
+        let url = Some("wss://eu2.rt.speechmatics.com/v2/".to_string());
 
         let (sender, receiver) = mpsc::channel::<Vec<u8>>(64);
         let callback_clone = callback.clone();
@@ -117,9 +116,13 @@ async fn run_session(
     audio_format.encoding = Some(models::audio_format::Encoding::PcmS16le);
     audio_format.sample_rate = Some(sample_rate as i32);
     config.audio_format = Some(audio_format);
+    config.transcription_config.conversation_config = Some(Box::new(ConversationConfig {
+        end_of_utterance_silence_trigger: Some(0.5),
+    }));
+    config.transcription_config.max_delay = Some(2.0);
+    config.transcription_config.enable_partials = Some(false);
 
     let reader = ChannelAudioReader::new(audio_rx);
-    let callback_clone = callback.clone();
 
     let message_task = tokio::spawn(async move {
         while let Some(message) = message_rx.recv().await {
@@ -127,7 +130,7 @@ async fn run_session(
                 ReadMessage::AddTranscript(transcript) => {
                     let text = transcript.metadata.transcript.trim().to_string();
                     if !text.is_empty() {
-                        callback_clone(&text);
+                        callback(&text);
                     }
                 }
                 ReadMessage::Error(err) => {

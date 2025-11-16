@@ -41,7 +41,7 @@ tungstenite = { version = "0.28.0", default-features = false, features = ["__rus
 tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["connect", "rustls-tls-webpki-roots", "rustls-tls-native-roots"] }
 futures-util = "0.3.31"
 inquire = "0.9.1"
-speechmatics = { version = "0.4.0", default-features = false, features = ["realtime", "batch"] }
+speechmatics = { version = "0.4.0", path = "speechmatics-rs", default-features = false, features = ["realtime", "batch"] }
 deepgram = "0.7.0"
 bytes = "1.11.0"
 futures = "0.3.31"

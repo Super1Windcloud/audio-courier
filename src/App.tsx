@@ -11,7 +11,13 @@ function Home() {
 	return (
 		<div className="w-full h-screen bg-gradient-to-b from-[#724766] to-[#2C4F71]">
 			<ChatContainer />
-			<Toaster position="top-center" richColors expand closeButton  duration={5000}/>
+			<Toaster
+				position="top-center"
+				richColors
+				expand
+				closeButton
+				duration={5000}
+			/>
 		</div>
 	);
 }

@@ -4516,8 +4516,6 @@ dependencies = [
 [[package]]
 name = "speechmatics"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f28a39a8964d6dd11e74f751741d7d2c32675451216c06ce9d1fb076d3db6100"
 dependencies = [
  "anyhow",
  "base64 0.21.7",

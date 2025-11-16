@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ModelOption } from "@/types/llm.ts";
 import { toast } from "sonner";
+import { ModelOption } from "@/types/llm.ts";
 
 export async function llmInterviewChatStreamOutput(
 	question: string,
@@ -34,7 +34,7 @@ export async function llmInterviewChatStreamOutput(
 		})
 		.catch((err) => {
 			console.error("invoke llmModel Error", err);
-      toast.error("invoke llm err "+err)
+			toast.error("invoke llm err " + err);
 		})
 		.finally(() => {
 			unlisten();

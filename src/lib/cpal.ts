@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
-import useAppStateStore from "@/stores";
 import { toast } from "sonner";
+import useAppStateStore from "@/stores";
 
 let unlistener: UnlistenFn | null = null;
 let errorUnlistener: UnlistenFn | null = null;
@@ -21,9 +21,13 @@ export async function startAudioLoopbackRecognition(
     errorUnlistener = null;
   }
 
+  let content: string = "";
+
   unlistener = await listen<string>("transcription_result", (event) => {
-    const content = event.payload;
-    console.log("识别扬声器结果:", content);
+    console.log("识别扬声器结果:", event.payload);
+    if (selectedAsrVendor === "speechmatics") {
+      content += event.payload;
+    }
     onMessageCapture(content);
   });
   errorUnlistener = await listen<string>("transcription_error", (event) => {

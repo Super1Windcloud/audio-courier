@@ -12,9 +12,9 @@ pub trait StreamingTranscriber: Send + Sync {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TranscriptVendors {
     DeepGram,
-    RevAI,
-    AssemblyAI,
-    GlaDia,
+    RevAI,      //Normal
+    AssemblyAI, //Normal
+    GlaDia,     // No punctuation
     SpeechMatics,
 }
 
