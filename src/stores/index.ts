@@ -61,7 +61,7 @@ const useAppStateStore = create<AppStateStore>((set) => ({
 		set({ isStartScrollToBottom: target });
 	},
 
-	useRemoteModelTranscribe: "assemblyai",
+	useRemoteModelTranscribe: "gladia",
 	updateRemoteModelTranscribe: (target: TranscribeVendor) => {
 		set({ useRemoteModelTranscribe: target });
 	},

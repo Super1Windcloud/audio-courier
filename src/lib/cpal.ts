@@ -33,7 +33,7 @@ export async function startAudioLoopbackRecognition(
 		) {
 			content = event.payload;
 		} else if (selectedAsrVendor.toLowerCase() === "gladia") {
-			content += convertTraditionalChinese(event.payload);
+			content = convertTraditionalChinese(event.payload);
 		} else {
 			content += event.payload;
 		}

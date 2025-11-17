@@ -148,6 +148,7 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
             .map_err(|e| format!("Failed to start Speechmatics stream: {e}"))?;
             let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
             Some(transcriber)
+
         }
         (TranscriptVendors::GlaDia, Some(callback)) => {
             let transcriber =
@@ -354,6 +355,8 @@ fn stereo_to_mono_f32(samples: &[f32]) -> Vec<f32> {
 }
 
 type WavWriterHandle = Arc<Mutex<Option<hound::WavWriter<BufWriter<File>>>>>;
+
+///! 停止录音线程可能死锁卡住,暂时还没解决
 
 pub fn stop_recording(handle: JoinHandle<()>) {
     RECORDING.store(false, Ordering::SeqCst);

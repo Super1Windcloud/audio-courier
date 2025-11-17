@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
 use tokio::runtime::Runtime;
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{mpsc, mpsc::error::TrySendError, oneshot, watch};
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{
@@ -24,6 +24,9 @@ pub struct GladiaTranscriber {
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
     handle: Mutex<Option<JoinHandle<()>>>,
 }
+
+const RECEIVE_PARTIAL_TRANSCRIPTS: bool = false;
+const RECEIVE_FINAL_TRANSCRIPTS: bool = true;
 
 impl GladiaTranscriber {
     pub fn start(
@@ -63,9 +66,15 @@ impl GladiaTranscriber {
     }
 
     pub fn enqueue_chunk(&self, chunk: Vec<i16>) -> Result<(), String> {
-        self.sender
-            .blocking_send(chunk)
-            .map_err(|e| format!("Failed to queue PCM chunk for Gladia: {e}"))
+        match self.sender.try_send(chunk) {
+            Ok(()) => Ok(()),
+            Err(TrySendError::Full(_chunk)) => Err(
+                "Failed to queue PCM chunk for Gladia: channel is full (consumer stalled)".into(),
+            ),
+            Err(TrySendError::Closed(_chunk)) => {
+                Err("Failed to queue PCM chunk for Gladia: channel closed".into())
+            }
+        }
     }
 
     pub fn stop(&self) {
@@ -126,21 +135,7 @@ async fn run_stream(
     let (mut sink, mut stream) = ws_stream.split();
     let (termination_tx, mut termination_rx) = watch::channel(false);
 
-    let default_language = language.unwrap_or_else(|| "en".to_string());
-    let should_send_start_message = ws_url.contains("/audio/live");
-    let start_payload = if should_send_start_message {
-        Some(build_start_message(default_language.clone(), sample_rate))
-    } else {
-        None
-    };
-
     let send_audio = async move {
-        if let Some(payload) = start_payload {
-            sink.send(Message::Text(payload.into()))
-                .await
-                .map_err(|e| format!("Failed to send Gladia start message: {e}"))?;
-        }
-
         loop {
             tokio::select! {
                 _ = &mut shutdown_rx => break,
@@ -190,7 +185,12 @@ async fn run_stream(
                 match message {
                     Message::Text(payload) => {
                         if let Some((kind, text)) = parse_transcript(&payload) {
-                            if matches!(kind, TranscriptKind::Partial) && !text.is_empty() {
+                            let should_emit = match kind {
+                                TranscriptKind::Partial => RECEIVE_PARTIAL_TRANSCRIPTS,
+                                TranscriptKind::Final => RECEIVE_FINAL_TRANSCRIPTS,
+                            };
+
+                            if should_emit && !text.is_empty() {
                                 callback(text.as_str());
                             }
                         } else if is_error_payload(&payload) {
@@ -215,22 +215,6 @@ async fn run_stream(
     Ok(())
 }
 
-fn build_start_message(language: String, sample_rate: u32) -> String {
-    serde_json::json!({
-        "type": "start",
-        "transcription_config": {
-            "language": language,
-            "sampling_frequency": sample_rate
-        },
-        "audio_format": {
-            "encoding": "pcm_s16le",
-            "sample_rate": sample_rate,
-            "channels": 1
-        }
-    })
-    .to_string()
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TranscriptKind {
     Partial,
@@ -251,7 +235,7 @@ fn parse_transcript(payload: &str) -> Option<(TranscriptKind, String)> {
             }
             parse_legacy_transcript(&value)
         }
-        "post_transcript" | "post_final_transcript" => value
+        "post_final_transcript" => value
             .get("data")
             .and_then(extract_text_from_data)
             .map(|text| (TranscriptKind::Final, text)),
@@ -322,6 +306,25 @@ fn extract_text_from_data(data: &Value) -> Option<String> {
         }
     }
 
+    if let Some(full_transcript) = data.get("full_transcript").and_then(|v| v.as_str()) {
+        let trimmed = full_transcript.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    if let Some(transcription) = data.get("transcription") {
+        if let Some(full_transcript) = transcription
+            .get("full_transcript")
+            .and_then(|v| v.as_str())
+        {
+            let trimmed = full_transcript.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+
     if let Some(transcript) = data.get("transcript").and_then(|v| v.as_str()) {
         let trimmed = transcript.trim();
         if !trimmed.is_empty() {
@@ -363,11 +366,13 @@ async fn create_live_session(
         bit_depth: 16,
         sample_rate,
         channels: 1,
+        endpointing: 0.4,
+        maximum_duration_without_endpointing: 60,
         model,
         language_config,
         messages_config: MessagesConfig {
-            receive_partial_transcripts: true,
-            receive_final_transcripts: true,
+            receive_partial_transcripts: RECEIVE_PARTIAL_TRANSCRIPTS,
+            receive_final_transcripts: RECEIVE_FINAL_TRANSCRIPTS,
         },
     };
 
@@ -410,6 +415,8 @@ struct LiveSessionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     language_config: Option<LanguageConfig>,
     messages_config: MessagesConfig,
+    maximum_duration_without_endpointing: u32,
+    endpointing: f32,
 }
 
 #[derive(Serialize)]

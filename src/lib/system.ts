@@ -1,48 +1,56 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
-	isRegistered,
-	register,
-	unregister,
+  isRegistered,
+  register,
+  unregister,
 } from "@tauri-apps/plugin-global-shortcut";
 import useAppStateStore from "@/stores";
+import { toast } from "sonner";
+let recordStartTime: number | null = null;
 
-// 在非TSX组件上下文, 不能够使用React Hook订阅字段, 只能getState读取,或者使用subscribe()订阅
 export async function toggleRecording() {
-	const appState = useAppStateStore.getState();
+  const appState = useAppStateStore.getState();
 
-	if (!appState.isRecording) {
-		appState.updateIsRecording(true);
-	} else {
-		appState.updateIsRecording(false);
-	}
+  if (!appState.isRecording) {
+    appState.updateIsRecording(true);
+    recordStartTime = Date.now();
+  } else {
+    if (recordStartTime && Date.now() - recordStartTime < 3000) {
+      toast.warning("录音开始后需要等待 3 秒才能停止");
+    } else {
+      appState.updateIsRecording(false);
+      recordStartTime = null;
+    }
+  }
 }
 
+
 export async function registryGlobalShortCuts() {
-	const combo = "CommandOrControl+Shift+`";
-	if (await isRegistered(combo)) {
-		await unregister(combo);
-	}
+  const combo = "CommandOrControl+Shift+`";
+  if (await isRegistered(combo)) {
+    await unregister(combo);
+  }
 
-	await register(combo, async (event) => {
-		if (event.state === "Released") {
-			const window = getCurrentWindow();
+  await register(combo, async (event) => {
+    if (event.state === "Released") {
+      const window = getCurrentWindow();
 
-			if (await window.isVisible()) {
-				await window.hide();
-			} else {
-				await window.show();
-			}
-		}
-	});
+      if (await window.isVisible()) {
+        await window.hide();
+      } else {
+        await window.show();
+      }
+    }
+  });
 
-	const recordCombo = "Alt+Space";
-	if (await isRegistered(recordCombo)) {
-		await unregister(recordCombo);
-	}
+  const recordCombo = "Alt+Space";
+  if (await isRegistered(recordCombo)) {
+    await unregister(recordCombo);
+  }
 
-	await register(recordCombo, async (event) => {
-		if (event.state === "Released") {
-			await toggleRecording();
-		}
-	});
+  await register(recordCombo, async (event) => {
+    if (event.state === "Released") {
+      await toggleRecording();
+    }
+  });
 }
