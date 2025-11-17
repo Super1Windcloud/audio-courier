@@ -3,7 +3,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use deepgram::{
     Deepgram,
     common::{
-        options::{Encoding, Language, Options},
+        options::{Encoding, Language, Model, Options},
         stream_response::StreamResponse,
     },
 };
@@ -112,7 +112,9 @@ async fn run_stream(
         .keep_alive()
         .encoding(Encoding::Linear16)
         .sample_rate(sample_rate)
-        .channels(1);
+        .channels(1)
+        .interim_results(true)
+        .vad_events(true);
 
     let emit_partials = true;
     let (mut stream_tx, stream_rx) = futures_mpsc::channel::<Result<Bytes, StreamBridgeError>>(32);
@@ -184,24 +186,7 @@ fn build_stream_options() -> Options {
     }
 
     builder = builder.smart_format(true);
-    builder = builder.dictation(true);
-
-    builder = builder.punctuate(true);
-
-    if let Some(value) = env::var("DEEPGRAM_QUERY_PARAMS")
-        .ok()
-        .filter(|v| !v.trim().is_empty())
-    {
-        let params = value
-            .split('&')
-            .filter_map(|pair| pair.split_once('='))
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect::<Vec<_>>();
-
-        if !params.is_empty() {
-            builder = builder.query_params(params);
-        }
-    }
+    builder = builder.model(Model::Nova2);
 
     builder.build()
 }

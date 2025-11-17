@@ -35,7 +35,7 @@ export function MoreMenu() {
 		"speechmatics",
 	];
 	const VENDOR_LABELS: Record<TranscribeVendor, string> = {
-		assemblyai: "AssemblyAI",
+		assemblyai: "AssemblyAI(English)",
 		deepgram: "DeepGram",
 		gladia: "Gladia",
 		revai: "RevAI",
