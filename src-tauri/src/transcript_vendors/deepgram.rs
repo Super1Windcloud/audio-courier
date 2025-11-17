@@ -1,9 +1,10 @@
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use bytes::{BufMut, Bytes, BytesMut};
+#[allow(unused_imports)]
 use deepgram::{
     Deepgram,
     common::{
-        options::{Encoding, Language, Model, Options},
+        options::{Encoding, Endpointing, Language, Model, Options},
         stream_response::StreamResponse,
     },
 };
@@ -112,11 +113,9 @@ async fn run_stream(
         .keep_alive()
         .encoding(Encoding::Linear16)
         .sample_rate(sample_rate)
-        .channels(1)
-        .interim_results(true)
-        .vad_events(true);
+        .endpointing(Endpointing::CustomDurationMs(500))
+        .channels(1);
 
-    let emit_partials = true;
     let (mut stream_tx, stream_rx) = futures_mpsc::channel::<Result<Bytes, StreamBridgeError>>(32);
 
     let bridge = tokio::spawn(async move {
@@ -144,19 +143,25 @@ async fn run_stream(
         .await
         .map_err(|e| format!("Deepgram websocket failed: {e}"))?;
 
+    let mut utterance_buffer = String::new();
+
     while let Some(message) = responses.next().await {
         match message {
             Ok(StreamResponse::TranscriptResponse {
-                channel, is_final, ..
+                channel,
+                is_final,
+                speech_final,
+                ..
             }) => {
                 if let Some(entry) = channel.alternatives.first() {
                     let transcript = entry.transcript.trim();
-                    if transcript.is_empty() {
-                        continue;
+
+                    if is_final && !transcript.is_empty() {
+                        append_utterance_segment(&mut utterance_buffer, transcript);
                     }
 
-                    if is_final || emit_partials {
-                        callback(transcript);
+                    if speech_final {
+                        flush_utterance(&mut utterance_buffer, &callback);
                     }
                 }
             }
@@ -166,6 +171,7 @@ async fn run_stream(
     }
 
     let _ = bridge.await;
+    flush_utterance(&mut utterance_buffer, &callback);
     println!("Deepgram websocket closed");
     Ok(())
 }
@@ -180,13 +186,18 @@ fn pcm_chunk_to_bytes(chunk: &[i16]) -> Bytes {
 
 fn build_stream_options() -> Options {
     let mut builder = Options::builder();
-
+    let mut select_language = Language::zh_CN;
     if let Some(language) = language_from_env() {
-        builder = builder.language(language);
+        select_language = language;
+        builder = builder.language(select_language.clone());
     }
 
-    builder = builder.smart_format(true);
-    builder = builder.model(Model::Nova2);
+    builder = builder.smart_format(false);
+    builder = if select_language == Language::zh || select_language == Language::zh_CN {
+        builder.model(Model::Nova2)
+    } else {
+        builder.model(Model::Nova3)
+    };
 
     builder.build()
 }
@@ -207,13 +218,32 @@ fn match_language(value: &str) -> Language {
     match cleaned.as_str() {
         "en" => Language::en,
         "zh" => Language::zh,
-        "zh_cn" | "zhcn" => Language::zh_CN,
+        "zh_cn" | "zh_CN" => Language::zh_CN,
         _ => Language::Other(value.trim().to_string()),
     }
 }
 
 #[derive(Debug)]
 struct StreamBridgeError;
+
+fn append_utterance_segment(buffer: &mut String, segment: &str) {
+    if !buffer.is_empty() {
+        buffer.push(' ');
+    }
+    buffer.push_str(segment);
+}
+
+fn flush_utterance(buffer: &mut String, callback: &PcmCallback) {
+    let trimmed = buffer.trim();
+    if trimmed.is_empty() {
+        buffer.clear();
+        return;
+    }
+
+    let owned = trimmed.to_string();
+    callback(&owned);
+    buffer.clear();
+}
 
 impl fmt::Display for StreamBridgeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

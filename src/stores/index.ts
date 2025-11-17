@@ -62,7 +62,7 @@ const useAppStateStore = create<AppStateStore>((set) => ({
 		set({ isStartScrollToBottom: target });
 	},
 
-	useRemoteModelTranscribe: "gladia",
+	useRemoteModelTranscribe: "deepgram",
 	updateRemoteModelTranscribe: (target: TranscribeVendor) => {
 		set({ useRemoteModelTranscribe: target });
 	},
