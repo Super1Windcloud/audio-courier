@@ -30,6 +30,7 @@ interface AppStateStore {
 	updateCaptureInterval: (target: number) => void;
 
 	isRecording: boolean;
+	recordingStartedAt: number | null;
 	updateIsRecording: (target: boolean) => void;
 
 	isUsePreRecorded: boolean;
@@ -72,8 +73,12 @@ const useAppStateStore = create<AppStateStore>((set) => ({
 	},
 
 	isRecording: false,
+	recordingStartedAt: null,
 	updateIsRecording: (target: boolean) => {
-		set({ isRecording: target });
+		set({
+			isRecording: target,
+			recordingStartedAt: target ? Date.now() : null,
+		});
 	},
 }));
 

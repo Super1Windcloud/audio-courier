@@ -148,7 +148,6 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
             .map_err(|e| format!("Failed to start Speechmatics stream: {e}"))?;
             let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
             Some(transcriber)
-
         }
         (TranscriptVendors::GlaDia, Some(callback)) => {
             let transcriber =

@@ -1,6 +1,0 @@
-warn = ["clippy::all"]
-allow = [
-    "clippy::needless_bool",
-    "clippy::too_many_arguments",
-]
-max_line_length = 120

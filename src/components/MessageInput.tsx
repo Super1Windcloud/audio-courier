@@ -1,12 +1,11 @@
 import { Mic, SendHorizontal, Trash2 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-
+import { toast } from "sonner";
 import { Message } from "@/components/ChatContainer.tsx";
 import { MoreMenu } from "@/components/MoreMenu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { startAudioRecognition, stopAudioRecognition } from "@/lib/audio.ts";
 import useAppStateStore from "@/stores";
-import { toast } from "sonner";
 
 interface MessageInputProps {
   onSendMessage: (text: string) => void;
@@ -35,8 +34,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     (state) => state.currentAudioChannel,
   );
   const isUsePreRecorded = useAppStateStore((state) => state.isUsePreRecorded);
+  const recordingStartedAt = useAppStateStore(
+    (state) => state.recordingStartedAt,
+  );
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const MIN_RECORDING_DURATION = 3000;
 
   const handleSend = () => {
     if (inputText.trim()) {
@@ -55,7 +58,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
 
     let timeout: number;
-    if (remoteModelVendor === "assemblyai" || remoteModelVendor === "gladia") {
+    if (
+      remoteModelVendor === "assemblyai" ||
+      remoteModelVendor === "gladia"
+    ) {
       timeout = 100;
     } else {
       timeout = 1000;
@@ -76,20 +82,35 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!recordingState) {
+      setCanStopRecording(true);
+      return;
+    }
+
+    setCanStopRecording(false);
+    const timer = setTimeout(() => {
+      setCanStopRecording(true);
+    }, MIN_RECORDING_DURATION);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [recordingState]);
+
   const toggleRecording = async () => {
     if (!recordingState) {
       updateRecordingState(true);
-      setCanStopRecording(false); // 禁止立即停止
-      setTimeout(() => {
-        setCanStopRecording(true);
-      }, 3000);
-    } else {
-      if (canStopRecording) {
-        updateRecordingState(false);
-      } else {
-        toast.warning("录音开始后需要等待3秒才能停止");
-      }
+      return;
     }
+
+    const startedAt = recordingStartedAt ?? 0;
+    const elapsed = Date.now() - startedAt;
+    if (elapsed < MIN_RECORDING_DURATION) {
+      toast.warning("录音开始后需要等待3秒才能停止");
+      return;
+    }
+    updateRecordingState(false);
   };
 
   useEffect(() => {

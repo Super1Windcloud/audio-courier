@@ -1,5 +1,3 @@
-#![allow(clippy::collapsible_if)]
-
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use bytes::{BufMut, Bytes, BytesMut};
 use deepgram::{

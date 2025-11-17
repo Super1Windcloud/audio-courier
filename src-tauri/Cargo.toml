@@ -61,3 +61,10 @@ path = "src/bin/transfer.rs"
 
 
 [dev-dependencies]
+
+
+[lints.clippy]
+all = "warn"
+needless_bool = "allow"
+too_many_arguments = "allow"
+collapsible_if = "allow"

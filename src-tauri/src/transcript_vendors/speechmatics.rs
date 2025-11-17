@@ -9,10 +9,11 @@ use std::task::{Context, Poll};
 use std::thread::{self, JoinHandle};
 use tokio::io::{AsyncRead, ReadBuf};
 use tokio::runtime::Runtime;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, mpsc::error::TrySendError, oneshot};
 
 pub struct SpeechmaticsTranscriber {
     sender: Mutex<Option<mpsc::Sender<Vec<u8>>>>,
+    shutdown: Mutex<Option<oneshot::Sender<()>>>,
     handle: Mutex<Option<JoinHandle<()>>>,
 }
 
@@ -30,6 +31,7 @@ impl SpeechmaticsTranscriber {
         let url = Some("wss://eu2.rt.speechmatics.com/v2/".to_string());
 
         let (sender, receiver) = mpsc::channel::<Vec<u8>>(64);
+        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         let callback_clone = callback.clone();
         let status_callback_clone = status_callback.clone();
 
@@ -42,6 +44,7 @@ impl SpeechmaticsTranscriber {
                 sample_rate,
                 callback_clone,
                 receiver,
+                shutdown_rx,
             )) {
                 if let Some(cb) = status_callback_clone.as_ref() {
                     cb(format!("speechmatics: {err}"));
@@ -52,6 +55,7 @@ impl SpeechmaticsTranscriber {
 
         Ok(Self {
             sender: Mutex::new(Some(sender)),
+            shutdown: Mutex::new(Some(shutdown_tx)),
             handle: Mutex::new(Some(handle)),
         })
     }
@@ -70,13 +74,23 @@ impl SpeechmaticsTranscriber {
             bytes.extend_from_slice(&sample.to_le_bytes());
         }
 
-        sender
-            .blocking_send(bytes)
-            .map_err(|e| format!("Failed to queue PCM chunk for Speechmatics: {e}"))
+        match sender.try_send(bytes) {
+            Ok(()) => Ok(()),
+            Err(TrySendError::Full(_chunk)) => Err(
+                "Failed to queue PCM chunk for Speechmatics: channel is full (consumer stalled)"
+                    .into(),
+            ),
+            Err(TrySendError::Closed(_chunk)) => {
+                Err("Failed to queue PCM chunk for Speechmatics: channel closed".into())
+            }
+        }
     }
 
     pub fn stop(&self) {
         self.sender.lock().unwrap().take();
+        if let Some(shutdown) = self.shutdown.lock().unwrap().take() {
+            let _ = shutdown.send(());
+        }
 
         if let Some(handle) = self.handle.lock().unwrap().take() {
             let _ = handle.join();
@@ -112,6 +126,7 @@ async fn run_session(
     sample_rate: u32,
     callback: PcmCallback,
     audio_rx: mpsc::Receiver<Vec<u8>>,
+    mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), String> {
     let (mut session, mut message_rx) = RealtimeSession::new(api_key, rt_url)
         .map_err(|e| format!("Failed to init Speechmatics session: {e}"))?;
@@ -128,7 +143,7 @@ async fn run_session(
     config.transcription_config.conversation_config = Some(Box::new(ConversationConfig {
         end_of_utterance_silence_trigger: Some(0.5),
     }));
-    config.transcription_config.max_delay = Some(2.0);
+    config.transcription_config.max_delay = Some(1.5);
     config.transcription_config.enable_partials = Some(false);
 
     let reader = ChannelAudioReader::new(audio_rx);
@@ -152,9 +167,21 @@ async fn run_session(
         }
     });
 
-    if let Err(err) = session.run(config, reader).await {
-        let _ = message_task.await;
-        return Err(format!("Speechmatics session run failed: {err}"));
+    let mut session_future = Box::pin(session.run(config, reader));
+
+    tokio::select! {
+        result = &mut session_future => {
+            if let Err(err) = result {
+                let _ = message_task.await;
+                return Err(format!("Speechmatics session run failed: {err}"));
+            }
+        }
+        _ = &mut shutdown_rx => {
+            message_task.abort();
+            let _ = message_task.await;
+            println!("Speechmatics session shutdown requested");
+            return Ok(());
+        }
     }
 
     let _ = message_task.await;
