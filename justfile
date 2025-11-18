@@ -23,3 +23,7 @@ clean :
 
 upgrade:
     cd src-tauri &&  cargo update && cargo upgrade
+
+
+macos:
+    git add -A  && git commit -m "update" && git push repo main:macos

@@ -1,7 +1,7 @@
 #![allow(clippy::collapsible_if)]
 
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
-use futures_util::{SinkExt, StreamExt, future::try_join};
+use futures_util::{future::try_join, SinkExt, StreamExt};
 #[cfg(target_os = "windows")]
 use native_tls::TlsConnector;
 use serde_json::Value;
@@ -9,19 +9,21 @@ use std::env;
 use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
-use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
 use tokio::sync::{mpsc, oneshot, watch};
 #[cfg(target_os = "windows")]
-use tokio_tungstenite::{Connector, connect_async_tls_with_config};
-use tokio_tungstenite::{
-    MaybeTlsStream, WebSocketStream, connect_async,
-    tungstenite::{
-        Error as WsError,
-        client::{ClientRequestBuilder, IntoClientRequest},
-        handshake::client::{Request as WsRequest, Response as WsResponse},
-        protocol::Message,
-    },
+use tokio::net::TcpStream;
+use tokio_tungstenite::connect_async;
+#[cfg(target_os = "windows")]
+use tokio_tungstenite::{connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::tungstenite::{
+    client::{ClientRequestBuilder, IntoClientRequest},
+    protocol::Message,
+};
+#[cfg(target_os = "windows")]
+use tokio_tungstenite::tungstenite::{
+    Error as WsError,
+    handshake::client::{Request as WsRequest, Response as WsResponse},
 };
 
 pub struct RevAiTranscriber {

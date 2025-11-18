@@ -16,7 +16,7 @@ async fn main() -> Result<(), DeepgramError> {
     dotenv().ok();
     let start = Instant::now();
     let deepgram_api_key =
-        env::var("DEEPGRAM_API_KEY").expect("DEEPGRAM_API_KEY environmental variable");
+        env::var("DEEPGRAM_API_KEY_GITHUB").expect("DEEPGRAM_API_KEY environmental variable");
 
     let dg_client = Deepgram::new(&deepgram_api_key)?;
 

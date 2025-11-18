@@ -5,6 +5,7 @@ description = "A Tauri App for audio capture"
 authors = ["superwindcloud"]
 edition = "2024"
 rust-version = "1.91.0"
+
 keywords = ["audio", "capture", "loopback"]
 resolver = "3"
 readme = "../README.md"
@@ -25,7 +26,7 @@ tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-cpal = "0.16.0"
+cpal = { version = "0.16.0",path = "cpal" }
 tokio-stream = "0.1.17"
 reqwest = { version = "0.12.24", features = ["json", "multipart", "stream", "gzip", "brotli"] }
 dotenv = "0.15.0"
@@ -49,10 +50,19 @@ futures = "0.3.31"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
 
-[target.'cfg(windows)'.dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
 native-tls = "0.2"
 tungstenite = { version = "0.28.0", default-features = false, features = ["native-tls"] }
 tokio-tungstenite = { version = "0.28.0", default-features = false, features = ["native-tls"] }
+
+
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10.1"
+core-media-rs = "0.3.5"
+screencapturekit = "0.3.6"
+native-tls = "0.2"
+
 
 
 [[bin]]
@@ -68,3 +78,8 @@ all = "warn"
 needless_bool = "allow"
 too_many_arguments = "allow"
 collapsible_if = "allow"
+
+
+[[example]]
+name = "screen_capture_kit"
+path = "examples/screen_capture_kit.rs"
