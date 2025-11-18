@@ -27,3 +27,8 @@ upgrade:
 
 macos:
     git add -A  && git commit -m "update" && git push repo main:macos
+
+
+
+dmg:
+    pnpm tb && rm -rf ./src-tauri/target/release/bundle/macos

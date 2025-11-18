@@ -11,9 +11,14 @@ use crate::utils::{is_dev, resample_audio_with_rubato, select_output_config, wri
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{ChannelCount, FromSample, Sample};
 use dasp::sample::ToSample;
-use std::env;
 use std::fs::File;
 use std::io::BufWriter;
+#[cfg(target_os = "macos")]
+use std::io::{BufReader, Read};
+#[cfg(target_os = "macos")]
+use std::path::PathBuf;
+#[cfg(target_os = "macos")]
+use std::process::{Command, Stdio};
 use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -36,6 +41,11 @@ thread_local! {
     static PCM_BUFFER: Mutex<Vec<f32>> = const { Mutex::new(Vec::new()) };
 }
 
+#[cfg(target_os = "macos")]
+thread_local! {
+    static SYSTEM_PCM_BUFFER: Mutex<Vec<i16>> = const { Mutex::new(Vec::new()) };
+}
+
 #[derive(Default)]
 pub struct RecordParams {
     pub device: String,
@@ -49,7 +59,17 @@ pub struct RecordParams {
     pub status_callback: Option<StatusCallback>,
 }
 
-pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
+pub fn record_audio_worker(params: RecordParams) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        if params.device != "default_input" {
+            return record_audio_worker_system_dump(params);
+        }
+    }
+    record_audio_worker_cpal(params)
+}
+
+fn record_audio_worker_cpal(mut params: RecordParams) -> Result<(), String> {
     let host = cpal::default_host();
     RECORDING.store(true, Ordering::SeqCst);
 
@@ -83,21 +103,8 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
     let asr_vendor: TranscriptVendors = params.selected_asr_vendor.parse()?;
 
     let config_sample_rate = config.sample_rate().0;
-    let spec = hound::WavSpec {
-        channels: 1,
-        sample_rate: config_sample_rate,
-        bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
-    };
-    let path = if params.file_name.trim().is_empty() {
-        concat!(env!("CARGO_MANIFEST_DIR"), "/assets/transfer_recorded.wav")
-    } else {
-        params.file_name.as_str()
-    };
-
-    let writer = hound::WavWriter::create(path, spec)
-        .map_err(|e| format!("Failed to create WAV writer: {e}"))?;
-    let writer = Arc::new(Mutex::new(Some(writer)));
+    let output_path = resolve_output_path(&params.file_name);
+    let writer = create_wav_writer(&output_path, config_sample_rate)?;
 
     let writer_clone = writer.clone();
     let err_fn = move |err| {
@@ -115,49 +122,12 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
         sample_rate_u32
     };
 
-    let callback = params.pcm_callback.clone();
-    let status_callback = params.status_callback.clone();
-    let asr_transcriber: Option<Arc<dyn StreamingTranscriber>> = match (asr_vendor, callback) {
-        (TranscriptVendors::AssemblyAI, Some(callback)) => {
-            let transcriber =
-                AssemblyAiTranscriber::start(stream_sample_rate, callback, status_callback.clone())
-                    .map_err(|e| format!("Failed to start AssemblyAI stream: {e}"))?;
-            let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
-            Some(transcriber)
-        }
-        (TranscriptVendors::RevAI, Some(callback)) => {
-            let transcriber =
-                RevAiTranscriber::start(stream_sample_rate, callback, status_callback.clone())
-                    .map_err(|e| format!("Failed to start RevAI stream: {e}"))?;
-            let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
-            Some(transcriber)
-        }
-        (TranscriptVendors::DeepGram, Some(callback)) => {
-            let transcriber =
-                DeepgramTranscriber::start(stream_sample_rate, callback, status_callback.clone())
-                    .map_err(|e| format!("Failed to start Deepgram stream: {e}"))?;
-            let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
-            Some(transcriber)
-        }
-        (TranscriptVendors::SpeechMatics, Some(callback)) => {
-            let transcriber = SpeechmaticsTranscriber::start(
-                stream_sample_rate,
-                callback,
-                status_callback.clone(),
-            )
-            .map_err(|e| format!("Failed to start Speechmatics stream: {e}"))?;
-            let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
-            Some(transcriber)
-        }
-        (TranscriptVendors::GlaDia, Some(callback)) => {
-            let transcriber =
-                GladiaTranscriber::start(stream_sample_rate, callback, status_callback.clone())
-                    .map_err(|e| format!("Failed to start Gladia stream: {e}"))?;
-            let transcriber: Arc<dyn StreamingTranscriber> = Arc::new(transcriber);
-            Some(transcriber)
-        }
-        _ => None,
-    };
+    let asr_transcriber = initialize_transcriber(
+        asr_vendor,
+        params.pcm_callback.clone(),
+        params.status_callback.clone(),
+        stream_sample_rate,
+    )?;
     let stream = match config.sample_format() {
         cpal::SampleFormat::I16 => device
             .build_input_stream(
@@ -224,10 +194,281 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
             .finalize()
             .map_err(|e| format!("Failed to finalize WAV file: {e}"))?;
 
-        write_some_log(format!("Recording complete! Saved to {path}").as_str());
+        write_some_log(format!("Recording complete! Saved to {}", output_path).as_str());
     }
 
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn record_audio_worker_system_dump(mut params: RecordParams) -> Result<(), String> {
+    RECORDING.store(true, Ordering::SeqCst);
+
+    if !params.only_pcm {
+        params.use_resampled = false;
+        params.auto_chunk_buffer = true;
+    }
+
+    let sample_rate_u32 = RESAMPLE_RATE;
+    let chunk_size = (sample_rate_u32 * params.capture_interval / 10) as usize;
+
+    let output_path = resolve_output_path(&params.file_name);
+    let writer = create_wav_writer(&output_path, sample_rate_u32)?;
+    let asr_vendor: TranscriptVendors = params.selected_asr_vendor.parse()?;
+    let stream_sample_rate = if params.use_resampled {
+        RESAMPLE_RATE
+    } else {
+        sample_rate_u32
+    };
+    let asr_transcriber = initialize_transcriber(
+        asr_vendor,
+        params.pcm_callback.clone(),
+        params.status_callback.clone(),
+        stream_sample_rate,
+    )?;
+
+    let binary_path = resolve_system_audio_dump_path()?;
+
+    let mut child = Command::new(&binary_path)
+        .stdout(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn SystemAudioDump: {e}"))?;
+
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "Failed to capture SystemAudioDump stdout".to_string())?;
+    let mut reader = BufReader::new(stdout);
+
+    const SAMPLES_PER_READ: usize = 2048;
+    let mut byte_buf = vec![0u8; SAMPLES_PER_READ * size_of::<i16>()];
+    let mut leftover: Option<u8> = None;
+    let mut pcm_chunk: Vec<i16> = Vec::with_capacity(SAMPLES_PER_READ);
+
+    while RECORDING.load(Ordering::SeqCst) {
+        let bytes_read = reader
+            .read(&mut byte_buf)
+            .map_err(|e| format!("Failed to read from SystemAudioDump: {e}"))?;
+        if bytes_read == 0 {
+            break;
+        }
+
+        pcm_chunk.clear();
+        let mut consumed = 0;
+
+        if let Some(prev) = leftover.take() {
+            let next_byte = byte_buf[0];
+            pcm_chunk.push(i16::from_le_bytes([prev, next_byte]));
+            consumed = 1;
+            if bytes_read == 1 {
+                continue;
+            }
+        }
+
+        if consumed < bytes_read {
+            let remaining = bytes_read - consumed;
+            let even_bytes = remaining - (remaining % 2);
+
+            for chunk in byte_buf[consumed..consumed + even_bytes].chunks_exact(2) {
+                pcm_chunk.push(i16::from_le_bytes([chunk[0], chunk[1]]));
+            }
+
+            if remaining % 2 != 0 {
+                leftover = Some(byte_buf[consumed + even_bytes]);
+            }
+        }
+
+        if pcm_chunk.is_empty() {
+            continue;
+        }
+
+        handle_system_dump_chunk(
+            &pcm_chunk,
+            &writer,
+            &params,
+            chunk_size,
+            asr_transcriber.clone(),
+        );
+    }
+
+    let _ = child.kill();
+    let _ = child.wait();
+
+    if !params.only_pcm {
+        writer
+            .lock()
+            .unwrap()
+            .take()
+            .unwrap()
+            .finalize()
+            .map_err(|e| format!("Failed to finalize WAV file: {e}"))?;
+        write_some_log(format!("Recording complete! Saved to {}", output_path).as_str());
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn handle_system_dump_chunk(
+    chunk: &[i16],
+    writer: &WavWriterHandle,
+    params: &RecordParams,
+    chunk_size: usize,
+    transcriber: Option<Arc<dyn StreamingTranscriber>>,
+) {
+    if !params.only_pcm {
+        if let Ok(mut guard) = writer.try_lock() {
+            if let Some(writer) = guard.as_mut() {
+                for &sample in chunk {
+                    writer.write_sample(sample).ok();
+                }
+            }
+        }
+        return;
+    }
+
+    let Some(transcriber) = transcriber else {
+        return;
+    };
+
+    if params.auto_chunk_buffer {
+        if let Err(err) = transcriber.queue_chunk(chunk.to_vec()) {
+            write_some_log(format!("SystemAudioDump streaming chunk failed: {err}").as_str());
+        }
+        return;
+    }
+
+    SYSTEM_PCM_BUFFER.with(|buf_cell| {
+        let mut buf = buf_cell.lock().unwrap();
+        buf.extend_from_slice(chunk);
+        drain_system_chunk_buffer(&mut buf, chunk_size, &transcriber);
+    });
+}
+
+#[cfg(target_os = "macos")]
+fn drain_system_chunk_buffer(
+    buf: &mut Vec<i16>,
+    chunk_size: usize,
+    transcriber: &Arc<dyn StreamingTranscriber>,
+) {
+    while buf.len() >= chunk_size {
+        let chunk = buf.drain(..chunk_size).collect::<Vec<i16>>();
+        if let Err(err) = transcriber.queue_chunk(chunk) {
+            write_some_log(format!("SystemAudioDump buffered streaming failed: {err}").as_str());
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn resolve_system_audio_dump_path() -> Result<PathBuf, String> {
+    let dev_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("assets")
+        .join("SystemAudioDump");
+    if dev_path.exists() {
+        return Ok(dev_path);
+    }
+
+    let packaged_path = std::env::current_exe()
+        .map_err(|e| format!("Failed to locate current executable: {e}"))?
+        .parent()
+        .and_then(|exe_dir| exe_dir.parent())
+        .map(|contents_dir| contents_dir.join("Resources").join("SystemAudioDump"));
+
+    if let Some(path) = packaged_path {
+        if path.exists() {
+            return Ok(path);
+        }
+        return Err(format!(
+            "SystemAudioDump binary not found. Looked in '{}' and '{}'",
+            dev_path.display(),
+            path.display()
+        ));
+    }
+
+    Err(format!(
+        "SystemAudioDump binary not found. Looked in '{}'",
+        dev_path.display()
+    ))
+}
+
+fn resolve_output_path(file_name: &str) -> String {
+    if file_name.trim().is_empty() {
+        concat!(env!("CARGO_MANIFEST_DIR"), "/assets/transfer_recorded.wav").to_string()
+    } else {
+        file_name.to_string()
+    }
+}
+
+fn create_wav_writer(path: &str, sample_rate: u32) -> Result<WavWriterHandle, String> {
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let writer = hound::WavWriter::create(path, spec)
+        .map_err(|e| format!("Failed to create WAV writer: {e}"))?;
+    Ok(Arc::new(Mutex::new(Some(writer))))
+}
+
+fn initialize_transcriber(
+    asr_vendor: TranscriptVendors,
+    callback: Option<PcmCallback>,
+    status_callback: Option<StatusCallback>,
+    stream_sample_rate: u32,
+) -> Result<Option<Arc<dyn StreamingTranscriber>>, String> {
+    let Some(callback) = callback else {
+        return Ok(None);
+    };
+    let result: Arc<dyn StreamingTranscriber> = match asr_vendor {
+        TranscriptVendors::AssemblyAI => {
+            let transcriber = AssemblyAiTranscriber::start(
+                stream_sample_rate,
+                callback.clone(),
+                status_callback.clone(),
+            )
+            .map_err(|e| format!("Failed to start AssemblyAI stream: {e}"))?;
+            Arc::new(transcriber)
+        }
+        TranscriptVendors::RevAI => {
+            let transcriber = RevAiTranscriber::start(
+                stream_sample_rate,
+                callback.clone(),
+                status_callback.clone(),
+            )
+            .map_err(|e| format!("Failed to start RevAI stream: {e}"))?;
+            Arc::new(transcriber)
+        }
+        TranscriptVendors::DeepGram => {
+            let transcriber = DeepgramTranscriber::start(
+                stream_sample_rate,
+                callback.clone(),
+                status_callback.clone(),
+            )
+            .map_err(|e| format!("Failed to start Deepgram stream: {e}"))?;
+            Arc::new(transcriber)
+        }
+        TranscriptVendors::SpeechMatics => {
+            let transcriber = SpeechmaticsTranscriber::start(
+                stream_sample_rate,
+                callback.clone(),
+                status_callback.clone(),
+            )
+            .map_err(|e| format!("Failed to start Speechmatics stream: {e}"))?;
+            Arc::new(transcriber)
+        }
+        TranscriptVendors::GlaDia => {
+            let transcriber = GladiaTranscriber::start(
+                stream_sample_rate,
+                callback.clone(),
+                status_callback.clone(),
+            )
+            .map_err(|e| format!("Failed to start Gladia stream: {e}"))?;
+            Arc::new(transcriber)
+        }
+    };
+
+    Ok(Some(result))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -330,7 +571,7 @@ fn prepare_chunk_for_transcriber(
     use_resampled: bool,
     input_sample_rate: usize,
 ) -> Vec<i16> {
-    if use_resampled {
+    if use_resampled && input_sample_rate != (RESAMPLE_RATE as usize) {
         match resample_audio_with_rubato(input, input_sample_rate, RESAMPLE_RATE as usize, 1) {
             Ok(resampled) => resampled,
             Err(err) => {
@@ -354,8 +595,6 @@ fn stereo_to_mono_f32(samples: &[f32]) -> Vec<f32> {
 }
 
 type WavWriterHandle = Arc<Mutex<Option<hound::WavWriter<BufWriter<File>>>>>;
-
-///! 停止录音线程可能死锁卡住,暂时还没解决
 
 pub fn stop_recording(handle: JoinHandle<()>) {
     RECORDING.store(false, Ordering::SeqCst);

@@ -204,7 +204,6 @@ fn handle_audio_input<T>(
     }
 }
 
-/// 写入所有四种格式（f32/i16 单/双通道）
 fn write_all_formats<T>(
     input: &[T],
     i16_mono: &WavWriterHandle,
