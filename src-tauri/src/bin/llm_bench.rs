@@ -7,10 +7,9 @@ use std::{
 
 use tauri::{AppHandle, Listener, Wry};
 use tauri_courier_ai_lib::{
-    ali_qwen_2_5, ali_qwen_max, ali_qwen_plus_latest, deepseek_api, doubao_lite, doubao_pro,
-    doubao_seed, doubao_seed_flash, siliconflow_free_models
-    , siliconflow_free_with_model,
-    siliconflow_pro_models, siliconflow_pro_with_model, FlowArgs,
+    FlowArgs, ali_qwen_2_5, ali_qwen_max, ali_qwen_plus_latest, deepseek_api, doubao_lite,
+    doubao_pro, doubao_seed, doubao_seed_flash, siliconflow_free_models,
+    siliconflow_free_with_model, siliconflow_pro_models, siliconflow_pro_with_model,
 };
 use tokio::{sync::oneshot, time::timeout};
 
@@ -76,19 +75,19 @@ async fn bench_base(app_handle: &AppHandle<Wry>) {
     bench!("ali_qwen_max", ali_qwen_max, app_handle);
     //总结 ali_qwen_max: 平均 0.38s | 最快 0.29s | 最慢 0.57s | 成功 10 | 失败 0
 
-
-
     for &model in siliconflow_free_models() {
         let label = format!("siliconflow_free::{model}");
-        if let Err(err) = run_bench_for(label.as_str(), app_handle, move |app, args| {
-            siliconflow_free_with_model(app, args, model)
-        }, None)
-            .await
+        if let Err(err) = run_bench_for(
+            label.as_str(),
+            app_handle,
+            move |app, args| siliconflow_free_with_model(app, args, model),
+            None,
+        )
+        .await
         {
             eprintln!("模型 {label} 基准测试终止: {err}");
         }
     }
-
 }
 async fn bench_models(app_handle: &AppHandle<Wry>) {
     bench_base(app_handle).await;
