@@ -42,7 +42,7 @@ const useAppStateStore = create<AppStateStore>((set) => ({
 	updatePreRecorded: (target: boolean) => {
 		set({ isUsePreRecorded: target });
 	},
-	currentSelectedModel: "siliconflow_free",
+	currentSelectedModel: "siliconflow_pro",
 	updateCurrentSelectedModel: (target: ModelOption) =>
 		set({ currentSelectedModel: target }),
 

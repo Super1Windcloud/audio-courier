@@ -2,7 +2,8 @@ mod api;
 use api::*;
 use rand::{Rng, rng as thread_rng};
 use serde_json::json;
-#[derive(serde::Deserialize, Debug)]
+
+#[derive(serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FlowArgs {
     question: String,
@@ -10,103 +11,92 @@ pub struct FlowArgs {
     request_id: Option<String>,
 }
 
+impl FlowArgs {
+    pub fn new(question: impl Into<String>, llm_prompt: impl Into<String>) -> Self {
+        Self {
+            question: question.into(),
+            llm_prompt: llm_prompt.into(),
+            request_id: None,
+        }
+    }
+
+    pub fn with_request_id(
+        question: impl Into<String>,
+        llm_prompt: impl Into<String>,
+        request_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            question: question.into(),
+            llm_prompt: llm_prompt.into(),
+            request_id: Some(request_id.into()),
+        }
+    }
+
+    pub fn set_request_id(mut self, request_id: Option<String>) -> Self {
+        self.request_id = request_id;
+        self
+    }
+}
+
 const FREE_MODELS: [&str; 8] = [
-    "Qwen/Qwen2.5-Coder-32B-Instruct",
-    "Qwen/Qwen2.5-7B-Instruct",
-    "Qwen/Qwen2-7B-Instruct",
-    "tencent/Hunyuan-MT-7B",
-    "THUDM/GLM-Z1-9B-0414",
-    "THUDM/GLM-4-9B-0414",
-    "internlm/internlm2_5-7b-chat",
-    "THUDM/glm-4-9b-chat",
+    "Qwen/Qwen2.5-Coder-32B-Instruct", // 0.15S
+    "Qwen/Qwen2.5-7B-Instruct",        //0.22S
+    "Qwen/Qwen2-7B-Instruct",          // 0.1S
+    "tencent/Hunyuan-MT-7B",           //0.17S
+    "THUDM/GLM-Z1-9B-0414",            // 0.22S
+    "THUDM/GLM-4-9B-0414",             //0.5S
+    "internlm/internlm2_5-7b-chat",    //0.11S
+    "THUDM/glm-4-9b-chat",             //0.35S
 ];
+
+pub fn siliconflow_free_models() -> &'static [&'static str] {
+    &FREE_MODELS
+}
 
 #[tauri::command]
 pub async fn siliconflow_free(
     app: tauri::AppHandle,
     flow_args: FlowArgs,
 ) -> Result<String, String> {
-    let api_key = get_env_key("Siliconflow");
-    let messages = vec![
-        json!({"role":"assistant","content":flow_args.llm_prompt}),
-        json!({"role":"user","content":flow_args.question}),
-    ];
     let idx = {
         let mut rng = thread_rng();
         rng.random_range(0..FREE_MODELS.len())
     };
     let random_model = FREE_MODELS[idx];
-    // let random_model = "internlm/internlm2_5-7b-chat";
     println!("随机选择的模型: {}", random_model);
-    call_model_api(
-        app,
-        ModelRequest {
-            model: random_model.to_string(),
-            messages,
-            base_url: "https://api.siliconflow.cn/v1".to_string(),
-            api_key,
-            max_tokens: 4096,
-            temperature: 0.7,
-        },
-        flow_args.request_id,
-    )
-    .await
-    .map_err(|e| e.to_string())
+    siliconflow_free_with_model(app, flow_args, random_model).await
 }
 
-const PRO_MODELS: [&str; 43] = [
-    "Pro/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
-    "Pro/Qwen/Qwen2.5-Coder-7B-Instruct",
-    "Pro/Qwen/Qwen2.5-VL-7B-Instruct",
-    "Pro/Qwen/Qwen2.5-7B-Instruct",
-    "Pro/Qwen/Qwen2-7B-Instruct",
-    "Pro/THUDM/glm-4-9b-chat",
-    "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
-    "Qwen/Qwen2.5-14B-Instruct",
-    "deepseek-ai/deepseek-vl2",
-    "Qwen/Qwen2.5-Coder-32B-Instruct",
-    "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
-    "Qwen/Qwen2.5-32B-Instruct",
-    "deepseek-ai/DeepSeek-V2.5",
-    "Qwen/Qwen2.5-VL-32B-Instruct",
-    "THUDM/GLM-4-32B-0414",
-    "Qwen/Qwen3-14B",
-    "Qwen/Qwen3-30B-A3B-Instruct-2507",
-    "Qwen/Qwen3-30B-A3B",
-    "Qwen/Qwen3-Coder-30B-A3B-Instruct",
-    "Qwen/Qwen3-Next-80B-A3B-Instruct",
-    "inclusionAI/Ling-flash-2.0",
-    "tencent/Hunyuan-A13B-Instruct",
-    "Qwen/Qwen3-32B",
-    "Tongyi-Zhiwen/QwenLong-L1-32B",
-    "ByteDance-Seed/Seed-OSS-36B-Instruct",
-    "ascend-tribe/pangu-pro-moe",
-    "THUDM/GLM-Z1-Rumination-32B-0414",
-    "THUDM/GLM-Z1-32B-0414",
-    "Qwen/QwQ-32B",
-    "Qwen/Qwen2.5-72B-Instruct",
-    "Qwen/Qwen2.5-VL-72B-Instruct",
-    "Qwen/Qwen2.5-72B-Instruct-128K",
-    "Qwen/Qwen2-VL-72B-Instruct",
-    "zai-org/GLM-4.5V",
-    "zai-org/GLM-4.5-Air",
-    "Pro/deepseek-ai/DeepSeek-V3",
-    "deepseek-ai/DeepSeek-V3",
-    "moonshotai/Kimi-Dev-72B",
-    "baidu/ERNIE-4.5-300B-A47B",
-    "Qwen/Qwen3-235B-A22B",
-    "Pro/deepseek-ai/DeepSeek-V3.1",
-    "deepseek-ai/DeepSeek-V3.1",
-    "zai-org/GLM-4.5",
+const PRO_MODELS: [&str; 13] = [
+    "Pro/Qwen/Qwen2.5-7B-Instruct",     //0.17S
+    "Pro/Qwen/Qwen2-7B-Instruct",       // 0.11S
+    "Pro/THUDM/glm-4-9b-chat",          //0.27S
+    "Qwen/Qwen2.5-14B-Instruct",        // 0.21S
+    "Qwen/Qwen2.5-Coder-32B-Instruct",  //0.14S
+    "Qwen/Qwen2.5-32B-Instruct",        // 0.23S
+    "THUDM/GLM-4-32B-0414",             //0.29S
+    "Qwen/Qwen3-Next-80B-A3B-Instruct", //0.36S
+    "inclusionAI/Ling-flash-2.0",       // 0.4S
+    "Qwen/Qwen2.5-72B-Instruct-128K",   //0.53S
+    "zai-org/GLM-4.5-Air",              //0.41S
+    "deepseek-ai/DeepSeek-V3",          //0.68S
+    "baidu/ERNIE-4.5-300B-A47B",        // 0.16S
 ];
+
+pub fn siliconflow_pro_models() -> &'static [&'static str] {
+    &PRO_MODELS
+}
+
+#[derive(serde::Serialize)]
+pub struct SiliconflowModelResult {
+    pub model: String,
+    pub success: bool,
+    pub response: Option<String>,
+    pub error: Option<String>,
+}
 
 #[tauri::command]
 pub async fn siliconflow_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
-    let api_key = get_env_key("SiliconflowVLM");
-    let messages = vec![
-        json!({"role":"assistant","content":flow_args.llm_prompt}),
-        json!({"role":"user","content":flow_args.question}),
-    ];
     let idx = {
         let mut rng = thread_rng();
         rng.random_range(0..PRO_MODELS.len())
@@ -114,20 +104,57 @@ pub async fn siliconflow_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Resu
 
     let random_model = PRO_MODELS[idx];
     println!("随机选择的模型: {}", random_model);
+    siliconflow_pro_with_model(app, flow_args, random_model).await
+}
+
+async fn siliconflow_call_with_model(
+    app: tauri::AppHandle,
+    flow_args: FlowArgs,
+    model: &str,
+    api_key_name: &str,
+) -> Result<String, String> {
+    let FlowArgs {
+        question,
+        llm_prompt,
+        request_id,
+    } = flow_args;
+
+    let messages = vec![
+        json!({"role":"assistant","content":llm_prompt}),
+        json!({"role":"user","content":question}),
+    ];
+    let api_key = get_env_key(api_key_name);
+
     call_model_api(
         app,
         ModelRequest {
-            model: random_model.to_string(),
+            model: model.to_string(),
             messages,
             base_url: "https://api.siliconflow.cn/v1".to_string(),
             api_key,
             max_tokens: 4096,
             temperature: 0.7,
         },
-        flow_args.request_id,
+        request_id,
     )
     .await
     .map_err(|e| e.to_string())
+}
+
+pub async fn siliconflow_free_with_model(
+    app: tauri::AppHandle,
+    flow_args: FlowArgs,
+    model: &str,
+) -> Result<String, String> {
+    siliconflow_call_with_model(app, flow_args, model, "Siliconflow").await
+}
+
+pub async fn siliconflow_pro_with_model(
+    app: tauri::AppHandle,
+    flow_args: FlowArgs,
+    model: &str,
+) -> Result<String, String> {
+    siliconflow_call_with_model(app, flow_args, model, "SiliconflowVLM").await
 }
 
 #[tauri::command]

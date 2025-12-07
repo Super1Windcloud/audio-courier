@@ -5,8 +5,6 @@ export const MODEL_OPTIONS = [
 	"doubao_pro",
 	"doubao_seed_flash",
 	"doubao_seed",
-	"kimi",
-	"zhipu",
 	"deepseek_api",
 	"ali_qwen_2_5",
 	"ali_qwen_plus_latest",

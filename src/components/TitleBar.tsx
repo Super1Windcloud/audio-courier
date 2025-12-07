@@ -5,6 +5,16 @@ const TitleBar: React.FC = () => {
 	const [isMaximized, setIsMaximized] = useState(false);
 	const window = getCurrentWindow();
 
+	const handleDrag = async (event: React.MouseEvent<HTMLDivElement>) => {
+		const target = event.target as HTMLElement;
+		if (target.closest("[data-no-drag='true']")) return;
+		try {
+			await window.startDragging();
+		} catch (error) {
+			console.error("Failed to start dragging window", error);
+		}
+	};
+
 	const handleMinimize = async () => {
 		await window.hide();
 	};
@@ -27,10 +37,12 @@ const TitleBar: React.FC = () => {
 	return (
 		<div
 			className="w-full flex justify-end items-center h-10 select-none bg-transparent"
+			onMouseDown={handleDrag}
 			style={{ WebkitAppRegion: "drag" }}
 		>
 			<div
 				className="flex items-center gap-1 pr-2"
+				data-no-drag="true"
 				style={{ WebkitAppRegion: "no-drag" }}
 			>
 				{/* 最小化 */}

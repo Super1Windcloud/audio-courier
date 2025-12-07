@@ -31,6 +31,7 @@ fn show_window(window: tauri::Window) -> Result<(), String> {
     window
         .set_focus()
         .map_err(|e| format!("Failed to set focus: {}", e))?;
+
     window
         .show()
         .map_err(|e| format!("Failed to show window: {}", e))?;
@@ -53,6 +54,11 @@ pub fn run() {
     }
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let main = app.get_webview_window("main").unwrap();
+            main.set_focus().unwrap();
+            main.show().unwrap();
+        }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -73,6 +79,11 @@ pub fn run() {
             start_recognize_audio_stream_from_speaker_loopback,
             stop_recognize_audio_stream_from_speaker_loopback,
         ])
+        .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
