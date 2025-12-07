@@ -23,3 +23,7 @@ clean :
 
 upgrade:
     cd src-tauri &&  cargo update && cargo upgrade
+
+
+nsis:
+    pnpm tb && mv  src-tauri/target/release/bundle/nsis  ./bundle

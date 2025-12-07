@@ -11,14 +11,14 @@ pub struct FlowArgs {
 }
 
 const FREE_MODELS: [&str; 8] = [
-    "Qwen/Qwen2.5-Coder-32B-Instruct",
-    "Qwen/Qwen2.5-7B-Instruct",
-    "Qwen/Qwen2-7B-Instruct",
-    "tencent/Hunyuan-MT-7B",
-    "THUDM/GLM-Z1-9B-0414",
-    "THUDM/GLM-4-9B-0414",
-    "internlm/internlm2_5-7b-chat",
-    "THUDM/glm-4-9b-chat",
+    "Qwen/Qwen2.5-Coder-32B-Instruct", // 0.15S
+    "Qwen/Qwen2.5-7B-Instruct",        //0.22S
+    "Qwen/Qwen2-7B-Instruct",          // 0.1S
+    "tencent/Hunyuan-MT-7B",           //0.17S
+    "THUDM/GLM-Z1-9B-0414",            // 0.22S
+    "THUDM/GLM-4-9B-0414",             //0.5S
+    "internlm/internlm2_5-7b-chat",    //0.11S
+    "THUDM/glm-4-9b-chat",             //0.35S
 ];
 
 #[tauri::command]
@@ -54,50 +54,20 @@ pub async fn siliconflow_free(
     .map_err(|e| e.to_string())
 }
 
-const PRO_MODELS: [&str; 43] = [
-    "Pro/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
-    "Pro/Qwen/Qwen2.5-Coder-7B-Instruct",
-    "Pro/Qwen/Qwen2.5-VL-7B-Instruct",
-    "Pro/Qwen/Qwen2.5-7B-Instruct",
-    "Pro/Qwen/Qwen2-7B-Instruct",
-    "Pro/THUDM/glm-4-9b-chat",
-    "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
-    "Qwen/Qwen2.5-14B-Instruct",
-    "deepseek-ai/deepseek-vl2",
-    "Qwen/Qwen2.5-Coder-32B-Instruct",
-    "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
-    "Qwen/Qwen2.5-32B-Instruct",
-    "deepseek-ai/DeepSeek-V2.5",
-    "Qwen/Qwen2.5-VL-32B-Instruct",
-    "THUDM/GLM-4-32B-0414",
-    "Qwen/Qwen3-14B",
-    "Qwen/Qwen3-30B-A3B-Instruct-2507",
-    "Qwen/Qwen3-30B-A3B",
-    "Qwen/Qwen3-Coder-30B-A3B-Instruct",
-    "Qwen/Qwen3-Next-80B-A3B-Instruct",
-    "inclusionAI/Ling-flash-2.0",
-    "tencent/Hunyuan-A13B-Instruct",
-    "Qwen/Qwen3-32B",
-    "Tongyi-Zhiwen/QwenLong-L1-32B",
-    "ByteDance-Seed/Seed-OSS-36B-Instruct",
-    "ascend-tribe/pangu-pro-moe",
-    "THUDM/GLM-Z1-Rumination-32B-0414",
-    "THUDM/GLM-Z1-32B-0414",
-    "Qwen/QwQ-32B",
-    "Qwen/Qwen2.5-72B-Instruct",
-    "Qwen/Qwen2.5-VL-72B-Instruct",
-    "Qwen/Qwen2.5-72B-Instruct-128K",
-    "Qwen/Qwen2-VL-72B-Instruct",
-    "zai-org/GLM-4.5V",
-    "zai-org/GLM-4.5-Air",
-    "Pro/deepseek-ai/DeepSeek-V3",
-    "deepseek-ai/DeepSeek-V3",
-    "moonshotai/Kimi-Dev-72B",
-    "baidu/ERNIE-4.5-300B-A47B",
-    "Qwen/Qwen3-235B-A22B",
-    "Pro/deepseek-ai/DeepSeek-V3.1",
-    "deepseek-ai/DeepSeek-V3.1",
-    "zai-org/GLM-4.5",
+const PRO_MODELS: [&str; 13] = [
+    "Pro/Qwen/Qwen2.5-7B-Instruct",     //0.17S
+    "Pro/Qwen/Qwen2-7B-Instruct",       // 0.11S
+    "Pro/THUDM/glm-4-9b-chat",          //0.27S
+    "Qwen/Qwen2.5-14B-Instruct",        // 0.21S
+    "Qwen/Qwen2.5-Coder-32B-Instruct",  //0.14S
+    "Qwen/Qwen2.5-32B-Instruct",        // 0.23S
+    "THUDM/GLM-4-32B-0414",             //0.29S
+    "Qwen/Qwen3-Next-80B-A3B-Instruct", //0.36S
+    "inclusionAI/Ling-flash-2.0",       // 0.4S
+    "Qwen/Qwen2.5-72B-Instruct-128K",   //0.53S
+    "zai-org/GLM-4.5-Air",              //0.41S
+    "deepseek-ai/DeepSeek-V3",          //0.68S
+    "baidu/ERNIE-4.5-300B-A47B",        // 0.16S
 ];
 
 #[tauri::command]
