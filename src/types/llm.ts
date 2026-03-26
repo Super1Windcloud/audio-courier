@@ -1,12 +1,12 @@
 export const MODEL_OPTIONS = [
-  "siliconflow_free",
-  "siliconflow_pro",
-  "doubao_lite",
-  "doubao_pro",
-  "deepseek_api",
-  "ali_qwen_2_5",
-  "ali_qwen_plus_latest",
-  "ali_qwen_max",
+	"siliconflow_free",
+	"siliconflow_pro",
+	"doubao_lite",
+	"doubao_pro",
+	"deepseek_api",
+	"ali_qwen_2_5",
+	"ali_qwen_plus_latest",
+	"ali_qwen_max",
 ] as const;
 
 export type ModelOption = (typeof MODEL_OPTIONS)[number];

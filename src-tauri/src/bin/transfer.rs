@@ -98,7 +98,7 @@ fn output_device_config() {
         }
         println!("输出设备支持的配置：");
 
-        let desired_sample_rate = cpal::SampleRate(RESAMPLE_RATE);
+        let desired_sample_rate = RESAMPLE_RATE;
 
         let mut best_config = None;
         for range in supported_configs {

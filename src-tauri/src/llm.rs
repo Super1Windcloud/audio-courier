@@ -1,6 +1,6 @@
 mod api;
 use api::*;
-use rand::{Rng, rng as thread_rng};
+use rand::{RngExt, rng as thread_rng};
 use serde_json::json;
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]

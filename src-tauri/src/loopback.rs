@@ -22,6 +22,13 @@ use std::thread::JoinHandle;
 
 pub static TOTAL_SAMPLES_WRITTEN: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
 
+fn device_display_name(device: &cpal::Device) -> Option<String> {
+    device
+        .description()
+        .ok()
+        .map(|description| description.name().to_string())
+}
+
 /** static 全局变量，用于控制录音线程的状态
 名称    中文含义	常用于	作用
 Relaxed	无序	计数器等简单情况	只保证原子性，不保证顺序
@@ -59,12 +66,14 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
         name => host
             .output_devices()
             .unwrap()
-            .find(|x| x.name().map(|y| y == name).unwrap_or(false)),
+            .find(|x| device_display_name(x).as_deref() == Some(name)),
     }
     .ok_or_else(|| "failed to find input device".to_string())?;
 
     if is_dev() {
-        write_some_log(format!("Input device: {}", device.name().unwrap()).as_str());
+        if let Some(name) = device_display_name(&device) {
+            write_some_log(format!("Input device: {name}").as_str());
+        }
     }
 
     if !params.only_pcm {
@@ -82,7 +91,7 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
 
     let asr_vendor: TranscriptVendors = params.selected_asr_vendor.parse()?;
 
-    let config_sample_rate = config.sample_rate().0;
+    let config_sample_rate = config.sample_rate();
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate: config_sample_rate,

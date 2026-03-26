@@ -4,10 +4,7 @@ use cpal::Sample;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use dasp::sample::ToSample;
 use hound::WavWriter;
-use rubato::{
-    ResampleError, Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType,
-    WindowFunction,
-};
+use rubato::ResampleError;
 use std::fs::File;
 use std::io::BufWriter;
 use std::sync::{Arc, Mutex};
@@ -16,6 +13,13 @@ use tauri_courier_ai_lib::RESAMPLE_RATE;
 pub struct RecordParams {
     pub device: String,
     pub duration: u64,
+}
+
+fn device_display_name(device: &cpal::Device) -> Option<String> {
+    device
+        .description()
+        .ok()
+        .map(|description| description.name().to_string())
 }
 
 fn select_output_config(use_resample: bool) -> Result<cpal::SupportedStreamConfig, String> {
@@ -27,7 +31,7 @@ fn select_output_config(use_resample: bool) -> Result<cpal::SupportedStreamConfi
         .supported_output_configs()
         .map_err(|_| "无法获取输出设备配置".to_string())?;
 
-    let desired_sample_rate = cpal::SampleRate(RESAMPLE_RATE);
+    let desired_sample_rate = RESAMPLE_RATE;
 
     for range in supported_configs {
         if range.min_sample_rate() <= desired_sample_rate
@@ -68,7 +72,7 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
         name => host
             .output_devices()
             .unwrap()
-            .find(|x| x.name().map(|y| y == name).unwrap_or(false)),
+            .find(|x| device_display_name(x).as_deref() == Some(name)),
     }
     .ok_or_else(|| "无法找到输出设备".to_string())?;
     let config = select_output_config(true)?;
@@ -109,7 +113,7 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
 
     let err_fn = |err| eprintln!("🎧 音频流错误: {err}");
     let channels = config.channels() as usize;
-    let sample_rate = config.sample_rate().0 as usize;
+    let sample_rate = config.sample_rate() as usize;
 
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device.build_input_stream(
@@ -174,7 +178,7 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
 fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> hound::WavSpec {
     hound::WavSpec {
         channels: config.channels() as _,
-        sample_rate: config.sample_rate().0 as _,
+        sample_rate: config.sample_rate() as _,
         bits_per_sample: (config.sample_format().sample_size() * 8) as _,
         sample_format: if config.sample_format().is_float() {
             hound::SampleFormat::Float
@@ -231,37 +235,37 @@ fn resample_audio_rubato(
     output_rate: usize,
     channels: usize,
 ) -> Result<Vec<i16>, ResampleError> {
-    let params = SincInterpolationParameters {
-        sinc_len: 256,
-        f_cutoff: 0.95,
-        interpolation: SincInterpolationType::Linear,
-        oversampling_factor: 256,
-        window: WindowFunction::BlackmanHarris2,
-    };
-    let mut resampler = SincFixedIn::<f32>::new(
-        output_rate as f64 / input_rate as f64,
-        2.0,
-        params,
-        input.len() / channels,
-        channels,
-    )
-    .unwrap();
-    let split: Vec<Vec<f32>> = (0..channels)
-        .map(|ch| {
-            input
-                .iter()
-                .skip(ch)
-                .step_by(channels)
-                .cloned()
-                .collect::<Vec<f32>>()
-        })
-        .collect();
+    if input.is_empty() || input_rate == 0 || output_rate == 0 || channels == 0 {
+        return Ok(Vec::new());
+    }
 
-    let waves_out = resampler.process(&split, None)?;
-    let resampled = waves_out
-        .iter()
-        .flat_map(|w| w.iter().map(|&s| s.to_sample::<i16>()))
-        .collect::<Vec<i16>>();
+    if input_rate == output_rate {
+        return Ok(input.iter().map(|&s| s.to_sample::<i16>()).collect());
+    }
+
+    let input_frames = input.len() / channels;
+    if input_frames == 0 {
+        return Ok(Vec::new());
+    }
+
+    let output_frames = ((input_frames as u128 * output_rate as u128) / input_rate as u128)
+        .max(1) as usize;
+    let ratio = input_rate as f64 / output_rate as f64;
+    let mut resampled = Vec::with_capacity(output_frames * channels);
+
+    for frame_idx in 0..output_frames {
+        let src_pos = frame_idx as f64 * ratio;
+        let src_idx = src_pos.floor() as usize;
+        let next_idx = (src_idx + 1).min(input_frames.saturating_sub(1));
+        let frac = (src_pos - src_idx as f64) as f32;
+
+        for ch in 0..channels {
+            let base = src_idx * channels + ch;
+            let next = next_idx * channels + ch;
+            let sample = input[base] * (1.0 - frac) + input[next] * frac;
+            resampled.push(sample.to_sample::<i16>());
+        }
+    }
 
     Ok(resampled)
 }

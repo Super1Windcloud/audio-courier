@@ -11,27 +11,33 @@ pub fn get_record_handle() -> &'static Mutex<Option<std::thread::JoinHandle<()>>
     RECORD_HANDLE.get_or_init(|| Mutex::new(None))
 }
 
+fn device_display_name(device: &cpal::Device) -> Option<String> {
+    device
+        .description()
+        .ok()
+        .map(|description| description.name().to_string())
+}
+
 #[tauri::command]
 pub fn get_audio_stream_devices_names() -> Result<Vec<String>, String> {
     let host = cpal::default_host();
     let mut device_names = Vec::new();
 
-    let default_output_name = host.default_output_device().and_then(|d| d.name().ok());
+    let default_output_name = host.default_output_device().and_then(|d| device_display_name(&d));
 
     if let Ok(output_devices) = host.output_devices() {
         for device in output_devices {
-            if let Ok(name) = device.name() {
-                if Some(&name) == default_output_name.as_ref() {
-                    continue;
+            if let Some(name) = device_display_name(&device) {
+                if Some(&name) != default_output_name.as_ref() {
+                    device_names.push(format!("{} [输出]", name));
                 }
-                device_names.push(format!("{} [输出]", name));
             }
         }
     }
 
     if let Ok(input_devices) = host.input_devices() {
         for device in input_devices {
-            if let Ok(name) = device.name() {
+            if let Some(name) = device_display_name(&device) {
                 device_names.push(format!("{} [输入]", name));
             }
         }

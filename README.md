@@ -2,10 +2,8 @@
 
 Real-time STT applications for local use
 
-# 从源码构建
+# build from source
 
 ```bash
 pnpm i && pnpm td
 ```
-
-
