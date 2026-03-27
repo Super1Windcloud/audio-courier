@@ -43,7 +43,9 @@ export function MoreMenu() {
 		revai: "RevAI",
 		speechmatics: "Speechmatics",
 	};
-	const UI_OPACITY_OPTIONS = [100, 95, 90, 85, 80, 75, 70, 65, 60];
+	const UI_OPACITY_OPTIONS = [
+		100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30,
+	];
 
 	useEffect(() => {
 		invoke("get_audio_stream_devices_names").then((result) => {

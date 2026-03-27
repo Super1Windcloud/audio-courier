@@ -127,3 +127,42 @@
 		background: linear-gradient(180deg, #724766 0%, #2c4f71 100%);
 	}
 }
+
+.low-opacity-shell {
+	color: #111827;
+}
+
+.low-opacity-shell,
+.low-opacity-shell * {
+	caret-color: #111827;
+}
+
+.low-opacity-shell
+	:is(
+		p,
+		span,
+		div,
+		label,
+		button,
+		input,
+		textarea,
+		h1,
+		h2,
+		h3,
+		h4,
+		h5,
+		h6,
+		li,
+		small,
+		strong,
+		em,
+		a,
+		svg
+	) {
+	color: #111827;
+}
+
+.low-opacity-shell input::placeholder,
+.low-opacity-shell textarea::placeholder {
+	color: rgb(31 41 55 / 0.7);
+}

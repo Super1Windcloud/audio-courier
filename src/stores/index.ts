@@ -47,7 +47,7 @@ interface AppStateStore {
 const UI_OPACITY_STORAGE_KEY = "audio-courier-ui-opacity";
 
 function normalizeUiOpacity(target: number) {
-	return Math.min(1, Math.max(0.45, Number(target.toFixed(2))));
+	return Math.min(1, Math.max(0.3, Number(target.toFixed(2))));
 }
 
 function readInitialUiOpacity() {

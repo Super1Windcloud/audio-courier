@@ -107,6 +107,7 @@ function App() {
 		window.location.hash === "#license-signer" ||
 		new URLSearchParams(window.location.search).get("mode") ===
 			"license-signer";
+	const isLowOpacityMode = uiOpacity <= 0.6;
 	const appShellStyle = {
 		opacity: uiOpacity,
 		transition: "opacity 180ms ease-out",
@@ -237,7 +238,11 @@ function App() {
 
 	if (isSignerMode) {
 		return (
-			<div style={appShellStyle}>
+			<div
+				className={isLowOpacityMode ? "low-opacity-shell" : undefined}
+				data-low-opacity={isLowOpacityMode}
+				style={appShellStyle}
+			>
 				<SignerErrorBoundary>
 					<Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
 						<LicenseSignerApp />
@@ -255,7 +260,11 @@ function App() {
 	}
 
 	return (
-		<div style={appShellStyle}>
+		<div
+			className={isLowOpacityMode ? "low-opacity-shell" : undefined}
+			data-low-opacity={isLowOpacityMode}
+			style={appShellStyle}
+		>
 			<BrowserRouter>
 				<Suspense fallback={<Home />}>
 					<Routes>
