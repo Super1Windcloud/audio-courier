@@ -23,7 +23,9 @@ pub fn get_audio_stream_devices_names() -> Result<Vec<String>, String> {
     let host = cpal::default_host();
     let mut device_names = Vec::new();
 
-    let default_output_name = host.default_output_device().and_then(|d| device_display_name(&d));
+    let default_output_name = host
+        .default_output_device()
+        .and_then(|d| device_display_name(&d));
 
     if let Ok(output_devices) = host.output_devices() {
         for device in output_devices {

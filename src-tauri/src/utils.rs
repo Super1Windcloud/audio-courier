@@ -129,8 +129,8 @@ pub fn resample_audio_with_rubato(
         return Ok(Vec::new());
     }
 
-    let output_frames = ((input_frames as u128 * output_rate as u128) / input_rate as u128)
-        .max(1) as usize;
+    let output_frames =
+        ((input_frames as u128 * output_rate as u128) / input_rate as u128).max(1) as usize;
     let ratio = input_rate as f64 / output_rate as f64;
     let mut resampled = Vec::with_capacity(output_frames * channels);
 
