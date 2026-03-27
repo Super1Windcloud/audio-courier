@@ -6,6 +6,19 @@
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY3E3L0ducEp5Qm8zUFVTTTQ0VGJBMjhsckx6anI1NkpDUzdrOHRueGZISUo5ckJ4UWdEc2VJUkJSVFZ4THJ6bytOTVdTYTJnZTgvUkhOWnlVTHRYK0MxSW5nUGZuYkFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0NjIxNjkxCWZpbGU6QXVkaW8gQ291cmllcl8xLjAuMV94NjQtc2V0dXAuZXhlClRENlY4NmUwYkVFbDNkbTFiZHpJYy96dWtLTzB5MkloQkZYaW8wOVgzMU5HdzQ3QXNmajdUVjF5NHNaa2NmdzdtR2FDMWJWWWtqN3RLTnFZRnlrNENnPT0K",
       "url": "https://github.com/super1windcloud/audio-courier/releases/download/audio-courier-v1.0.3/Audio.Courier_1.0.1_x64-setup.exe"
+    },
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTYnRDT3lDVDNBUkM5bHNsSnlqMlc2SmVKZ1NHOEpkYUo5NWFpNkRaYWgwQ1Y1TjR2OFA0SElYNUlLc3R0a3pQalA5Q0xpWnhaY3dGLytGcHJWWjlXVXFPd1h0QXQ4Zmc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0NTg2NjM0CWZpbGU6SW50ZXJ2aWV3LUNvZGVyLmFwcC50YXIuZ3oKWVRrMzFNcWR6emRtOCtwTzRsQ09IOU1kUmZGUFJiZGdJOGNsRlZlZm53bXBRa0U1K3VaU1NXM2s2WU9nMzZLa2hFY2VhMDlVS0E1YWE5Y1dzRTdSREE9PQo=",
+      "url": "https://github.com/Super1Windcloud/automatic-coder/releases/download/1.0.11/Interview-Coder.app.tar.gz"
+    },
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTYnRDT3lDVDNBUkJSbmc3TEtuNXNmUi9pSTQ0NFdmYzFSTVhIeFF6TVp0cVBPa0p4QmEybVJ0NG9xK0NmTWlYQjlRbjJVYm9kUHQxSlhYc1M0YWNuNStGRTFReFova3dnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczOTAxMjg5CWZpbGU6SW50ZXJ2aWV3LUNvZGVyXzEuMC43X3g2NC1zZXR1cC5leGUKZDR6bW03NjRQbnhzUWtLbEJVeGRyb0hzKzJHMGxpWW1HbGdQdkxsYWtsczFXN1pqUi9ReGFxZGRyaUNDRWhMNzA5UVhmT0dtUGdGSlNya1BIMytKQ3c9PQo",
+
+      "url": "https://github.com/super1windcloud/audio-courier/releases/download/audio-courier-v1.0.3/Audio.Courier_1.0.1_x64-setup.exe"
+    },
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTYnRDT3lDVDNBUkM5bHNsSnlqMlc2SmVKZ1NHOEpkYUo5NWFpNkRaYWgwQ1Y1TjR2OFA0SElYNUlLc3R0a3pQalA5Q0xpWnhaY3dGLytGcHJWWjlXVXFPd1h0QXQ4Zmc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0NTg2NjM0CWZpbGU6SW50ZXJ2aWV3LUNvZGVyLmFwcC50YXIuZ3oKWVRrMzFNcWR6emRtOCtwTzRsQ09IOU1kUmZGUFJiZGdJOGNsRlZlZm53bXBRa0U1K3VaU1NXM2s2WU9nMzZLa2hFY2VhMDlVS0E1YWE5Y1dzRTdSREE9PQo=",
+      "url": "https://github.com/super1windcloud/audio-courier/releases/download/audio-courier-v1.0.3/Audio.Courier_1.0.1_x64-setup.exe"
     }
   }
 }
