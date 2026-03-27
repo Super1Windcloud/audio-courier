@@ -162,6 +162,7 @@ async function publishRelease(version: string) {
 		repository,
 		tagName,
 		targetTriple,
+		version,
 	});
 
 	if (artifactContext.uploads.length === 0 || !artifactContext.manifestEntry) {
@@ -301,9 +302,14 @@ async function collectArtifacts(input: {
 	repository: string;
 	tagName: string;
 	targetTriple: string | null;
+	version: string;
 }) {
 	const files = await listFiles(input.bundleDir);
-	const preferred = findPreferredArtifact(files, input.targetTriple);
+	const preferred = findPreferredArtifact(
+		files,
+		input.targetTriple,
+		input.version,
+	);
 
 	if (!preferred) {
 		return {
@@ -330,7 +336,11 @@ async function collectArtifacts(input: {
 	};
 }
 
-function findPreferredArtifact(files: string[], targetTriple: string | null) {
+function findPreferredArtifact(
+	files: string[],
+	targetTriple: string | null,
+	version: string,
+) {
 	const artifacts = files
 		.filter((filePath) => !filePath.endsWith(".sig"))
 		.map((filePath) => {
@@ -342,6 +352,7 @@ function findPreferredArtifact(files: string[], targetTriple: string | null) {
 			};
 		})
 		.filter((item) => item.hasSignature)
+		.filter((item) => path.basename(item.artifactPath).includes(`_${version}_`))
 		.map((item) => {
 			const metadata = classifyArtifact(item.artifactPath, targetTriple);
 			return metadata ? { ...item, ...metadata } : null;

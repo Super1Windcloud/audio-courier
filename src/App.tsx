@@ -17,7 +17,11 @@ import { LicenseSignerApp } from "@/components/LicenseSignerApp.tsx";
 import { UpdateDialog } from "@/components/UpdateDialog.tsx";
 import { logError, logInfo } from "@/lib/logger.ts";
 import { registryGlobalShortCuts } from "@/lib/system.ts";
-import { checkForUpdate, downloadAndInstallUpdate } from "@/lib/updater.ts";
+import {
+	checkForUpdate,
+	downloadAndInstallUpdate,
+	OPEN_UPDATER_DIALOG_EVENT,
+} from "@/lib/updater.ts";
 import useAppStateStore from "@/stores";
 import type { LicenseStatus } from "@/types/license.ts";
 
@@ -152,23 +156,56 @@ function App() {
 
 		didCheckForUpdates.current = true;
 
-		void checkForUpdate()
-			.then((update) => {
-				if (!update) {
-					console.log("[updater] no update available");
-					logInfo("startup updater: no update available");
-					return;
-				}
-
-				logInfo(`startup updater: found version ${update.version}`);
-				setAvailableUpdate(update);
-				setUpdateDialogOpen(true);
-			})
+		void checkForUpdates("startup")
 			.catch((error) => {
 				console.error("startup updater check failed", error);
 				logError("startup updater check failed", error);
 			});
 	}, [isSignerMode]);
+
+	useEffect(() => {
+		if (isSignerMode) {
+			return;
+		}
+
+		const handleManualUpdateCheck = () => {
+			void checkForUpdates("manual").catch((error) => {
+				console.error("manual updater check failed", error);
+				logError("manual updater check failed", error);
+				toast.error(String(error));
+			});
+		};
+
+		window.addEventListener(OPEN_UPDATER_DIALOG_EVENT, handleManualUpdateCheck);
+
+		return () => {
+			window.removeEventListener(
+				OPEN_UPDATER_DIALOG_EVENT,
+				handleManualUpdateCheck,
+			);
+		};
+	}, [isSignerMode]);
+
+	const checkForUpdates = async (source: "startup" | "manual") => {
+		const update = await checkForUpdate();
+		if (!update) {
+			console.log("[updater] no update available");
+			logInfo(`${source} updater: no update available`);
+			if (source === "manual") {
+				toast.message("当前已是最新版本");
+			}
+			setAvailableUpdate(null);
+			setUpdateDialogOpen(false);
+			return;
+		}
+
+		logInfo(`${source} updater: found version ${update.version}`);
+		setAvailableUpdate(update);
+		setUpdateDialogOpen(true);
+		setIsInstallingUpdate(false);
+		setUpdateProgressDownloadedBytes(0);
+		setUpdateProgressTotalBytes(0);
+	};
 
 	const handleInstallUpdate = async () => {
 		if (!availableUpdate || isInstallingUpdate) {

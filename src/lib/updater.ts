@@ -1,6 +1,8 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { toast } from "sonner";
 
+export const OPEN_UPDATER_DIALOG_EVENT = "audio-courier:open-updater-dialog";
+
 export function formatBytes(bytes?: number) {
 	if (!bytes || Number.isNaN(bytes)) {
 		return "";
@@ -75,17 +77,7 @@ export async function downloadAndInstallUpdate(
 
 export async function runUpdater() {
 	try {
-		const update = await checkForUpdate();
-		if (!update) {
-			console.log("[updater] no update available");
-			return;
-		}
-
-		toast.message(`发现新版本 ${update.version}`, {
-			description: update.body ?? "开始下载并安装更新包",
-		});
-
-		await downloadAndInstallUpdate(update);
+		window.dispatchEvent(new CustomEvent(OPEN_UPDATER_DIALOG_EVENT));
 	} catch (error) {
 		toast.error("更新失败", {
 			description: toErrorMessage(error),
