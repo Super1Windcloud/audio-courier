@@ -16,7 +16,7 @@ const defaultPrivateKeyPath = path.join(
 
 const mode = process.argv[2] ?? "all";
 
-main().catch((error) => {
+void main().catch((error: unknown) => {
 	console.error(error instanceof Error ? error.message : String(error));
 	process.exitCode = 1;
 });
@@ -39,9 +39,9 @@ async function main() {
 	}
 }
 
-function assertMode(value) {
+function assertMode(value: string) {
 	if (!["all", "build", "publish"].includes(value)) {
-		throw new Error("usage: node scripts/release.mjs [build|publish]");
+		throw new Error("usage: tsx scripts/release.ts [build|publish]");
 	}
 }
 
@@ -52,8 +52,15 @@ async function loadVersions() {
 		readFile(cargoTomlPath, "utf8"),
 	]);
 
-	const packageJson = JSON.parse(packageJsonRaw);
-	const tauriConfig = JSON.parse(tauriConfigRaw);
+	const packageJson = JSON.parse(packageJsonRaw) as {
+		version?: string;
+		repository?: string;
+		homepage?: string;
+	};
+	const tauriConfig = JSON.parse(tauriConfigRaw) as {
+		version?: string;
+		productName?: string;
+	};
 	const cargoVersionMatch = cargoToml.match(/^version\s*=\s*"([^"]+)"/m);
 
 	if (!cargoVersionMatch) {
@@ -67,24 +74,24 @@ async function loadVersions() {
 		repository:
 			process.env.GITHUB_REPOSITORY ??
 			parseGithubRepository(
-				packageJson.repository ??
-					packageJson.homepage ??
-					tauriConfig.productName ??
-					"",
+				packageJson.repository ?? packageJson.homepage ?? tauriConfig.productName ?? "",
 			),
 	};
 }
 
-function assertVersions(versions) {
+function assertVersions(versions: {
+	packageVersion?: string;
+	tauriVersion?: string;
+	cargoVersion?: string;
+}) {
 	const { packageVersion, tauriVersion, cargoVersion } = versions;
 	if (!packageVersion || !tauriVersion || !cargoVersion) {
-		throw new Error("package.json, tauri.conf.json and Cargo.toml must all declare a version");
+		throw new Error(
+			"package.json, tauri.conf.json and Cargo.toml must all declare a version",
+		);
 	}
 
-	if (
-		packageVersion !== tauriVersion ||
-		packageVersion !== cargoVersion
-	) {
+	if (packageVersion !== tauriVersion || packageVersion !== cargoVersion) {
 		throw new Error(
 			[
 				"version mismatch detected:",
@@ -96,7 +103,7 @@ function assertVersions(versions) {
 	}
 }
 
-async function buildRelease(version) {
+async function buildRelease(version: string) {
 	ensureSigningEnv();
 	const extraArgs = splitArgs(process.env.RELEASE_TAURI_ARGS);
 	console.log(`building audio-courier ${version}`);
@@ -122,7 +129,7 @@ function ensureSigningEnv() {
 	process.env.TAURI_SIGNING_PRIVATE_KEY = defaultPrivateKeyPath;
 }
 
-async function publishRelease(version) {
+async function publishRelease(version: string) {
 	const token = requireEnv("GITHUB_TOKEN");
 	const repository = await resolveRepository();
 	const tagName = process.env.RELEASE_TAG ?? `audio-courier-v${version}`;
@@ -137,7 +144,7 @@ async function publishRelease(version) {
 		targetTriple,
 	});
 
-	if (artifactContext.uploads.length === 0) {
+	if (artifactContext.uploads.length === 0 || !artifactContext.manifestEntry) {
 		throw new Error(
 			"no updater artifacts found. build first with a signing key so .sig files are generated",
 		);
@@ -213,7 +220,10 @@ async function publishRelease(version) {
 async function resolveRepository() {
 	const packageJsonRaw = await readFile(packageJsonPath, "utf8");
 	const cargoToml = await readFile(cargoTomlPath, "utf8");
-	const packageJson = JSON.parse(packageJsonRaw);
+	const packageJson = JSON.parse(packageJsonRaw) as {
+		repository?: string;
+		homepage?: string;
+	};
 	const repositoryFromCargo = cargoToml.match(/^repository\s*=\s*"([^"]+)"/m)?.[1];
 
 	const repository = parseGithubRepository(
@@ -233,7 +243,7 @@ async function resolveRepository() {
 	return repository;
 }
 
-function parseGithubRepository(value) {
+function parseGithubRepository(value: string | undefined | null) {
 	if (!value || typeof value !== "string") {
 		return null;
 	}
@@ -253,7 +263,7 @@ function parseGithubRepository(value) {
 	return `${match[1]}/${match[2]}`;
 }
 
-async function loadReleaseNotes(version) {
+async function loadReleaseNotes(version: string) {
 	const notesFile = process.env.RELEASE_NOTES_FILE;
 	if (notesFile) {
 		return (await readFile(path.resolve(rootDir, notesFile), "utf8")).trim();
@@ -276,44 +286,41 @@ function resolveTargetTriple() {
 	return process.env.RELEASE_TARGET_TRIPLE ?? null;
 }
 
-async function collectArtifacts({ bundleDir, repository, tagName, targetTriple }) {
-	const files = await listFiles(bundleDir);
-	const preferred = findPreferredArtifact(files, targetTriple);
+async function collectArtifacts(input: {
+	bundleDir: string;
+	repository: string;
+	tagName: string;
+	targetTriple: string | null;
+}) {
+	const files = await listFiles(input.bundleDir);
+	const preferred = findPreferredArtifact(files, input.targetTriple);
 
 	if (!preferred) {
 		return {
-			uploads: [],
+			uploads: [] as UploadAsset[],
 			manifestEntry: null,
 		};
 	}
 
-	const uploads = preferred.relatedFiles.map((filePath) => ({
+	const uploads = preferred.relatedFiles.map(async (filePath) => ({
 		name: path.basename(filePath),
 		contentType: contentTypeFor(filePath),
-		bufferPromise: readFile(filePath),
+		buffer: await readFile(filePath),
 	}));
 
-	const resolvedUploads = [];
-	for (const upload of uploads) {
-		resolvedUploads.push({
-			...upload,
-			buffer: await upload.bufferPromise,
-		});
-	}
-
 	return {
-		uploads: resolvedUploads,
+		uploads: await Promise.all(uploads),
 		manifestEntry: {
 			platform: preferred.platform,
 			signature: (await readFile(preferred.signaturePath, "utf8")).trim(),
-			url: `https://github.com/${repository}/releases/download/${tagName}/${encodeURIComponent(
+			url: `https://github.com/${input.repository}/releases/download/${input.tagName}/${encodeURIComponent(
 				path.basename(preferred.artifactPath),
 			)}`,
 		},
 	};
 }
 
-function findPreferredArtifact(files, targetTriple) {
+function findPreferredArtifact(files: string[], targetTriple: string | null) {
 	const artifacts = files
 		.filter((filePath) => !filePath.endsWith(".sig"))
 		.map((filePath) => {
@@ -329,7 +336,7 @@ function findPreferredArtifact(files, targetTriple) {
 			const metadata = classifyArtifact(item.artifactPath, targetTriple);
 			return metadata ? { ...item, ...metadata } : null;
 		})
-		.filter(Boolean);
+		.filter((item): item is PreferredArtifact => item !== null);
 
 	const preferredOrder = ["nsis", "appimage", "app-tar", "msi"];
 	for (const kind of preferredOrder) {
@@ -345,41 +352,41 @@ function findPreferredArtifact(files, targetTriple) {
 	return null;
 }
 
-function classifyArtifact(filePath, targetTriple) {
+function classifyArtifact(filePath: string, targetTriple: string | null) {
 	const fileName = path.basename(filePath);
 
 	if (fileName.endsWith(".AppImage")) {
 		return {
 			kind: "appimage",
 			platform: platformKey("linux", targetTriple),
-		};
+		} as const;
 	}
 
 	if (fileName.endsWith(".app.tar.gz")) {
 		return {
 			kind: "app-tar",
 			platform: platformKey("darwin", targetTriple),
-		};
+		} as const;
 	}
 
 	if (fileName.endsWith(".msi")) {
 		return {
 			kind: "msi",
 			platform: platformKey("windows", targetTriple),
-		};
+		} as const;
 	}
 
 	if (fileName.endsWith(".exe")) {
 		return {
 			kind: "nsis",
 			platform: platformKey("windows", targetTriple),
-		};
+		} as const;
 	}
 
 	return null;
 }
 
-function platformKey(osName, targetTriple) {
+function platformKey(osName: string, targetTriple: string | null) {
 	if (targetTriple) {
 		return `${osName}-${archFromTargetTriple(targetTriple)}`;
 	}
@@ -387,7 +394,7 @@ function platformKey(osName, targetTriple) {
 	return `${osName}-${archFromNode(process.arch)}`;
 }
 
-function archFromTargetTriple(targetTriple) {
+function archFromTargetTriple(targetTriple: string) {
 	if (targetTriple.startsWith("x86_64-")) {
 		return "x86_64";
 	}
@@ -407,7 +414,7 @@ function archFromTargetTriple(targetTriple) {
 	throw new Error(`unsupported target triple for updater manifest: ${targetTriple}`);
 }
 
-function archFromNode(arch) {
+function archFromNode(arch: string) {
 	switch (arch) {
 		case "x64":
 			return "x86_64";
@@ -422,9 +429,9 @@ function archFromNode(arch) {
 	}
 }
 
-async function listFiles(directory) {
+async function listFiles(directory: string): Promise<string[]> {
 	const entries = await readdir(directory, { withFileTypes: true });
-	const files = [];
+	const files: string[] = [];
 
 	for (const entry of entries) {
 		const fullPath = path.join(directory, entry.name);
@@ -439,7 +446,7 @@ async function listFiles(directory) {
 	return files;
 }
 
-function contentTypeFor(filePath) {
+function contentTypeFor(filePath: string) {
 	if (filePath.endsWith(".json")) {
 		return "application/json; charset=utf-8";
 	}
@@ -455,33 +462,33 @@ function contentTypeFor(filePath) {
 	return "application/octet-stream";
 }
 
-async function ensureRelease({
-	token,
-	repository,
-	tagName,
-	releaseName,
-	releaseBody,
+async function ensureRelease(input: {
+	token: string;
+	repository: string;
+	tagName: string;
+	releaseName: string;
+	releaseBody: string;
 }) {
-	const existing = await githubRequest({
-		token,
-		url: `https://api.github.com/repos/${repository}/releases/tags/${encodeURIComponent(
-			tagName,
+	const existing = await githubRequest<GitHubRelease>({
+		token: input.token,
+		url: `https://api.github.com/repos/${input.repository}/releases/tags/${encodeURIComponent(
+			input.tagName,
 		)}`,
 		allow404: true,
 	});
 
-	if (existing.status === 200) {
+	if (existing.status === 200 && existing.json) {
 		return existing.json;
 	}
 
-	const created = await githubRequest({
-		token,
+	const created = await githubRequest<GitHubRelease>({
+		token: input.token,
 		method: "POST",
-		url: `https://api.github.com/repos/${repository}/releases`,
+		url: `https://api.github.com/repos/${input.repository}/releases`,
 		body: {
-			tag_name: tagName,
-			name: releaseName,
-			body: releaseBody,
+			tag_name: input.tagName,
+			name: input.releaseName,
+			body: input.releaseBody,
 			draft: false,
 			prerelease: false,
 			generate_release_notes: false,
@@ -489,18 +496,25 @@ async function ensureRelease({
 		},
 	});
 
+	if (!created.json) {
+		throw new Error("failed to create GitHub release");
+	}
+
 	return created.json;
 }
 
-async function loadExistingLatestJson({ token, release }) {
-	const latestAsset = release.assets?.find((asset) => asset.name === "latest.json");
+async function loadExistingLatestJson(input: {
+	token: string;
+	release: GitHubRelease;
+}) {
+	const latestAsset = input.release.assets?.find((asset) => asset.name === "latest.json");
 	if (!latestAsset) {
 		return null;
 	}
 
 	const response = await fetch(latestAsset.url, {
 		headers: {
-			Authorization: `Bearer ${token}`,
+			Authorization: `Bearer ${input.token}`,
 			Accept: "application/octet-stream",
 			"User-Agent": "audio-courier-release-script",
 		},
@@ -510,69 +524,79 @@ async function loadExistingLatestJson({ token, release }) {
 		throw new Error(`failed to download existing latest.json: ${response.status}`);
 	}
 
-	return response.json();
+	return (await response.json()) as LatestJson;
 }
 
-async function deleteReleaseAssetByName({ token, release, name }) {
-	const asset = release.assets?.find((item) => item.name === name);
+async function deleteReleaseAssetByName(input: {
+	token: string;
+	release: GitHubRelease;
+	name: string;
+}) {
+	const asset = input.release.assets?.find((item) => item.name === input.name);
 	if (!asset) {
 		return;
 	}
 
 	await githubRequest({
-		token,
+		token: input.token,
 		method: "DELETE",
-		url: `https://api.github.com/repos/${release.repository_url.split("/repos/")[1]}/releases/assets/${asset.id}`,
+		url: `https://api.github.com/repos/${input.release.repository_url.split("/repos/")[1]}/releases/assets/${asset.id}`,
 	});
 
-	release.assets = release.assets.filter((item) => item.id !== asset.id);
+	input.release.assets = input.release.assets.filter((item) => item.id !== asset.id);
 }
 
-async function uploadReleaseAsset({ token, release, upload }) {
-	const uploadUrl = release.upload_url.replace("{?name,label}", "");
+async function uploadReleaseAsset(input: {
+	token: string;
+	release: GitHubRelease;
+	upload: UploadAsset;
+}) {
+	const uploadUrl = input.release.upload_url.replace("{?name,label}", "");
 	const response = await fetch(
-		`${uploadUrl}?name=${encodeURIComponent(upload.name)}`,
+		`${uploadUrl}?name=${encodeURIComponent(input.upload.name)}`,
 		{
 			method: "POST",
 			headers: {
-				Authorization: `Bearer ${token}`,
-				"Content-Type": upload.contentType,
+				Authorization: `Bearer ${input.token}`,
+				"Content-Type": input.upload.contentType,
 				Accept: "application/vnd.github+json",
 				"User-Agent": "audio-courier-release-script",
 			},
-			body: upload.buffer,
+			body: input.upload.buffer,
 		},
 	);
 
 	if (!response.ok) {
 		const errorText = await response.text();
-		throw new Error(`failed to upload ${upload.name}: ${response.status} ${errorText}`);
+		throw new Error(
+			`failed to upload ${input.upload.name}: ${response.status} ${errorText}`,
+		);
 	}
 
-	const asset = await response.json();
-	release.assets = [...(release.assets ?? []), asset];
+	const asset = (await response.json()) as GitHubAsset;
+	input.release.assets = [...(input.release.assets ?? []), asset];
 }
 
-async function githubRequest({
-	token,
-	url,
-	method = "GET",
-	body,
-	allow404 = false,
+async function githubRequest<T>(input: {
+	token: string;
+	url: string;
+	method?: string;
+	body?: unknown;
+	allow404?: boolean;
 }) {
-	const response = await fetch(url, {
-		method,
+	const response = await fetch(input.url, {
+		method: input.method ?? "GET",
 		headers: {
-			Authorization: `Bearer ${token}`,
+			Authorization: `Bearer ${input.token}`,
 			Accept: "application/vnd.github+json",
 			"Content-Type": "application/json",
 			"User-Agent": "audio-courier-release-script",
 		},
-		body: body ? JSON.stringify(body) : undefined,
+		body: input.body ? JSON.stringify(input.body) : undefined,
 	});
 
-	if (allow404 && response.status === 404) {
-		return { status: 404, json: null };
+	if (input.allow404 && response.status === 404) {
+		return { status: 404, json: null as T | null };
 	}
 
 	if (!response.ok) {
@@ -580,11 +604,12 @@ async function githubRequest({
 		throw new Error(`github api failed: ${response.status} ${errorText}`);
 	}
 
-	const json = response.status === 204 ? null : await response.json();
+	const json =
+		response.status === 204 ? null : ((await response.json()) as T | null);
 	return { status: response.status, json };
 }
 
-function requireEnv(name) {
+function requireEnv(name: string) {
 	const value = process.env[name];
 	if (!value) {
 		throw new Error(`missing required environment variable: ${name}`);
@@ -593,16 +618,26 @@ function requireEnv(name) {
 	return value;
 }
 
-function splitArgs(value) {
+function splitArgs(value: string | undefined) {
 	if (!value) {
 		return [];
 	}
 
-	return value.match(/(?:[^\s"]+|"[^"]*")+/g)?.map((item) => item.replace(/^"|"$/g, "")) ?? [];
+	return (
+		value
+			.match(/(?:[^\s"]+|"[^"]*")+/g)
+			?.map((item) => item.replace(/^"|"$/g, "")) ?? []
+	);
 }
 
-async function runCommand(command, args, options = {}) {
-	await new Promise((resolve, reject) => {
+async function runCommand(
+	command: string,
+	args: string[],
+	options: {
+		env?: NodeJS.ProcessEnv;
+	} = {},
+) {
+	await new Promise<void>((resolve, reject) => {
 		const child = spawn(command, args, {
 			stdio: "inherit",
 			shell: process.platform === "win32",
@@ -621,3 +656,43 @@ async function runCommand(command, args, options = {}) {
 		child.on("error", reject);
 	});
 }
+
+type UploadAsset = {
+	name: string;
+	contentType: string;
+	buffer: Buffer;
+};
+
+type PreferredArtifact = {
+	artifactPath: string;
+	signaturePath: string;
+	hasSignature: boolean;
+	kind: "nsis" | "appimage" | "app-tar" | "msi";
+	platform: string;
+	relatedFiles: string[];
+};
+
+type GitHubAsset = {
+	id: number;
+	name: string;
+	url: string;
+};
+
+type GitHubRelease = {
+	upload_url: string;
+	repository_url: string;
+	assets: GitHubAsset[];
+};
+
+type LatestJson = {
+	version: string;
+	notes: string;
+	pub_date: string;
+	platforms: Record<
+		string,
+		{
+			signature: string;
+			url: string;
+		}
+	>;
+};
