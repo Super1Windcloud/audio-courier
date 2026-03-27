@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
 	isRegistered,
@@ -5,6 +6,7 @@ import {
 	unregister,
 } from "@tauri-apps/plugin-global-shortcut";
 import { toast } from "sonner";
+import { logError, logInfo } from "@/lib/logger.ts";
 import useAppStateStore from "@/stores";
 
 export async function toggleRecording() {
@@ -50,4 +52,24 @@ export async function registryGlobalShortCuts() {
 			await toggleRecording();
 		}
 	});
+
+	const devtoolsCombos = ["F12", "CommandOrControl+Alt+I"];
+	for (const combo of devtoolsCombos) {
+		if (await isRegistered(combo)) {
+			await unregister(combo);
+		}
+
+		await register(combo, async (event) => {
+			if (event.state !== "Released") {
+				return;
+			}
+			try {
+				await invoke("toggle_devtools");
+				logInfo(`toggle-devtools via ${combo}`);
+			} catch (error) {
+				logError(`toggle-devtools failed via ${combo}`, error);
+				toast.error(String(error));
+			}
+		});
+	}
 }
