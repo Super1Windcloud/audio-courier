@@ -1,5 +1,6 @@
 import type { Update } from "@tauri-apps/plugin-updater";
 import { Download, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button.tsx";
 import {
 	Dialog,
 	DialogContent,
@@ -8,7 +9,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog.tsx";
-import { Button } from "@/components/ui/button.tsx";
 import { formatBytes } from "@/lib/updater.ts";
 
 interface UpdateDialogProps {
@@ -50,7 +50,8 @@ export function UpdateDialog({
 							发现新版本 {update?.version}
 						</DialogTitle>
 						<DialogDescription className="pt-2 text-sm leading-6 text-slate-300">
-							{update?.body?.trim() || "检测到可用更新。安装后应用可能会退出并启动安装器。"}
+							{update?.body?.trim() ||
+								"检测到可用更新。安装后应用可能会退出并启动安装器。"}
 						</DialogDescription>
 					</DialogHeader>
 
