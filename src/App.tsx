@@ -7,6 +7,7 @@ import {
 	type ReactNode,
 	Suspense,
 	useEffect,
+	useEffectEvent,
 	useRef,
 	useState,
 } from "react";
@@ -149,6 +150,29 @@ function App() {
 		invoke("show_window").then();
 	}, [isSignerMode, updateLicenseStatus]);
 
+	const checkForUpdates = useEffectEvent(
+		async (source: "startup" | "manual") => {
+			const update = await checkForUpdate();
+			if (!update) {
+				console.log("[updater] no update available");
+				logInfo(`${source} updater: no update available`);
+				if (source === "manual") {
+					toast.message("当前已是最新版本");
+				}
+				setAvailableUpdate(null);
+				setUpdateDialogOpen(false);
+				return;
+			}
+
+			logInfo(`${source} updater: found version ${update.version}`);
+			setAvailableUpdate(update);
+			setUpdateDialogOpen(true);
+			setIsInstallingUpdate(false);
+			setUpdateProgressDownloadedBytes(0);
+			setUpdateProgressTotalBytes(0);
+		},
+	);
+
 	useEffect(() => {
 		if (isSignerMode || didCheckForUpdates.current) {
 			return;
@@ -156,11 +180,10 @@ function App() {
 
 		didCheckForUpdates.current = true;
 
-		void checkForUpdates("startup")
-			.catch((error) => {
-				console.error("startup updater check failed", error);
-				logError("startup updater check failed", error);
-			});
+		void checkForUpdates("startup").catch((error) => {
+			console.error("startup updater check failed", error);
+			logError("startup updater check failed", error);
+		});
 	}, [isSignerMode]);
 
 	useEffect(() => {
@@ -185,27 +208,6 @@ function App() {
 			);
 		};
 	}, [isSignerMode]);
-
-	const checkForUpdates = async (source: "startup" | "manual") => {
-		const update = await checkForUpdate();
-		if (!update) {
-			console.log("[updater] no update available");
-			logInfo(`${source} updater: no update available`);
-			if (source === "manual") {
-				toast.message("当前已是最新版本");
-			}
-			setAvailableUpdate(null);
-			setUpdateDialogOpen(false);
-			return;
-		}
-
-		logInfo(`${source} updater: found version ${update.version}`);
-		setAvailableUpdate(update);
-		setUpdateDialogOpen(true);
-		setIsInstallingUpdate(false);
-		setUpdateProgressDownloadedBytes(0);
-		setUpdateProgressTotalBytes(0);
-	};
 
 	const handleInstallUpdate = async () => {
 		if (!availableUpdate || isInstallingUpdate) {
@@ -248,23 +250,21 @@ function App() {
 	return (
 		<BrowserRouter>
 			<Suspense fallback={<Home />}>
-				<>
-					<Routes>
-						<Route path="/" element={<Home />} />
-						<Route path="/conversation" element={<Conversation />} />
-					</Routes>
-					<UpdateDialog
-						open={updateDialogOpen}
-						update={availableUpdate}
-						isInstalling={isInstallingUpdate}
-						progressTotalBytes={updateProgressTotalBytes}
-						progressDownloadedBytes={updateProgressDownloadedBytes}
-						onOpenChange={setUpdateDialogOpen}
-						onInstall={() => {
-							void handleInstallUpdate();
-						}}
-					/>
-				</>
+				<Routes>
+					<Route path="/" element={<Home />} />
+					<Route path="/conversation" element={<Conversation />} />
+				</Routes>
+				<UpdateDialog
+					open={updateDialogOpen}
+					update={availableUpdate}
+					isInstalling={isInstallingUpdate}
+					progressTotalBytes={updateProgressTotalBytes}
+					progressDownloadedBytes={updateProgressDownloadedBytes}
+					onOpenChange={setUpdateDialogOpen}
+					onInstall={() => {
+						void handleInstallUpdate();
+					}}
+				/>
 			</Suspense>
 		</BrowserRouter>
 	);
