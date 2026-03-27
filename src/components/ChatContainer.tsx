@@ -118,7 +118,8 @@ export const ChatContainer: React.FC = () => {
 			>
 				{!licenseStatus?.isValid ? (
 					<div className="mx-4 mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4 text-sm text-amber-100">
-						许可证状态: {licenseStatus?.reason ?? "未加载"}。点击顶部“许可证”生成设备请求码并导入授权。
+						许可证状态: {licenseStatus?.reason ?? "未加载"}
+						。点击顶部“许可证”生成设备请求码并导入授权。
 					</div>
 				) : null}
 				<MessageList messages={messages} isTyping={isTyping} />

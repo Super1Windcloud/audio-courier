@@ -32,3 +32,4 @@ src-tauri/vosk-model-cn-0.22
 scripts/output.wav
 scripts/test_1.pcm
 macro
+assets
