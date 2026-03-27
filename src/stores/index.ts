@@ -39,9 +39,44 @@ interface AppStateStore {
 
 	licenseStatus: LicenseStatus | null;
 	updateLicenseStatus: (target: LicenseStatus | null) => void;
+
+	uiOpacity: number;
+	updateUiOpacity: (target: number) => void;
+}
+
+const UI_OPACITY_STORAGE_KEY = "audio-courier-ui-opacity";
+
+function normalizeUiOpacity(target: number) {
+	return Math.min(1, Math.max(0.45, Number(target.toFixed(2))));
+}
+
+function readInitialUiOpacity() {
+	if (typeof window === "undefined") {
+		return 1;
+	}
+
+	const rawValue = window.localStorage.getItem(UI_OPACITY_STORAGE_KEY);
+	if (!rawValue) {
+		return 1;
+	}
+
+	const parsedValue = Number(rawValue);
+	if (Number.isNaN(parsedValue)) {
+		return 1;
+	}
+
+	return normalizeUiOpacity(parsedValue);
 }
 
 const useAppStateStore = create<AppStateStore>((set) => ({
+	uiOpacity: readInitialUiOpacity(),
+	updateUiOpacity: (target: number) => {
+		const nextOpacity = normalizeUiOpacity(target);
+		if (typeof window !== "undefined") {
+			window.localStorage.setItem(UI_OPACITY_STORAGE_KEY, String(nextOpacity));
+		}
+		set({ uiOpacity: nextOpacity });
+	},
 	isUsePreRecorded: false,
 	updatePreRecorded: (target: boolean) => {
 		set({ isUsePreRecorded: target });

@@ -124,7 +124,7 @@ function assertVersions(versions: {
 }
 
 async function buildRelease(version: string) {
-	ensureSigningEnv();
+	await ensureSigningEnv();
 	const extraArgs = splitArgs(process.env.RELEASE_TAURI_ARGS);
 	console.log(`building audio-courier ${version}`);
 	await runCommand("pnpm", ["tauri", "build", "--ci", ...extraArgs], {
@@ -135,18 +135,18 @@ async function buildRelease(version: string) {
 	});
 }
 
-function ensureSigningEnv() {
+async function ensureSigningEnv() {
 	if (process.env.TAURI_SIGNING_PRIVATE_KEY) {
-		return;
-	}
-
-	if (process.env.TAURI_SIGNING_PRIVATE_KEY_PATH) {
 		process.env.TAURI_SIGNING_PRIVATE_KEY =
-			process.env.TAURI_SIGNING_PRIVATE_KEY_PATH;
+			process.env.TAURI_SIGNING_PRIVATE_KEY.trim();
 		return;
 	}
 
-	process.env.TAURI_SIGNING_PRIVATE_KEY = defaultPrivateKeyPath;
+	const privateKeyPath =
+		process.env.TAURI_SIGNING_PRIVATE_KEY_PATH ?? defaultPrivateKeyPath;
+	process.env.TAURI_SIGNING_PRIVATE_KEY = (
+		await readFile(privateKeyPath, "utf8")
+	).trim();
 }
 
 async function publishRelease(version: string) {

@@ -43,6 +43,7 @@ export function MoreMenu() {
 		revai: "RevAI",
 		speechmatics: "Speechmatics",
 	};
+	const UI_OPACITY_OPTIONS = [100, 95, 90, 85, 80, 75, 70, 65, 60];
 
 	useEffect(() => {
 		invoke("get_audio_stream_devices_names").then((result) => {
@@ -97,6 +98,37 @@ export function MoreMenu() {
 					>
 						{isUpdating ? "检查更新中..." : "检查更新"}
 					</DropdownMenuItem>
+					<DropdownMenuSub>
+						<DropdownMenuSubTrigger
+							className="
+             bg-gray-600 text-white
+            data-[highlighted]:bg-gray-500
+            data-[state=open]:bg-gray-500"
+						>
+							前端透明度
+						</DropdownMenuSubTrigger>
+						<DropdownMenuSubContent className="w-40 bg-gray-600 text-white border-0">
+							{UI_OPACITY_OPTIONS.map((opacity) => {
+								const normalizedOpacity = opacity / 100;
+								return (
+									<DropdownMenuItem
+										key={opacity}
+										className={`data-[highlighted]:bg-gray-500 ${
+											appState.uiOpacity === normalizedOpacity
+												? "font-bold"
+												: ""
+										}`}
+										onClick={() => appState.updateUiOpacity(normalizedOpacity)}
+									>
+										{opacity}%
+										{appState.uiOpacity === normalizedOpacity && (
+											<span className="ml-2 text-green-400">✔</span>
+										)}
+									</DropdownMenuItem>
+								);
+							})}
+						</DropdownMenuSubContent>
+					</DropdownMenuSub>
 					<DropdownMenuSub>
 						<DropdownMenuSubTrigger
 							className="

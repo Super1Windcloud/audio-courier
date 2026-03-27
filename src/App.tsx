@@ -101,11 +101,16 @@ function App() {
 	const updateLicenseStatus = useAppStateStore(
 		(state) => state.updateLicenseStatus,
 	);
+	const uiOpacity = useAppStateStore((state) => state.uiOpacity);
 	const isSignerMode =
 		windowLabel === "license-signer" ||
 		window.location.hash === "#license-signer" ||
 		new URLSearchParams(window.location.search).get("mode") ===
 			"license-signer";
+	const appShellStyle = {
+		opacity: uiOpacity,
+		transition: "opacity 180ms ease-out",
+	};
 
 	useEffect(() => {
 		try {
@@ -232,41 +237,45 @@ function App() {
 
 	if (isSignerMode) {
 		return (
-			<SignerErrorBoundary>
-				<Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
-					<LicenseSignerApp />
-					<Toaster
-						position="top-center"
-						richColors
-						expand
-						closeButton
-						duration={5000}
-					/>
-				</Suspense>
-			</SignerErrorBoundary>
+			<div style={appShellStyle}>
+				<SignerErrorBoundary>
+					<Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+						<LicenseSignerApp />
+						<Toaster
+							position="top-center"
+							richColors
+							expand
+							closeButton
+							duration={5000}
+						/>
+					</Suspense>
+				</SignerErrorBoundary>
+			</div>
 		);
 	}
 
 	return (
-		<BrowserRouter>
-			<Suspense fallback={<Home />}>
-				<Routes>
-					<Route path="/" element={<Home />} />
-					<Route path="/conversation" element={<Conversation />} />
-				</Routes>
-				<UpdateDialog
-					open={updateDialogOpen}
-					update={availableUpdate}
-					isInstalling={isInstallingUpdate}
-					progressTotalBytes={updateProgressTotalBytes}
-					progressDownloadedBytes={updateProgressDownloadedBytes}
-					onOpenChange={setUpdateDialogOpen}
-					onInstall={() => {
-						void handleInstallUpdate();
-					}}
-				/>
-			</Suspense>
-		</BrowserRouter>
+		<div style={appShellStyle}>
+			<BrowserRouter>
+				<Suspense fallback={<Home />}>
+					<Routes>
+						<Route path="/" element={<Home />} />
+						<Route path="/conversation" element={<Conversation />} />
+					</Routes>
+					<UpdateDialog
+						open={updateDialogOpen}
+						update={availableUpdate}
+						isInstalling={isInstallingUpdate}
+						progressTotalBytes={updateProgressTotalBytes}
+						progressDownloadedBytes={updateProgressDownloadedBytes}
+						onOpenChange={setUpdateDialogOpen}
+						onInstall={() => {
+							void handleInstallUpdate();
+						}}
+					/>
+				</Suspense>
+			</BrowserRouter>
+		</div>
 	);
 }
 
