@@ -1,6 +1,13 @@
 import { Mic, SendHorizontal, Trash2 } from "lucide-react";
 import type React from "react";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import {
+	lazy,
+	Suspense,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { toast } from "sonner";
 import type { Message } from "@/components/ChatContainer.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";

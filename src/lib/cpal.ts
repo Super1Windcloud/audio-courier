@@ -4,9 +4,7 @@ import { toast } from "sonner";
 import { logError, logInfo } from "@/lib/logger.ts";
 import useAppStateStore from "@/stores";
 
-let traditionalChineseConverter:
-	| ((content: string) => string)
-	| null = null;
+let traditionalChineseConverter: ((content: string) => string) | null = null;
 
 async function convertTraditionalChinese(content: string) {
 	if (!traditionalChineseConverter) {
