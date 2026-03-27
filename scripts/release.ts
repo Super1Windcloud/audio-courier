@@ -1,10 +1,16 @@
-import { readFile, readdir } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { spawn } from "node:child_process";
 
 const rootDir = process.cwd();
-const bundleDir = path.join(rootDir, "src-tauri", "target", "release", "bundle");
+const bundleDir = path.join(
+	rootDir,
+	"src-tauri",
+	"target",
+	"release",
+	"bundle",
+);
 const tauriConfigPath = path.join(rootDir, "src-tauri", "tauri.conf.json");
 const cargoTomlPath = path.join(rootDir, "src-tauri", "Cargo.toml");
 const packageJsonPath = path.join(rootDir, "package.json");
@@ -74,7 +80,10 @@ async function loadVersions() {
 		repository:
 			process.env.GITHUB_REPOSITORY ??
 			parseGithubRepository(
-				packageJson.repository ?? packageJson.homepage ?? tauriConfig.productName ?? "",
+				packageJson.repository ??
+					packageJson.homepage ??
+					tauriConfig.productName ??
+					"",
 			),
 	};
 }
@@ -224,7 +233,9 @@ async function resolveRepository() {
 		repository?: string;
 		homepage?: string;
 	};
-	const repositoryFromCargo = cargoToml.match(/^repository\s*=\s*"([^"]+)"/m)?.[1];
+	const repositoryFromCargo = cargoToml.match(
+		/^repository\s*=\s*"([^"]+)"/m,
+	)?.[1];
 
 	const repository = parseGithubRepository(
 		process.env.GITHUB_REPOSITORY ??
@@ -278,7 +289,9 @@ async function loadReleaseNotes(version: string) {
 
 function resolveTargetTriple() {
 	const args = splitArgs(process.env.RELEASE_TAURI_ARGS);
-	const targetIndex = args.findIndex((item) => item === "--target" || item === "-t");
+	const targetIndex = args.findIndex(
+		(item) => item === "--target" || item === "-t",
+	);
 	if (targetIndex >= 0 && args[targetIndex + 1]) {
 		return args[targetIndex + 1];
 	}
@@ -411,7 +424,9 @@ function archFromTargetTriple(targetTriple: string) {
 		return "armv7";
 	}
 
-	throw new Error(`unsupported target triple for updater manifest: ${targetTriple}`);
+	throw new Error(
+		`unsupported target triple for updater manifest: ${targetTriple}`,
+	);
 }
 
 function archFromNode(arch: string) {
@@ -425,7 +440,9 @@ function archFromNode(arch: string) {
 		case "arm":
 			return "armv7";
 		default:
-			throw new Error(`unsupported node architecture for updater manifest: ${arch}`);
+			throw new Error(
+				`unsupported node architecture for updater manifest: ${arch}`,
+			);
 	}
 }
 
@@ -507,7 +524,9 @@ async function loadExistingLatestJson(input: {
 	token: string;
 	release: GitHubRelease;
 }) {
-	const latestAsset = input.release.assets?.find((asset) => asset.name === "latest.json");
+	const latestAsset = input.release.assets?.find(
+		(asset) => asset.name === "latest.json",
+	);
 	if (!latestAsset) {
 		return null;
 	}
@@ -521,7 +540,9 @@ async function loadExistingLatestJson(input: {
 	});
 
 	if (!response.ok) {
-		throw new Error(`failed to download existing latest.json: ${response.status}`);
+		throw new Error(
+			`failed to download existing latest.json: ${response.status}`,
+		);
 	}
 
 	return (await response.json()) as LatestJson;
@@ -543,7 +564,9 @@ async function deleteReleaseAssetByName(input: {
 		url: `https://api.github.com/repos/${input.release.repository_url.split("/repos/")[1]}/releases/assets/${asset.id}`,
 	});
 
-	input.release.assets = input.release.assets.filter((item) => item.id !== asset.id);
+	input.release.assets = input.release.assets.filter(
+		(item) => item.id !== asset.id,
+	);
 }
 
 async function uploadReleaseAsset(input: {
@@ -650,7 +673,9 @@ async function runCommand(
 				return;
 			}
 
-			reject(new Error(`${command} ${args.join(" ")} failed with exit code ${code}`));
+			reject(
+				new Error(`${command} ${args.join(" ")} failed with exit code ${code}`),
+			);
 		});
 
 		child.on("error", reject);
