@@ -14,6 +14,10 @@ import type {
 } from "@/types/license.ts";
 
 function defaultExpiryValue() {
+	return "2099-12-31T23:59";
+}
+
+function oneYearExpiryValue() {
 	const nextYear = new Date();
 	nextYear.setFullYear(nextYear.getFullYear() + 1);
 	nextYear.setSeconds(0, 0);
@@ -40,6 +44,7 @@ export function LicenseSignerApp({
 	const [requestJson, setRequestJson] = useState("");
 	const [userId, setUserId] = useState("");
 	const [expiresAt, setExpiresAt] = useState(defaultExpiryValue);
+	const [isLifetime, setIsLifetime] = useState(true);
 	const [maxVersion, setMaxVersion] = useState("1.9.99");
 	const [featuresInput, setFeaturesInput] = useState("pro");
 	const [licenseJson, setLicenseJson] = useState("");
@@ -302,9 +307,50 @@ export function LicenseSignerApp({
 										id="signer-expires-at"
 										type="datetime-local"
 										value={expiresAt}
-										onChange={(event) => setExpiresAt(event.target.value)}
+										onChange={(event) => {
+											setIsLifetime(false);
+											setExpiresAt(event.target.value);
+										}}
 										className="border-white/10 bg-white/5 text-white"
+										disabled={isLifetime}
 									/>
+									<div className="flex gap-2">
+										<Button
+											type="button"
+											variant={isLifetime ? "default" : "outline"}
+											size="sm"
+											className={
+												isLifetime
+													? "bg-emerald-300 text-slate-950 hover:bg-emerald-200"
+													: "border-white/10 bg-white/5 text-white"
+											}
+											onClick={() => {
+												setIsLifetime(true);
+												setExpiresAt(defaultExpiryValue());
+											}}
+										>
+											永久授权
+										</Button>
+										<Button
+											type="button"
+											variant={!isLifetime ? "default" : "outline"}
+											size="sm"
+											className={
+												!isLifetime
+													? "bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+													: "border-white/10 bg-white/5 text-white"
+											}
+											onClick={() => {
+												setIsLifetime(false);
+												setExpiresAt(oneYearExpiryValue());
+											}}
+										>
+											一年期
+										</Button>
+									</div>
+									<p className="text-xs text-slate-400">
+										永久授权默认写入 2099-12-31 23:59。
+									</p>
 								</div>
 								<div className="grid gap-2">
 									<label

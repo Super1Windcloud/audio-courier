@@ -43,6 +43,23 @@ function formatDate(value: string | null) {
 	}).format(date);
 }
 
+function formatLicenseExpiry(value: string | null) {
+	if (!value) {
+		return "未设置";
+	}
+
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) {
+		return value;
+	}
+
+	if (date.getUTCFullYear() >= 2099) {
+		return "永久授权";
+	}
+
+	return formatDate(value);
+}
+
 function StatusHero({ licenseStatus }: { licenseStatus: LicenseStatus }) {
 	const isHostSigner = licenseStatus.isHostSigner;
 	const title = isHostSigner ? "宿主机已授权" : "许可证已激活";
@@ -121,7 +138,7 @@ function StatusHero({ licenseStatus }: { licenseStatus: LicenseStatus }) {
 						<p className="mt-2 text-base font-medium text-white">
 							{isHostSigner
 								? "宿主机长期放行"
-								: formatDate(licenseStatus.expiresAt)}
+								: formatLicenseExpiry(licenseStatus.expiresAt)}
 						</p>
 						<p className="mt-1 text-xs text-slate-400">
 							签发时间 {formatDate(licenseStatus.issuedAt)}
