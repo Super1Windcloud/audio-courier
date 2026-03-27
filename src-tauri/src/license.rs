@@ -157,9 +157,7 @@ pub fn verify_license(license: &SignedLicense) -> Result<(), String> {
 
     public_key
         .verify(&payload_bytes, &signature)
-        .map_err(|_| {
-            "许可证签名校验失败，可能是客户端内置公钥与签发私钥不匹配".to_string()
-        })
+        .map_err(|_| "许可证签名校验失败，可能是客户端内置公钥与签发私钥不匹配".to_string())
 }
 
 pub fn evaluate_license(license: &SignedLicense) -> LicenseStatus {
