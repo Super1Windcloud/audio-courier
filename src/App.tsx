@@ -2,8 +2,7 @@ import "./App.css";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { toast } from "sonner";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { Conversation } from "@/Conversation.tsx";
 import { ChatContainer } from "@/components/ChatContainer";
 import { LicenseSignerApp } from "@/components/LicenseSignerApp.tsx";
@@ -32,7 +31,8 @@ function App() {
 		(state) => state.updateLicenseStatus,
 	);
 	const isSignerMode =
-		new URLSearchParams(window.location.search).get("mode") === "license-signer";
+		new URLSearchParams(window.location.search).get("mode") ===
+		"license-signer";
 
 	useEffect(() => {
 		const handleContextMenu = (e: MouseEvent) => {
@@ -65,7 +65,13 @@ function App() {
 		return (
 			<>
 				<LicenseSignerApp />
-				<Toaster position="top-center" richColors expand closeButton duration={5000} />
+				<Toaster
+					position="top-center"
+					richColors
+					expand
+					closeButton
+					duration={5000}
+				/>
 			</>
 		);
 	}

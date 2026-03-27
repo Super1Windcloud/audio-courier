@@ -31,9 +31,12 @@ export function LicenseCenter() {
 	const handleGenerateRequest = async () => {
 		setIsLoadingRequest(true);
 		try {
-			const request = await invoke<ActivationRequest>("get_activation_request", {
-				userId: userId.trim() || null,
-			});
+			const request = await invoke<ActivationRequest>(
+				"get_activation_request",
+				{
+					userId: userId.trim() || null,
+				},
+			);
 			const content = JSON.stringify(request, null, 2);
 			setRequestJson(content);
 			await navigator.clipboard.writeText(content);
@@ -90,7 +93,8 @@ export function LicenseCenter() {
 				<DialogHeader>
 					<DialogTitle>离线激活</DialogTitle>
 					<DialogDescription className="text-slate-300">
-						先生成设备请求码发给你自己签名，再把返回的许可证 JSON 粘贴到这里导入。
+						先生成设备请求码发给你自己签名，再把返回的许可证 JSON
+						粘贴到这里导入。
 					</DialogDescription>
 				</DialogHeader>
 
@@ -99,7 +103,9 @@ export function LicenseCenter() {
 						<div className="mb-2 flex items-center justify-between">
 							<div>
 								<p className="text-sm font-medium">当前状态</p>
-								<p className="text-xs text-slate-300">{licenseStatus?.reason ?? "未加载"}</p>
+								<p className="text-xs text-slate-300">
+									{licenseStatus?.reason ?? "未加载"}
+								</p>
 							</div>
 							<span
 								className={`rounded-full px-3 py-1 text-xs ${licenseStatus?.isValid ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-200"}`}

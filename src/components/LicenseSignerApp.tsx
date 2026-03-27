@@ -116,7 +116,9 @@ export function LicenseSignerApp() {
 						<p className="text-xs uppercase tracking-[0.35em] text-red-200/70">
 							Signer Locked
 						</p>
-						<h1 className="mt-3 text-3xl font-semibold">当前机器不能打开签名器</h1>
+						<h1 className="mt-3 text-3xl font-semibold">
+							当前机器不能打开签名器
+						</h1>
 						<p className="mt-4 text-sm text-slate-300">{signerStatus.reason}</p>
 						<p className="mt-4 text-xs text-slate-400">
 							设备摘要: {signerStatus.currentDeviceHint}
@@ -269,7 +271,10 @@ export function LicenseSignerApp() {
 							</div>
 							<div className="grid gap-4">
 								<div className="grid gap-2">
-									<label className="text-sm font-medium" htmlFor="signer-user-id">
+									<label
+										className="text-sm font-medium"
+										htmlFor="signer-user-id"
+									>
 										用户标识
 									</label>
 									<Input
@@ -281,7 +286,10 @@ export function LicenseSignerApp() {
 									/>
 								</div>
 								<div className="grid gap-2">
-									<label className="text-sm font-medium" htmlFor="signer-expires-at">
+									<label
+										className="text-sm font-medium"
+										htmlFor="signer-expires-at"
+									>
 										过期时间
 									</label>
 									<Input
@@ -293,7 +301,10 @@ export function LicenseSignerApp() {
 									/>
 								</div>
 								<div className="grid gap-2">
-									<label className="text-sm font-medium" htmlFor="signer-max-version">
+									<label
+										className="text-sm font-medium"
+										htmlFor="signer-max-version"
+									>
 										最大版本
 									</label>
 									<Input
@@ -305,7 +316,10 @@ export function LicenseSignerApp() {
 									/>
 								</div>
 								<div className="grid gap-2">
-									<label className="text-sm font-medium" htmlFor="signer-features">
+									<label
+										className="text-sm font-medium"
+										htmlFor="signer-features"
+									>
 										功能列表
 									</label>
 									<Input
@@ -334,7 +348,9 @@ export function LicenseSignerApp() {
 							<h2 className="text-lg font-medium text-white">请求预览</h2>
 							<p className="mt-3">用户: {parsedRequest?.userId ?? "-"}</p>
 							<p className="mt-2">版本: {parsedRequest?.appVersion ?? "-"}</p>
-							<p className="mt-2">设备摘要: {parsedRequest?.deviceHint ?? "-"}</p>
+							<p className="mt-2">
+								设备摘要: {parsedRequest?.deviceHint ?? "-"}
+							</p>
 							<p className="mt-2 break-all">
 								指纹: {parsedRequest?.deviceFingerprint ?? "-"}
 							</p>
