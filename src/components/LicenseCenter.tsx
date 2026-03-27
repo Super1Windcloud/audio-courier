@@ -276,6 +276,10 @@ export function LicenseCenter() {
 						<p className="mt-1 text-xs text-slate-400 break-all">
 							指纹: {licenseStatus?.deviceFingerprint ?? "unknown"}
 						</p>
+						<p className="mt-3 text-xs text-slate-400">客户端公钥:</p>
+						<p className="mt-1 break-all text-[11px] leading-5 text-slate-500">
+							{licenseStatus?.publicKey ?? "unknown"}
+						</p>
 					</div>
 
 					{licenseStatus && isAuthorized ? (

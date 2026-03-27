@@ -22,6 +22,7 @@ export interface LicenseStatus {
 	currentVersion: string;
 	deviceHint: string;
 	deviceFingerprint: string;
+	publicKey: string | null;
 }
 
 export interface SignedLicense {

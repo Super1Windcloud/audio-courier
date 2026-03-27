@@ -62,6 +62,7 @@ pub struct LicenseStatus {
     pub current_version: String,
     pub device_hint: String,
     pub device_fingerprint: String,
+    pub public_key: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -156,7 +157,9 @@ pub fn verify_license(license: &SignedLicense) -> Result<(), String> {
 
     public_key
         .verify(&payload_bytes, &signature)
-        .map_err(|_| "许可证签名校验失败".to_string())
+        .map_err(|_| {
+            "许可证签名校验失败，可能是客户端内置公钥与签发私钥不匹配".to_string()
+        })
 }
 
 pub fn evaluate_license(license: &SignedLicense) -> LicenseStatus {
@@ -235,6 +238,7 @@ pub fn evaluate_license(license: &SignedLicense) -> LicenseStatus {
         current_version: env!("CARGO_PKG_VERSION").to_string(),
         device_hint,
         device_fingerprint,
+        public_key: current_public_key(),
     }
 }
 
@@ -261,6 +265,7 @@ pub fn load_license_status(app: &AppHandle) -> Result<LicenseStatus, String> {
             current_version: env!("CARGO_PKG_VERSION").to_string(),
             device_hint,
             device_fingerprint,
+            public_key: current_public_key(),
         });
     }
 
@@ -284,6 +289,7 @@ pub fn load_license_status(app: &AppHandle) -> Result<LicenseStatus, String> {
             current_version: env!("CARGO_PKG_VERSION").to_string(),
             device_hint,
             device_fingerprint,
+            public_key: current_public_key(),
         });
     }
 
@@ -443,7 +449,16 @@ fn invalid_status(
         current_version: env!("CARGO_PKG_VERSION").to_string(),
         device_hint,
         device_fingerprint,
+        public_key: current_public_key(),
     }
+}
+
+fn current_public_key() -> Option<String> {
+    env::var("LICENSE_PUBLIC_KEY")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .or_else(|| Some(DEFAULT_PUBLIC_KEY.to_string()))
 }
 
 fn device_parts() -> Result<Vec<String>, String> {
