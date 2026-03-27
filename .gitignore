@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+.tauri
 *.local
 
 # Editor directories and files
@@ -30,3 +31,4 @@ src-tauri/vosk-win64-0.3.45
 src-tauri/vosk-model-cn-0.22
 scripts/output.wav
 scripts/test_1.pcm
+macro

@@ -53,6 +53,14 @@ pub fn run() {
     }
 
     tauri::Builder::default()
+        .setup(|app| {
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())
+                .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
+
+            Ok(())
+        })
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             let main = app.get_webview_window("main").expect("no main window");
             main.set_focus().unwrap();

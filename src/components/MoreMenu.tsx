@@ -18,6 +18,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import { runUpdater } from "@/lib/updater.ts";
 import useAppStateStore, { TranscribeVendor } from "@/stores";
 import { HOTKEYS, MODEL_OPTIONS, ModelOption } from "@/types/llm.ts";
 
@@ -27,6 +28,7 @@ export function MoreMenu() {
 	const appState = useAppStateStore();
 	const [audioChannels, setAudioChannels] = useState<string[]>([]);
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
+	const [isUpdating, setIsUpdating] = useState(false);
 	const TRANSCRIBE_VENDORS: TranscribeVendor[] = [
 		"assemblyai",
 		"deepgram",
@@ -59,6 +61,19 @@ export function MoreMenu() {
 		console.log(currentModel);
 	}, [currentModel]);
 
+	const handleCheckUpdate = async () => {
+		if (isUpdating) {
+			return;
+		}
+
+		setIsUpdating(true);
+		try {
+			await runUpdater();
+		} finally {
+			setIsUpdating(false);
+		}
+	};
+
 	return (
 		<>
 			<DropdownMenu>
@@ -74,6 +89,13 @@ export function MoreMenu() {
 						className="data-[highlighted]:bg-gray-500"
 					>
 						提示词
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						onClick={handleCheckUpdate}
+						disabled={isUpdating}
+						className="data-[highlighted]:bg-gray-500"
+					>
+						{isUpdating ? "检查更新中..." : "检查更新"}
 					</DropdownMenuItem>
 					<DropdownMenuSub>
 						<DropdownMenuSubTrigger
