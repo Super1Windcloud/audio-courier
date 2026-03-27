@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
 const LICENSE_FILE_NAME: &str = "license.json";
-const DEFAULT_PUBLIC_KEY: &str = "xgDtU9Yh1+Z7X7/V7fPeDjYTKvJdmRvGf7Rfg6dM75A=";
+const LICENSE_PUBLIC_KEY: &str = "93GQjRCWsE0ZeNB8yE67/Ryh/ZvUTbwVR1D0YgIE1uc=";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -355,9 +355,8 @@ pub fn write_signed_license(path: &Path, license: &SignedLicense) -> Result<(), 
 }
 
 pub fn public_key_from_env() -> Result<VerifyingKey, String> {
-    let raw = env::var("LICENSE_PUBLIC_KEY").unwrap_or_else(|_| DEFAULT_PUBLIC_KEY.to_string());
     let bytes = STANDARD
-        .decode(raw.trim())
+        .decode(LICENSE_PUBLIC_KEY)
         .map_err(|err| format!("LICENSE_PUBLIC_KEY 不是有效的 Base64: {err}"))?;
     let key_bytes: [u8; 32] = bytes
         .try_into()
@@ -367,11 +366,7 @@ pub fn public_key_from_env() -> Result<VerifyingKey, String> {
 }
 
 pub fn signer_status() -> SignerStatus {
-    let public_key = env::var("LICENSE_PUBLIC_KEY")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .or_else(|| Some(DEFAULT_PUBLIC_KEY.to_string()));
+    let public_key = current_public_key();
     let current_device_fingerprint = compute_device_fingerprint().ok();
     let current_device_hint = device_hint();
     let access_result = ensure_signer_access();
@@ -452,11 +447,7 @@ fn invalid_status(
 }
 
 fn current_public_key() -> Option<String> {
-    env::var("LICENSE_PUBLIC_KEY")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .or_else(|| Some(DEFAULT_PUBLIC_KEY.to_string()))
+    Some(LICENSE_PUBLIC_KEY.to_string())
 }
 
 fn device_parts() -> Result<Vec<String>, String> {
