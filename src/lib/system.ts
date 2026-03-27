@@ -53,23 +53,29 @@ export async function registryGlobalShortCuts() {
 		}
 	});
 
-	const devtoolsCombos = ["F12", "CommandOrControl+Alt+I"];
+	const devtoolsCombos = navigator.userAgent.includes("Windows")
+		? ["CommandOrControl+Alt+I"]
+		: ["F12", "CommandOrControl+Alt+I"];
 	for (const combo of devtoolsCombos) {
-		if (await isRegistered(combo)) {
-			await unregister(combo);
-		}
+		try {
+			if (await isRegistered(combo)) {
+				await unregister(combo);
+			}
 
-		await register(combo, async (event) => {
-			if (event.state !== "Released") {
-				return;
-			}
-			try {
-				await invoke("toggle_devtools");
-				logInfo(`toggle-devtools via ${combo}`);
-			} catch (error) {
-				logError(`toggle-devtools failed via ${combo}`, error);
-				toast.error(String(error));
-			}
-		});
+			await register(combo, async (event) => {
+				if (event.state !== "Released") {
+					return;
+				}
+				try {
+					await invoke("toggle_devtools");
+					logInfo(`toggle-devtools via ${combo}`);
+				} catch (error) {
+					logError(`toggle-devtools failed via ${combo}`, error);
+					toast.error(String(error));
+				}
+			});
+		} catch (error) {
+			logError(`register devtools shortcut failed for ${combo}`, error);
+		}
 	}
 }
