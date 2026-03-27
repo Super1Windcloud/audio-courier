@@ -1,24 +1,12 @@
 import { Mic, SendHorizontal, Trash2 } from "lucide-react";
 import type React from "react";
-import {
-	lazy,
-	Suspense,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Message } from "@/components/ChatContainer.tsx";
+import { MoreMenu } from "@/components/MoreMenu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { startAudioRecognition, stopAudioRecognition } from "@/lib/audio.ts";
 import useAppStateStore from "@/stores";
-
-const MoreMenu = lazy(() =>
-	import("@/components/MoreMenu.tsx").then((module) => ({
-		default: module.MoreMenu,
-	})),
-);
 
 interface MessageInputProps {
 	onSendMessage: (text: string) => void;
@@ -219,9 +207,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 				</span>
 
 				<span title="更多选项">
-					<Suspense fallback={<span className="text-gray-400">...</span>}>
-						<MoreMenu />
-					</Suspense>
+					<MoreMenu />
 				</span>
 			</div>
 		</div>

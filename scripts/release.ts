@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { config as loadDotenv } from "dotenv";
 
 const rootDir = process.cwd();
 const bundleDir = path.join(
@@ -19,6 +20,8 @@ const defaultPrivateKeyPath = path.join(
 	".tauri",
 	"audio-courier_signer.key",
 );
+const rootEnvPath = path.join(rootDir, ".env");
+const tauriEnvPath = path.join(rootDir, "src-tauri", ".env");
 
 const mode = process.argv[2] ?? "all";
 
@@ -28,6 +31,7 @@ void main().catch((error: unknown) => {
 });
 
 async function main() {
+	loadEnvFiles();
 	assertMode(mode);
 
 	const versions = await loadVersions();
@@ -43,6 +47,11 @@ async function main() {
 			`published ${releaseContext.tagName} with ${releaseContext.uploadedAssets.length} asset(s)`,
 		);
 	}
+}
+
+function loadEnvFiles() {
+	loadDotenv({ path: rootEnvPath });
+	loadDotenv({ path: tauriEnvPath, override: false });
 }
 
 function assertMode(value: string) {
@@ -524,6 +533,10 @@ async function loadExistingLatestJson(input: {
 	token: string;
 	release: GitHubRelease;
 }) {
+	input.release.assets = await listReleaseAssets({
+		token: input.token,
+		release: input.release,
+	});
 	const latestAsset = input.release.assets?.find(
 		(asset) => asset.name === "latest.json",
 	);
@@ -553,20 +566,43 @@ async function deleteReleaseAssetByName(input: {
 	release: GitHubRelease;
 	name: string;
 }) {
-	const asset = input.release.assets?.find((item) => item.name === input.name);
-	if (!asset) {
+	input.release.assets = await listReleaseAssets({
+		token: input.token,
+		release: input.release,
+	});
+	const candidateNames = new Set([
+		input.name,
+		sanitizeGitHubAssetName(input.name),
+	]);
+	const matchingAssets =
+		input.release.assets?.filter((item) => candidateNames.has(item.name)) ?? [];
+	if (matchingAssets.length === 0) {
 		return;
 	}
 
-	await githubRequest({
+	for (const asset of matchingAssets) {
+		await githubRequest({
+			token: input.token,
+			method: "DELETE",
+			url: releaseAssetDeleteUrl(input.release, asset.id),
+		});
+
+		input.release.assets = input.release.assets.filter(
+			(item) => item.id !== asset.id,
+		);
+	}
+}
+
+async function listReleaseAssets(input: {
+	token: string;
+	release: GitHubRelease;
+}) {
+	const response = await githubRequest<GitHubAsset[]>({
 		token: input.token,
-		method: "DELETE",
-		url: `https://api.github.com/repos/${input.release.repository_url.split("/repos/")[1]}/releases/assets/${asset.id}`,
+		url: `${input.release.url}/assets?per_page=100`,
 	});
 
-	input.release.assets = input.release.assets.filter(
-		(item) => item.id !== asset.id,
-	);
+	return response.json ?? [];
 }
 
 async function uploadReleaseAsset(input: {
@@ -575,7 +611,7 @@ async function uploadReleaseAsset(input: {
 	upload: UploadAsset;
 }) {
 	const uploadUrl = input.release.upload_url.replace("{?name,label}", "");
-	const response = await fetch(
+	let response = await fetch(
 		`${uploadUrl}?name=${encodeURIComponent(input.upload.name)}`,
 		{
 			method: "POST",
@@ -588,6 +624,35 @@ async function uploadReleaseAsset(input: {
 			body: input.upload.buffer,
 		},
 	);
+
+	if (response.status === 422) {
+		const errorText = await response.text();
+		if (errorText.includes("\"already_exists\"")) {
+			await deleteReleaseAssetByName({
+				token: input.token,
+				release: input.release,
+				name: input.upload.name,
+			});
+
+			response = await fetch(
+				`${uploadUrl}?name=${encodeURIComponent(input.upload.name)}`,
+				{
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${input.token}`,
+						"Content-Type": input.upload.contentType,
+						Accept: "application/vnd.github+json",
+						"User-Agent": "audio-courier-release-script",
+					},
+					body: input.upload.buffer,
+				},
+			);
+		} else {
+			throw new Error(
+				`failed to upload ${input.upload.name}: ${response.status} ${errorText}`,
+			);
+		}
+	}
 
 	if (!response.ok) {
 		const errorText = await response.text();
@@ -653,6 +718,14 @@ function splitArgs(value: string | undefined) {
 	);
 }
 
+function sanitizeGitHubAssetName(name: string) {
+	return name.replace(/[^A-Za-z0-9._-]+/g, ".");
+}
+
+function releaseAssetDeleteUrl(release: GitHubRelease, assetId: number) {
+	return release.url.replace(/\/releases\/\d+$/, `/releases/assets/${assetId}`);
+}
+
 async function runCommand(
 	command: string,
 	args: string[],
@@ -704,8 +777,10 @@ type GitHubAsset = {
 };
 
 type GitHubRelease = {
+	id: number;
+	url: string;
+	assets_url: string;
 	upload_url: string;
-	repository_url: string;
 	assets: GitHubAsset[];
 };
 

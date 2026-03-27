@@ -115,7 +115,15 @@
 		@apply border-border outline-ring/50;
 	}
 
+	html,
+	body,
+	#root {
+		width: 100%;
+		height: 100%;
+	}
+
 	body {
-		@apply bg-background text-foreground;
+		@apply text-foreground;
+		background: linear-gradient(180deg, #724766 0%, #2c4f71 100%);
 	}
 }

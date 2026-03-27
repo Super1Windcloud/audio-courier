@@ -53,9 +53,7 @@ export async function registryGlobalShortCuts() {
 		}
 	});
 
-	const devtoolsCombos = navigator.userAgent.includes("Windows")
-		? ["CommandOrControl+Alt+I"]
-		: ["F12", "CommandOrControl+Alt+I"];
+	const devtoolsCombos = ["CommandOrControl+F12"];
 	for (const combo of devtoolsCombos) {
 		try {
 			if (await isRegistered(combo)) {

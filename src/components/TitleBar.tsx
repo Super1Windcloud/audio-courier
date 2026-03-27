@@ -1,20 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type React from "react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { LicenseCenter } from "@/components/LicenseCenter.tsx";
+import { LicenseSignerCenter } from "@/components/LicenseSignerCenter.tsx";
 import { logError, logInfo } from "@/lib/logger.ts";
 import type { SignerStatus } from "@/types/license.ts";
-
-const LicenseCenter = lazy(() =>
-	import("@/components/LicenseCenter.tsx").then((module) => ({
-		default: module.LicenseCenter,
-	})),
-);
-const LicenseSignerCenter = lazy(() =>
-	import("@/components/LicenseSignerCenter.tsx").then((module) => ({
-		default: module.LicenseSignerCenter,
-	})),
-);
 
 const TitleBar: React.FC = () => {
 	const [isMaximized, setIsMaximized] = useState(false);
@@ -66,10 +57,8 @@ const TitleBar: React.FC = () => {
 				data-tauri-drag-region={false}
 			>
 				<div className="flex items-center gap-2">
-					<Suspense fallback={null}>
-						<LicenseCenter />
-						<LicenseSignerCenter signerStatus={signerStatus} />
-					</Suspense>
+					<LicenseCenter />
+					<LicenseSignerCenter signerStatus={signerStatus} />
 				</div>
 			</div>
 			<div

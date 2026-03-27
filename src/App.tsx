@@ -13,6 +13,7 @@ import {
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster, toast } from "sonner";
 import { ChatContainer } from "@/components/ChatContainer";
+import { LicenseSignerApp } from "@/components/LicenseSignerApp.tsx";
 import { logError, logInfo } from "@/lib/logger.ts";
 import { registryGlobalShortCuts } from "@/lib/system.ts";
 import useAppStateStore from "@/stores";
@@ -21,11 +22,6 @@ import type { LicenseStatus } from "@/types/license.ts";
 const Conversation = lazy(() =>
 	import("@/Conversation.tsx").then((module) => ({
 		default: module.Conversation,
-	})),
-);
-const LicenseSignerApp = lazy(() =>
-	import("@/components/LicenseSignerApp.tsx").then((module) => ({
-		default: module.LicenseSignerApp,
 	})),
 );
 
