@@ -7,7 +7,7 @@ import {
 	ShieldCheck,
 	Sparkles,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -149,6 +149,7 @@ export function LicenseCenter() {
 		(state) => state.updateLicenseStatus,
 	);
 	const [open, setOpen] = useState(false);
+	const didAutoOpen = useRef(false);
 	const [userId, setUserId] = useState(licenseStatus?.userId ?? "customer");
 	const [requestJson, setRequestJson] = useState("");
 	const [licenseJson, setLicenseJson] = useState("");
@@ -157,6 +158,14 @@ export function LicenseCenter() {
 	const isAuthorized = Boolean(
 		licenseStatus?.isValid || licenseStatus?.isHostSigner,
 	);
+
+	useEffect(() => {
+		if (!licenseStatus || isAuthorized || didAutoOpen.current) {
+			return;
+		}
+		didAutoOpen.current = true;
+		setOpen(true);
+	}, [isAuthorized, licenseStatus]);
 
 	const handleGenerateRequest = async () => {
 		setIsLoadingRequest(true);
