@@ -21,7 +21,7 @@ pub use loopback::*;
 use std::path::PathBuf;
 use tauri::{LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_log::{Target, TargetKind};
-use utils::*;
+pub use utils::*;
 
 #[tauri::command]
 fn show_window(window: tauri::Window) -> Result<(), String> {
@@ -136,27 +136,21 @@ fn open_license_signer(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn toggle_devtools(window: tauri::WebviewWindow) -> Result<(), String> {
-    #[cfg(debug_assertions)]
-    {
-        if window.is_devtools_open() {
-            window.close_devtools();
-            info!("devtools closed for {}", window.label());
-        } else {
-            window.open_devtools();
-            info!("devtools opened for {}", window.label());
-        }
-        Ok(())
+    if window.is_devtools_open() {
+        window.close_devtools();
+        info!("devtools closed for {}", window.label());
+    } else {
+        window.open_devtools();
+        info!("devtools opened for {}", window.label());
     }
 
-    #[cfg(not(debug_assertions))]
-    {
-        let _ = window;
-        Err("当前构建未启用 DevTools".to_string())
-    }
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    reset_app_log_files();
+
     let mut env_loaded = false;
     if is_dev() {
         let env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".env");
@@ -176,7 +170,9 @@ pub fn run() {
             tauri_plugin_log::Builder::new()
                 .targets([
                     Target::new(TargetKind::Stdout),
-                    Target::new(TargetKind::LogDir { file_name: None }),
+                    Target::new(TargetKind::LogDir {
+                        file_name: Some(APP_LOG_FILE_NAME.to_string()),
+                    }),
                     Target::new(TargetKind::Webview),
                 ])
                 .level(tauri_plugin_log::log::LevelFilter::Info)

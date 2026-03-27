@@ -40,7 +40,7 @@
 ```json
 {
   "appId": "audio-courier",
-  "appVersion": "1.0.1",
+  "appVersion": "1.0.2",
   "userId": "customer_001",
   "deviceFingerprint": "a3f4...",
   "deviceHint": "DESKTOP-123456 / windows / x86_64",

@@ -10,6 +10,21 @@ pub struct FlowArgs {
     request_id: Option<String>,
 }
 
+impl FlowArgs {
+    pub fn new(question: impl Into<String>, llm_prompt: impl Into<String>) -> Self {
+        Self {
+            question: question.into(),
+            llm_prompt: llm_prompt.into(),
+            request_id: None,
+        }
+    }
+
+    pub fn set_request_id(mut self, request_id: Option<String>) -> Self {
+        self.request_id = request_id;
+        self
+    }
+}
+
 const FREE_MODELS: [&str; 8] = [
     "Qwen/Qwen2.5-Coder-32B-Instruct", // 0.15S
     "Qwen/Qwen2.5-7B-Instruct",        //0.22S
@@ -21,27 +36,25 @@ const FREE_MODELS: [&str; 8] = [
     "THUDM/glm-4-9b-chat",             //0.35S
 ];
 
-#[tauri::command]
-pub async fn siliconflow_free(
+pub fn siliconflow_free_models() -> &'static [&'static str] {
+    &FREE_MODELS
+}
+
+pub async fn siliconflow_free_with_model(
     app: tauri::AppHandle,
     flow_args: FlowArgs,
+    model: &str,
 ) -> Result<String, String> {
     let api_key = get_env_key("Siliconflow");
     let messages = vec![
         json!({"role":"assistant","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
     ];
-    let idx = {
-        let mut rng = thread_rng();
-        rng.random_range(0..FREE_MODELS.len())
-    };
-    let random_model = FREE_MODELS[idx];
-    // let random_model = "internlm/internlm2_5-7b-chat";
-    println!("随机选择的模型: {}", random_model);
+
     call_model_api(
         app,
         ModelRequest {
-            model: random_model.to_string(),
+            model: model.to_string(),
             messages,
             base_url: "https://api.siliconflow.cn/v1".to_string(),
             api_key,
@@ -52,6 +65,20 @@ pub async fn siliconflow_free(
     )
     .await
     .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn siliconflow_free(
+    app: tauri::AppHandle,
+    flow_args: FlowArgs,
+) -> Result<String, String> {
+    let idx = {
+        let mut rng = thread_rng();
+        rng.random_range(0..FREE_MODELS.len())
+    };
+    let random_model = FREE_MODELS[idx];
+    println!("随机选择的模型: {}", random_model);
+    siliconflow_free_with_model(app, flow_args, random_model).await
 }
 
 const PRO_MODELS: [&str; 13] = [
@@ -70,24 +97,25 @@ const PRO_MODELS: [&str; 13] = [
     "baidu/ERNIE-4.5-300B-A47B",        // 0.16S
 ];
 
-#[tauri::command]
-pub async fn siliconflow_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
+pub fn siliconflow_pro_models() -> &'static [&'static str] {
+    &PRO_MODELS
+}
+
+pub async fn siliconflow_pro_with_model(
+    app: tauri::AppHandle,
+    flow_args: FlowArgs,
+    model: &str,
+) -> Result<String, String> {
     let api_key = get_env_key("SiliconflowVLM");
     let messages = vec![
         json!({"role":"assistant","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
     ];
-    let idx = {
-        let mut rng = thread_rng();
-        rng.random_range(0..PRO_MODELS.len())
-    };
 
-    let random_model = PRO_MODELS[idx];
-    println!("随机选择的模型: {}", random_model);
     call_model_api(
         app,
         ModelRequest {
-            model: random_model.to_string(),
+            model: model.to_string(),
             messages,
             base_url: "https://api.siliconflow.cn/v1".to_string(),
             api_key,
@@ -98,6 +126,18 @@ pub async fn siliconflow_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Resu
     )
     .await
     .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn siliconflow_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
+    let idx = {
+        let mut rng = thread_rng();
+        rng.random_range(0..PRO_MODELS.len())
+    };
+
+    let random_model = PRO_MODELS[idx];
+    println!("随机选择的模型: {}", random_model);
+    siliconflow_pro_with_model(app, flow_args, random_model).await
 }
 
 #[tauri::command]

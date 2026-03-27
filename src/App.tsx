@@ -1,16 +1,33 @@
 import "./App.css";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Component, type ReactNode, useEffect, useRef, useState } from "react";
+import {
+	Component,
+	lazy,
+	Suspense,
+	type ReactNode,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster, toast } from "sonner";
-import { Conversation } from "@/Conversation.tsx";
 import { ChatContainer } from "@/components/ChatContainer";
-import { LicenseSignerApp } from "@/components/LicenseSignerApp.tsx";
 import { logError, logInfo } from "@/lib/logger.ts";
 import { registryGlobalShortCuts } from "@/lib/system.ts";
 import useAppStateStore from "@/stores";
 import type { LicenseStatus } from "@/types/license.ts";
+
+const Conversation = lazy(() =>
+	import("@/Conversation.tsx").then((module) => ({
+		default: module.Conversation,
+	})),
+);
+const LicenseSignerApp = lazy(() =>
+	import("@/components/LicenseSignerApp.tsx").then((module) => ({
+		default: module.LicenseSignerApp,
+	})),
+);
 
 function Home() {
 	return (
@@ -124,24 +141,28 @@ function App() {
 	if (isSignerMode) {
 		return (
 			<SignerErrorBoundary>
-				<LicenseSignerApp />
-				<Toaster
-					position="top-center"
-					richColors
-					expand
-					closeButton
-					duration={5000}
-				/>
+				<Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+					<LicenseSignerApp />
+					<Toaster
+						position="top-center"
+						richColors
+						expand
+						closeButton
+						duration={5000}
+					/>
+				</Suspense>
 			</SignerErrorBoundary>
 		);
 	}
 
 	return (
 		<BrowserRouter>
-			<Routes>
-				<Route path="/" element={<Home />} />
-				<Route path="/conversation" element={<Conversation />} />
-			</Routes>
+			<Suspense fallback={<Home />}>
+				<Routes>
+					<Route path="/" element={<Home />} />
+					<Route path="/conversation" element={<Conversation />} />
+				</Routes>
+			</Suspense>
 		</BrowserRouter>
 	);
 }

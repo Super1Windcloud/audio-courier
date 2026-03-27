@@ -4,35 +4,82 @@ use cpal::traits::{DeviceTrait, HostTrait};
 use rubato::ResampleError;
 use std::collections::HashMap;
 use std::env;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions, create_dir_all};
 use std::io::Write;
+use std::path::{Path, PathBuf};
+
+pub const APP_LOG_FILE_NAME: &str = "Audio Courier.log";
+const LEGACY_APP_LOG_FILE_NAME: &str = "app.log";
+const APP_IDENTIFIER: &str = "com.superwindcloud.audio-courier";
+const APP_PRODUCT_NAME: &str = "Audio Courier";
 
 pub fn is_dev() -> bool {
     cfg!(debug_assertions)
 }
 
-pub fn write_some_log(msg: &str) {
-    #[cfg(target_os = "macos")]
-    {
-        let mut file = OpenOptions::new()
-            .create(true) // 文件不存在则创建
-            .append(true) // 追加写入
-            .open("app.log") // 日志文件名
-            .unwrap();
-
-        writeln!(file, "{}", msg).unwrap(); // 写入一行
+pub fn reset_app_log_files() {
+    for path in all_known_log_paths() {
+        truncate_log_file(&path);
     }
+}
+
+pub fn write_some_log(msg: &str) {
+    let path = primary_plain_log_path();
+    if let Some(parent) = path.parent() {
+        let _ = create_dir_all(parent);
+    }
+
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(file, "{}", msg);
+    }
+}
+
+fn truncate_log_file(path: &Path) {
+    if let Some(parent) = path.parent() {
+        let _ = create_dir_all(parent);
+    }
+
+    let _ = File::create(path);
+}
+
+fn all_known_log_paths() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
 
     #[cfg(target_os = "windows")]
     {
-        let mut file = OpenOptions::new()
-            .create(true) // 文件不存在则创建
-            .append(true) // 追加写入
-            .open("app.log") // 日志文件名
-            .unwrap();
-
-        writeln!(file, "{}", msg).unwrap(); // 写入一行
+        if let Some(local_app_data) = env::var_os("LOCALAPPDATA") {
+            let local_app_data = PathBuf::from(local_app_data);
+            paths.push(
+                local_app_data
+                    .join(APP_IDENTIFIER)
+                    .join("logs")
+                    .join(APP_LOG_FILE_NAME),
+            );
+            paths.push(local_app_data.join(APP_PRODUCT_NAME).join(APP_LOG_FILE_NAME));
+            paths.push(
+                local_app_data
+                    .join(APP_PRODUCT_NAME)
+                    .join(LEGACY_APP_LOG_FILE_NAME),
+            );
+        }
     }
+
+    paths.push(PathBuf::from(APP_LOG_FILE_NAME));
+    paths.push(PathBuf::from(LEGACY_APP_LOG_FILE_NAME));
+    paths
+}
+
+fn primary_plain_log_path() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(local_app_data) = env::var_os("LOCALAPPDATA") {
+            return PathBuf::from(local_app_data)
+                .join(APP_PRODUCT_NAME)
+                .join(APP_LOG_FILE_NAME);
+        }
+    }
+
+    PathBuf::from(APP_LOG_FILE_NAME)
 }
 
 pub fn load_env_variables() {

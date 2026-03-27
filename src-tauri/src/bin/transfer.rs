@@ -2,14 +2,12 @@
 
 use cpal::traits::{DeviceTrait, HostTrait};
 use inquire::Select;
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::iter::Rev;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri_courier_ai_lib::{
     RESAMPLE_RATE, RecordParams, get_audio_stream_devices_names, get_record_handle,
-    start_record_audio_with_writer, stop_recording,
+    start_record_audio_with_writer, stop_recording, write_some_log,
 };
 
 fn main() {
@@ -65,13 +63,7 @@ fn main() {
 }
 
 fn write_log(msg: &str) {
-    let mut file = OpenOptions::new()
-        .create(true) // 文件不存在则创建
-        .append(true) // 追加写入
-        .open("app.log") // 日志文件名
-        .unwrap();
-
-    writeln!(file, "{}", msg).unwrap(); // 写入一行
+    write_some_log(msg);
 }
 #[test]
 fn output_device_config() {
