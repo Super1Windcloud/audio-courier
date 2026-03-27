@@ -1,7 +1,7 @@
 {
   "name": "audio-courier",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "author": "superwindcloud",
   "license": "Apache-2.0",
