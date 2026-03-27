@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { FileSignature } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { LicenseCenter } from "@/components/LicenseCenter.tsx";
 import type { SignerStatus } from "@/types/license.ts";
@@ -74,15 +75,18 @@ const TitleBar: React.FC = () => {
 			>
 				{/* 最小化 */}
 				<button
+					type="button"
 					onClick={handleMinimize}
 					className="w-10 h-8 flex items-center justify-center text-gray-400  dark:hover:bg-gray-700 hover:text-pink-300 rounded transition-colors"
 				>
 					<svg width="10" height="2" viewBox="0 0 10 2" fill="none">
+						<title>最小化窗口</title>
 						<rect width="10" height="2" rx="1" fill="currentColor" />
 					</svg>
 				</button>
 
 				<button
+					type="button"
 					onClick={handleMaximize}
 					className="w-10 h-8 flex items-center justify-center text-gray-400  dark:hover:bg-gray-700 hover:text-pink-300  rounded transition-colors"
 				>
@@ -124,6 +128,7 @@ const TitleBar: React.FC = () => {
 						</svg>
 					) : (
 						<svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+							<title>最大化窗口</title>
 							<rect
 								x="3"
 								y="3"
@@ -139,11 +144,13 @@ const TitleBar: React.FC = () => {
 
 				{/* 关闭 */}
 				<button
+					type="button"
 					onClick={handleClose}
 					className="w-10 h-8 flex items-center justify-center text-gray-400  hover:text-red-700
 	        rounded transition-colors"
 				>
 					<svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+						<title>关闭窗口</title>
 						<path
 							d="M6 6L18 18M6 18L18 6"
 							stroke="currentColor"

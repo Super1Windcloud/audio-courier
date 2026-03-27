@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from "react";
+import type React from "react";
+import { useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import useAppStateStore from "@/stores";
 import type { Message } from "./ChatContainer";
@@ -16,15 +17,13 @@ export const MessageList: React.FC<MessageListProps> = ({
 }) => {
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const isScrolling = useAppStateStore((state) => state.isStartScrollToBottom);
-	const scrollToBottom = () => {
-		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	};
+	const shouldScroll = isScrolling && (messages.length > 0 || isTyping);
 
 	useEffect(() => {
-		if (isScrolling) {
-			scrollToBottom();
+		if (shouldScroll) {
+			messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 		}
-	}, [messages, isTyping]);
+	}, [shouldScroll]);
 
 	return (
 		<ScrollArea

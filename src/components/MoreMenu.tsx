@@ -19,8 +19,8 @@ import {
 } from "@/components/ui/dropdown-menu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { runUpdater } from "@/lib/updater.ts";
-import useAppStateStore, { TranscribeVendor } from "@/stores";
-import { HOTKEYS, MODEL_OPTIONS, ModelOption } from "@/types/llm.ts";
+import useAppStateStore, { type TranscribeVendor } from "@/stores";
+import { HOTKEYS, MODEL_OPTIONS, type ModelOption } from "@/types/llm.ts";
 
 export function MoreMenu() {
 	const [currentModel, setCurrentModel] =
@@ -54,12 +54,12 @@ export function MoreMenu() {
 				toast.error("No audio streams output device  found");
 			}
 		});
-	}, []);
+	}, [appState.updateCurrentAudioChannel]);
 
 	useEffect(() => {
 		appState.updateCurrentSelectedModel(currentModel);
 		console.log(currentModel);
-	}, [currentModel]);
+	}, [currentModel, appState.updateCurrentSelectedModel]);
 
 	const handleCheckUpdate = async () => {
 		if (isUpdating) {
@@ -181,9 +181,9 @@ export function MoreMenu() {
 							选择音频通道
 						</DropdownMenuSubTrigger>
 						<DropdownMenuSubContent className="w-48 bg-gray-600 text-white border-0">
-							{audioChannels.map((devices, index) => (
+							{audioChannels.map((devices) => (
 								<DropdownMenuItem
-									key={devices + index}
+									key={devices}
 									className={`data-[highlighted]:bg-gray-500 ${
 										appState.currentAudioChannel === devices ? "font-bold" : ""
 									}`}

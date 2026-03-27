@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Copy, FileSignature } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -48,7 +48,7 @@ export function LicenseSignerApp() {
 		}
 	}
 
-	const loadSignerStatus = async () => {
+	const loadSignerStatus = useCallback(async () => {
 		setIsLoadingStatus(true);
 		try {
 			const status = await invoke<SignerStatus>("get_signer_status");
@@ -58,11 +58,11 @@ export function LicenseSignerApp() {
 		} finally {
 			setIsLoadingStatus(false);
 		}
-	};
+	}, []);
 
 	useEffect(() => {
 		loadSignerStatus().catch(() => {});
-	}, []);
+	}, [loadSignerStatus]);
 
 	const handleSign = async () => {
 		if (!requestJson.trim()) {

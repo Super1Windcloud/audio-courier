@@ -3,8 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { toast } from "sonner";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { Conversation } from "@/Conversation.tsx";
 import { ChatContainer } from "@/components/ChatContainer";
 import { LicenseSignerApp } from "@/components/LicenseSignerApp.tsx";
@@ -66,7 +65,13 @@ function App() {
 		return (
 			<>
 				<LicenseSignerApp />
-				<Toaster position="top-center" richColors expand closeButton duration={5000} />
+				<Toaster
+					position="top-center"
+					richColors
+					expand
+					closeButton
+					duration={5000}
+				/>
 			</>
 		);
 	}

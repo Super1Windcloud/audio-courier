@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import TitleBar from "@/components/TitleBar.tsx";
 import { llmInterviewChatStreamOutput } from "@/lib/llm.ts";
@@ -24,72 +25,78 @@ export const ChatContainer: React.FC = () => {
 	]);
 
 	const [messages, setMessages] = useState<Message[]>(messagesRef.current);
-	useEffect(() => {
-		if (didRun.current) return;
-		didRun.current = true;
-		if (import.meta.env.VITE_INIT_MESSAGE) {
-			handleSendMessage(import.meta.env.VITE_INIT_MESSAGE, true).then();
-		}
-	}, []);
-
 	const [isTyping, setIsTyping] = useState(false);
 	const llmPromptStore = useAppStateStore((state) => state.llmPrompt);
 	const currentSelectedModel = useAppStateStore(
 		(state) => state.currentSelectedModel,
 	);
 	const licenseStatus = useAppStateStore((state) => state.licenseStatus);
+	const isAuthorized = Boolean(
+		licenseStatus?.isValid || licenseStatus?.isHostSigner,
+	);
 
-	const handleSendMessage = async (text: string, introduceSelf?: boolean) => {
-		if (!licenseStatus?.isValid) {
-			toast.warning("当前许可证无效，请先完成离线激活");
-			return;
-		}
+	const updateSpecificBotMessage = useCallback(
+		(id: number, content: string) => {
+			const msgs = messagesRef.current;
+			const idx = msgs.findIndex((msg) => msg.id === id);
 
-		const userMsg: Message = {
-			id: messagesRef.current.length,
-			text,
-			sender: "user",
-		};
-		messagesRef.current.push(userMsg);
+			if (idx === -1) return;
 
-		// 添加机器人占位
-		const botMsg: Message = {
-			id: messagesRef.current.length,
-			text: "",
-			sender: "robot",
-		};
-		messagesRef.current.push(botMsg);
+			msgs[idx] = {
+				...msgs[idx],
+				text: content,
+			};
 
-		setMessages([...messagesRef.current]);
+			setMessages([...msgs]);
+		},
+		[],
+	);
 
-		const thisBotId = botMsg.id; // ← 记录本轮机器人消息 ID
+	const handleSendMessage = useCallback(
+		async (text: string, introduceSelf?: boolean) => {
+			if (!isAuthorized) {
+				toast.warning("当前许可证无效，请先完成离线激活");
+				return;
+			}
 
-		setIsTyping(true);
+			const userMsg: Message = {
+				id: messagesRef.current.length,
+				text,
+				sender: "user",
+			};
+			messagesRef.current.push(userMsg);
 
-		await llmInterviewChatStreamOutput(
-			text,
-			introduceSelf ? import.meta.env.VITE_INTERVIEW_PROMPT : llmPromptStore,
+			// 添加机器人占位
+			const botMsg: Message = {
+				id: messagesRef.current.length,
+				text: "",
+				sender: "robot",
+			};
+			messagesRef.current.push(botMsg);
+
+			setMessages([...messagesRef.current]);
+
+			const thisBotId = botMsg.id; // ← 记录本轮机器人消息 ID
+
+			setIsTyping(true);
+
+			await llmInterviewChatStreamOutput(
+				text,
+				introduceSelf ? import.meta.env.VITE_INTERVIEW_PROMPT : llmPromptStore,
+				currentSelectedModel,
+				(content) => {
+					setIsTyping(false);
+					updateSpecificBotMessage(thisBotId, content); // ← 更新特定机器人消息
+				},
+			);
+		},
+		[
 			currentSelectedModel,
-			(content) => {
-				setIsTyping(false);
-				updateSpecificBotMessage(thisBotId, content); // ← 更新特定机器人消息
-			},
-		);
-	};
-
-	function updateSpecificBotMessage(id: number, content: string) {
-		const msgs = messagesRef.current;
-		const idx = msgs.findIndex((msg) => msg.id === id);
-
-		if (idx === -1) return;
-
-		msgs[idx] = {
-			...msgs[idx],
-			text: content,
-		};
-
-		setMessages([...msgs]);
-	}
+			isAuthorized,
+			llmPromptStore,
+			updateSpecificBotMessage,
+		],
+	);
 
 	const handleClearConversation = () => {
 		messagesRef.current = [
@@ -102,6 +109,14 @@ export const ChatContainer: React.FC = () => {
 		setMessages([...messagesRef.current]);
 		setIsTyping(false);
 	};
+
+	useEffect(() => {
+		if (didRun.current) return;
+		didRun.current = true;
+		if (import.meta.env.VITE_INIT_MESSAGE) {
+			handleSendMessage(import.meta.env.VITE_INIT_MESSAGE, true).then();
+		}
+	}, [handleSendMessage]);
 
 	return (
 		<div className="flex flex-col h-screen w-screen justify-center">
@@ -116,7 +131,7 @@ export const ChatContainer: React.FC = () => {
 					scrollbarWidth: "none",
 				}}
 			>
-				{!licenseStatus?.isValid ? (
+				{!isAuthorized ? (
 					<div className="mx-4 mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4 text-sm text-amber-100">
 						许可证状态: {licenseStatus?.reason ?? "未加载"}
 						。点击顶部“许可证”生成设备请求码并导入授权。

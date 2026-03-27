@@ -118,7 +118,9 @@ function StatusHero({ licenseStatus }: { licenseStatus: LicenseStatus }) {
 							授权期限
 						</p>
 						<p className="mt-2 text-base font-medium text-white">
-							{isHostSigner ? "宿主机长期放行" : formatDate(licenseStatus.expiresAt)}
+							{isHostSigner
+								? "宿主机长期放行"
+								: formatDate(licenseStatus.expiresAt)}
 						</p>
 						<p className="mt-1 text-xs text-slate-400">
 							签发时间 {formatDate(licenseStatus.issuedAt)}
@@ -309,7 +311,10 @@ export function LicenseCenter() {
 					) : (
 						<>
 							<div className="grid gap-2">
-								<label className="text-sm font-medium" htmlFor="license-user-id">
+								<label
+									className="text-sm font-medium"
+									htmlFor="license-user-id"
+								>
 									用户标识
 								</label>
 								<Input
@@ -375,7 +380,6 @@ export function LicenseCenter() {
 							</div>
 						</>
 					)}
-					</div>
 				</div>
 			</DialogContent>
 		</Dialog>

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { LicenseStatus } from "@/types/license.ts";
-import { ModelOption } from "@/types/llm.ts";
+import type { ModelOption } from "@/types/llm.ts";
 
 export type TranscribeVendor =
 	| "assemblyai"

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 import useAppStateStore from "@/stores";
 import { convertTraditionalChinese } from "../../scripts/opencc.ts";
@@ -42,12 +42,12 @@ export async function startAudioLoopbackRecognition(
 	});
 	errorUnlistener = await listen<string>("transcription_error", (event) => {
 		console.error("transcription error:", event.payload);
-		toast.error("transcription error" + event.payload);
+		toast.error(`transcription error${event.payload}`);
 		const appState = useAppStateStore.getState();
 		if (appState.isRecording) {
 			appState.updateIsRecording(false);
 		}
-		toast.error("当前" + selectedAsrVendor + "Websocket流连接已关闭");
+		toast.error(`当前${selectedAsrVendor}Websocket流连接已关闭`);
 	});
 
 	await invoke("start_recognize_audio_stream_from_speaker_loopback", {
@@ -56,7 +56,7 @@ export async function startAudioLoopbackRecognition(
 		captureInterval,
 	}).catch((err) => {
 		console.error("invoke start output audio recognition failed", err);
-		toast.error("invoke start audio capture err" + err);
+		toast.error(`invoke start audio capture err${err}`);
 	});
 }
 
@@ -64,7 +64,7 @@ export async function stopAudioLoopbackRecognition() {
 	await invoke("stop_recognize_audio_stream_from_speaker_loopback").catch(
 		(err) => {
 			console.error("invoke stop output audio recognition failed", err);
-			toast.error("invoke stop audio capture err" + err);
+			toast.error(`invoke stop audio capture err${err}`);
 		},
 	);
 

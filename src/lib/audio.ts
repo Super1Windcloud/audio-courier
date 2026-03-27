@@ -2,7 +2,7 @@ import {
 	startAudioLoopbackRecognition,
 	stopAudioLoopbackRecognition,
 } from "@/lib/cpal.ts";
-import { TranscribeVendor } from "@/stores";
+import type { TranscribeVendor } from "@/stores";
 
 declare global {
 	interface Window {

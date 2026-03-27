@@ -1,7 +1,8 @@
 import { Mic, SendHorizontal, Trash2 } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Message } from "@/components/ChatContainer.tsx";
+import type { Message } from "@/components/ChatContainer.tsx";
 import { MoreMenu } from "@/components/MoreMenu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { startAudioRecognition, stopAudioRecognition } from "@/lib/audio.ts";
@@ -38,12 +39,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		(state) => state.recordingStartedAt,
 	);
 	const licenseStatus = useAppStateStore((state) => state.licenseStatus);
+	const isAuthorized = Boolean(
+		licenseStatus?.isValid || licenseStatus?.isHostSigner,
+	);
 
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const MIN_RECORDING_DURATION = 3000;
 
-	const handleSend = () => {
-		if (!licenseStatus?.isValid) {
+	const handleSend = useCallback(() => {
+		if (!isAuthorized) {
 			toast.warning("未激活许可证，无法使用发送和录音功能");
 			return;
 		}
@@ -53,7 +57,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 			onSendMessage(inputText.trim());
 			setInputText("");
 		}
-	};
+	}, [inputText, isAuthorized, onSendMessage, updateQuestionState]);
 
 	useEffect(() => {
 		if (!recordingState) return () => undefined;
@@ -78,7 +82,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		return () => {
 			if (timeoutRef.current) clearTimeout(timeoutRef.current);
 		};
-	}, [inputText, recordingState]);
+	}, [handleSend, inputText, recordingState, remoteModelVendor]);
 
 	const handleKeyPress = (e: React.KeyboardEvent) => {
 		if (e.key === "Enter" && !e.shiftKey) {
@@ -104,7 +108,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	}, [recordingState]);
 
 	const toggleRecording = async () => {
-		if (!licenseStatus?.isValid) {
+		if (!isAuthorized) {
 			toast.warning("未激活许可证，无法开始录音");
 			return;
 		}
@@ -136,7 +140,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		} else {
 			stopAudioRecognition(currentAudioChannel).then();
 		}
-	}, [recordingState]);
+	}, [
+		captureInterval,
+		currentAudioChannel,
+		isUsePreRecorded,
+		recordingState,
+		remoteModelVendor,
+		setIsTyping,
+	]);
 
 	const handleClearConversation = () => {
 		setInputText("");
@@ -156,12 +167,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 					onChange={(e) => {
 						setInputText(e.target.value);
 						e.currentTarget.style.height = "auto"; // 先重置
-						e.currentTarget.style.height = e.currentTarget.scrollHeight + "px"; // 根据内容调整
+						e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // 根据内容调整
 					}}
 					onKeyDown={handleKeyPress}
 					placeholder="输入消息..."
 					rows={1}
-					disabled={!licenseStatus?.isValid}
+					disabled={!isAuthorized}
 					className="flex-1 resize-none overflow-hidden text-white border-none focus-visible:ring-0 placeholder:text-gray-300 focus-visible:ring-offset-0 bg-transparent"
 				/>
 
