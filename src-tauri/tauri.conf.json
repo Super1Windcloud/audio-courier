@@ -48,7 +48,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY3MjkyOUVDNkJGQUI1QwpSV1JjcTcvR25wSnlCaHZmQ0VPendZUDVETkRkZnJ6cm8vVUdNVzBOdlNWYVNmcC8vUVVvU09pOQo=",
       "endpoints": [
-        "https://github.com/Super1Windcloud/audio-courier/releases/latest/download/latest.json"
+        "https://raw.githubusercontent.com/Super1Windcloud/audio-courier/main/updater/latest.json"
       ],
       "windows": {
         "installMode": "passive"

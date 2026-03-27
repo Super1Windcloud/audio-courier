@@ -1,0 +1,11 @@
+{
+  "version": "1.0.2",
+  "notes": "Release 1.0.2",
+  "pub_date": "2026-03-27T13:56:11.186Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY3E3L0ducEp5Qm5NVVdlNTJOelpLV2xSNDRGN2lkZE1FeXp3L2hqcnYzRTE3ZHR3Tmh5cFpsczE5bmlVU2JkT0pSbE82L2FDenNHR004bEZPR2Vyc1pWKzFqOEJySHdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0NjE5MzczCWZpbGU6QXVkaW8gQ291cmllcl8xLjAuMl94NjQtc2V0dXAuZXhlCkpSU04wbmRhdW82V0JDTmVMeFhQdDN5eUtILytLekZOUmdYdStvUm53N2VWd0M0RW10S1E1WlhZeFR1dFVtdFVDWnNpU1dNNHBtbnpySXM5ZjlIZkJnPT0K",
+      "url": "https://github.com/Super1Windcloud/audio-courier/releases/download/audio-courier-v1.0.2/Audio.Courier_1.0.2_x64-setup.exe"
+    }
+  }
+}

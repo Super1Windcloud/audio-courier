@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { config as loadDotenv } from "dotenv";
@@ -22,6 +22,8 @@ const defaultPrivateKeyPath = path.join(
 );
 const rootEnvPath = path.join(rootDir, ".env");
 const tauriEnvPath = path.join(rootDir, "src-tauri", ".env");
+const updaterMetadataDir = path.join(rootDir, "updater");
+const updaterMetadataPath = path.join(updaterMetadataDir, "latest.json");
 
 const mode = process.argv[2] ?? "all";
 
@@ -177,8 +179,7 @@ async function publishRelease(version: string) {
 	});
 
 	const currentLatest = await loadExistingLatestJson({
-		token,
-		release,
+		path: updaterMetadataPath,
 	});
 
 	for (const upload of artifactContext.uploads) {
@@ -208,7 +209,7 @@ async function publishRelease(version: string) {
 		},
 	};
 
-	const latestBuffer = Buffer.from(`${JSON.stringify(nextLatest, null, 2)}\n`);
+	await writeLatestJson(nextLatest);
 
 	await deleteReleaseAssetByName({
 		token,
@@ -216,22 +217,9 @@ async function publishRelease(version: string) {
 		name: "latest.json",
 	});
 
-	await uploadReleaseAsset({
-		token,
-		release,
-		upload: {
-			name: "latest.json",
-			contentType: "application/json; charset=utf-8",
-			buffer: latestBuffer,
-		},
-	});
-
 	return {
 		tagName,
-		uploadedAssets: [
-			...artifactContext.uploads.map((item) => item.name),
-			"latest.json",
-		],
+		uploadedAssets: artifactContext.uploads.map((item) => item.name),
 	};
 }
 
@@ -529,36 +517,43 @@ async function ensureRelease(input: {
 	return created.json;
 }
 
-async function loadExistingLatestJson(input: {
+async function loadExistingLatestJson(input: { path: string }) {
+	try {
+		const content = await readFile(input.path, "utf8");
+		return JSON.parse(content) as LatestJson;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		if (
+			message.includes("ENOENT") ||
+			message.includes("no such file") ||
+			message.includes("系统找不到指定的文件")
+		) {
+			return null;
+		}
+
+		throw error;
+	}
+}
+
+async function writeLatestJson(content: LatestJson) {
+	await mkdir(updaterMetadataDir, { recursive: true });
+	await writeFile(
+		updaterMetadataPath,
+		`${JSON.stringify(content, null, 2)}\n`,
+		"utf8",
+	);
+}
+
+async function listReleaseAssets(input: {
 	token: string;
 	release: GitHubRelease;
 }) {
-	input.release.assets = await listReleaseAssets({
+	const response = await githubRequest<GitHubAsset[]>({
 		token: input.token,
-		release: input.release,
-	});
-	const latestAsset = input.release.assets?.find(
-		(asset) => asset.name === "latest.json",
-	);
-	if (!latestAsset) {
-		return null;
-	}
-
-	const response = await fetch(latestAsset.url, {
-		headers: {
-			Authorization: `Bearer ${input.token}`,
-			Accept: "application/octet-stream",
-			"User-Agent": "audio-courier-release-script",
-		},
+		url: `${input.release.url}/assets?per_page=100`,
 	});
 
-	if (!response.ok) {
-		throw new Error(
-			`failed to download existing latest.json: ${response.status}`,
-		);
-	}
-
-	return (await response.json()) as LatestJson;
+	return response.json ?? [];
 }
 
 async function deleteReleaseAssetByName(input: {
@@ -577,7 +572,7 @@ async function deleteReleaseAssetByName(input: {
 	const matchingAssets =
 		input.release.assets?.filter((item) => candidateNames.has(item.name)) ?? [];
 	if (matchingAssets.length === 0) {
-		return;
+		return null;
 	}
 
 	for (const asset of matchingAssets) {
@@ -591,18 +586,8 @@ async function deleteReleaseAssetByName(input: {
 			(item) => item.id !== asset.id,
 		);
 	}
-}
 
-async function listReleaseAssets(input: {
-	token: string;
-	release: GitHubRelease;
-}) {
-	const response = await githubRequest<GitHubAsset[]>({
-		token: input.token,
-		url: `${input.release.url}/assets?per_page=100`,
-	});
-
-	return response.json ?? [];
+	return null;
 }
 
 async function uploadReleaseAsset(input: {
