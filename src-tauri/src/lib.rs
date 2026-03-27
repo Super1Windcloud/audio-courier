@@ -134,6 +134,27 @@ fn open_license_signer(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn toggle_devtools(window: tauri::WebviewWindow) -> Result<(), String> {
+    #[cfg(debug_assertions)]
+    {
+        if window.is_devtools_open() {
+            window.close_devtools();
+            info!("devtools closed for {}", window.label());
+        } else {
+            window.open_devtools();
+            info!("devtools opened for {}", window.label());
+        }
+        Ok(())
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = window;
+        Err("当前构建未启用 DevTools".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut env_loaded = false;
@@ -192,6 +213,7 @@ pub fn run() {
             get_signer_status,
             sign_activation_license,
             open_license_signer,
+            toggle_devtools,
             siliconflow_free,
             siliconflow_pro,
             doubao_lite,
