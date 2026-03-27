@@ -27,3 +27,5 @@ upgrade:
 
 nsis:
     pnpm tb && mv  src-tauri/target/release/bundle/nsis  ./bundle
+
+

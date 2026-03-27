@@ -1,8 +1,14 @@
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import React, { useState } from "react";
+import { FileSignature } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { LicenseCenter } from "@/components/LicenseCenter.tsx";
+import type { SignerStatus } from "@/types/license.ts";
 
 const TitleBar: React.FC = () => {
 	const [isMaximized, setIsMaximized] = useState(false);
+	const [signerStatus, setSignerStatus] = useState<SignerStatus | null>(null);
 	const window = getCurrentWindow();
 
 	const handleMinimize = async () => {
@@ -24,11 +30,44 @@ const TitleBar: React.FC = () => {
 		await window.close();
 	};
 
+	const handleOpenSigner = async () => {
+		try {
+			await invoke("open_license_signer");
+		} catch (error) {
+			toast.error(String(error));
+		}
+	};
+
+	useEffect(() => {
+		invoke<SignerStatus>("get_signer_status")
+			.then((status) => {
+				setSignerStatus(status);
+			})
+			.catch(() => {
+				setSignerStatus(null);
+			});
+	}, []);
+
 	return (
 		<div
-			className="w-full flex justify-end items-center h-10 select-none bg-transparent"
+			className="w-full flex justify-between items-center h-10 select-none bg-transparent"
 			style={{ WebkitAppRegion: "drag" }}
 		>
+			<div className="pl-2" style={{ WebkitAppRegion: "no-drag" }}>
+				<div className="flex items-center gap-2">
+					<LicenseCenter />
+					{signerStatus?.isAllowed ? (
+						<button
+							type="button"
+							onClick={handleOpenSigner}
+							className="inline-flex h-8 items-center gap-2 rounded-md px-3 text-sm text-gray-200 transition-colors hover:bg-white/10 hover:text-white"
+						>
+							<FileSignature className="size-4" />
+							签名器
+						</button>
+					) : null}
+				</div>
+			</div>
 			<div
 				className="flex items-center gap-1 pr-2"
 				style={{ WebkitAppRegion: "no-drag" }}

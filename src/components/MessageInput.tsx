@@ -37,11 +37,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	const recordingStartedAt = useAppStateStore(
 		(state) => state.recordingStartedAt,
 	);
+	const licenseStatus = useAppStateStore((state) => state.licenseStatus);
 
-	const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const MIN_RECORDING_DURATION = 3000;
 
 	const handleSend = () => {
+		if (!licenseStatus?.isValid) {
+			toast.warning("未激活许可证，无法使用发送和录音功能");
+			return;
+		}
+
 		if (inputText.trim()) {
 			updateQuestionState(inputText.trim());
 			onSendMessage(inputText.trim());
@@ -98,6 +104,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	}, [recordingState]);
 
 	const toggleRecording = async () => {
+		if (!licenseStatus?.isValid) {
+			toast.warning("未激活许可证，无法开始录音");
+			return;
+		}
+
 		if (!recordingState) {
 			updateRecordingState(true);
 			return;
@@ -150,6 +161,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 					onKeyDown={handleKeyPress}
 					placeholder="输入消息..."
 					rows={1}
+					disabled={!licenseStatus?.isValid}
 					className="flex-1 resize-none overflow-hidden text-white border-none focus-visible:ring-0 placeholder:text-gray-300 focus-visible:ring-offset-0 bg-transparent"
 				/>
 

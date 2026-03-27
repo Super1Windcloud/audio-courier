@@ -1,5 +1,5 @@
 #! /bin/sh
 
 
-pnpm fix
 pnpm format
+pnpm fix

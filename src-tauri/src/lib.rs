@@ -2,17 +2,23 @@ extern crate core;
 
 mod audio_stream;
 mod constant;
+pub mod license;
 mod llm;
 mod loopback;
 mod transcript_vendors;
 mod utils;
 pub use audio_stream::*;
+use chrono::{DateTime, Utc};
 pub use constant::*;
 use dotenv::{dotenv, from_filename};
+use license::{
+    build_activation_request, ensure_signer_access, load_license_status, persist_license,
+    sign_license_from_request_json, signer_status,
+};
 pub use llm::*;
 pub use loopback::*;
 use std::path::PathBuf;
-use tauri::{LogicalSize, Manager};
+use tauri::{LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
 use utils::*;
 
 #[tauri::command]
@@ -34,6 +40,74 @@ fn show_window(window: tauri::Window) -> Result<(), String> {
     window
         .show()
         .map_err(|e| format!("Failed to show window: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn get_activation_request(user_id: Option<String>) -> Result<license::ActivationRequest, String> {
+    build_activation_request(user_id)
+}
+
+#[tauri::command]
+fn get_license_status(app: tauri::AppHandle) -> Result<license::LicenseStatus, String> {
+    load_license_status(&app)
+}
+
+#[tauri::command]
+fn import_license(
+    app: tauri::AppHandle,
+    raw_license: String,
+) -> Result<license::LicenseStatus, String> {
+    persist_license(&app, &raw_license)
+}
+
+#[tauri::command]
+fn get_signer_status() -> license::SignerStatus {
+    signer_status()
+}
+
+#[tauri::command]
+fn sign_activation_license(
+    raw_request: String,
+    user_id: String,
+    expires_at: String,
+    max_version: String,
+    features: Vec<String>,
+) -> Result<license::SignedLicense, String> {
+    let expires_at = expires_at
+        .parse::<DateTime<Utc>>()
+        .map_err(|err| format!("expiresAt 解析失败: {err}"))?;
+    sign_license_from_request_json(&raw_request, user_id, expires_at, max_version, features)
+}
+
+#[tauri::command]
+fn open_license_signer(app: tauri::AppHandle) -> Result<(), String> {
+    ensure_signer_access()?;
+
+    if let Some(window) = app.get_webview_window("license-signer") {
+        window
+            .show()
+            .map_err(|err| format!("显示签名窗口失败: {err}"))?;
+        window
+            .set_focus()
+            .map_err(|err| format!("聚焦签名窗口失败: {err}"))?;
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(
+        &app,
+        "license-signer",
+        WebviewUrl::App("index.html?mode=license-signer".into()),
+    )
+    .title("License Signer")
+    .inner_size(980.0, 820.0)
+    .min_inner_size(860.0, 720.0)
+    .center()
+    .resizable(true)
+    .visible(true)
+    .build()
+    .map_err(|err| format!("创建签名窗口失败: {err}"))?;
 
     Ok(())
 }
@@ -70,6 +144,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             show_window,
+            get_activation_request,
+            get_license_status,
+            import_license,
+            get_signer_status,
+            sign_activation_license,
+            open_license_signer,
             siliconflow_free,
             siliconflow_pro,
             doubao_lite,

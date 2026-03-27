@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { LicenseStatus } from "@/types/license.ts";
 import { ModelOption } from "@/types/llm.ts";
 
 export type TranscribeVendor =
@@ -35,12 +36,19 @@ interface AppStateStore {
 
 	isUsePreRecorded: boolean;
 	updatePreRecorded: (target: boolean) => void;
+
+	licenseStatus: LicenseStatus | null;
+	updateLicenseStatus: (target: LicenseStatus | null) => void;
 }
 
 const useAppStateStore = create<AppStateStore>((set) => ({
 	isUsePreRecorded: false,
 	updatePreRecorded: (target: boolean) => {
 		set({ isUsePreRecorded: target });
+	},
+	licenseStatus: null,
+	updateLicenseStatus: (target: LicenseStatus | null) => {
+		set({ licenseStatus: target });
 	},
 	currentSelectedModel: "siliconflow_pro",
 	updateCurrentSelectedModel: (target: ModelOption) =>

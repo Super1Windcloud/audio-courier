@@ -13,4 +13,4 @@ app.log
 
 src/constant.rs
 .env
-assets
+.idea

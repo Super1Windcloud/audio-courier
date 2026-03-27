@@ -2,10 +2,14 @@ import "./App.css";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { toast } from "sonner";
 import { Toaster } from "sonner";
 import { Conversation } from "@/Conversation.tsx";
 import { ChatContainer } from "@/components/ChatContainer";
+import { LicenseSignerApp } from "@/components/LicenseSignerApp.tsx";
 import { registryGlobalShortCuts } from "@/lib/system.ts";
+import useAppStateStore from "@/stores";
+import type { LicenseStatus } from "@/types/license.ts";
 
 function Home() {
 	return (
@@ -24,6 +28,11 @@ function Home() {
 
 function App() {
 	const didRun = useRef(false);
+	const updateLicenseStatus = useAppStateStore(
+		(state) => state.updateLicenseStatus,
+	);
+	const isSignerMode =
+		new URLSearchParams(window.location.search).get("mode") === "license-signer";
 
 	useEffect(() => {
 		const handleContextMenu = (e: MouseEvent) => {
@@ -36,11 +45,30 @@ function App() {
 	}, []);
 
 	useEffect(() => {
+		if (isSignerMode) {
+			return;
+		}
 		if (didRun.current) return;
 		didRun.current = true;
+		invoke<LicenseStatus>("get_license_status")
+			.then((status) => {
+				updateLicenseStatus(status);
+			})
+			.catch((error) => {
+				toast.error(String(error));
+			});
 		registryGlobalShortCuts().then();
 		invoke("show_window").then();
-	}, []);
+	}, [isSignerMode, updateLicenseStatus]);
+
+	if (isSignerMode) {
+		return (
+			<>
+				<LicenseSignerApp />
+				<Toaster position="top-center" richColors expand closeButton duration={5000} />
+			</>
+		);
+	}
 
 	return (
 		<BrowserRouter>

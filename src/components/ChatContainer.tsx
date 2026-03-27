@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import TitleBar from "@/components/TitleBar.tsx";
 import { llmInterviewChatStreamOutput } from "@/lib/llm.ts";
 import useAppStateStore from "@/stores";
@@ -36,8 +37,14 @@ export const ChatContainer: React.FC = () => {
 	const currentSelectedModel = useAppStateStore(
 		(state) => state.currentSelectedModel,
 	);
+	const licenseStatus = useAppStateStore((state) => state.licenseStatus);
 
 	const handleSendMessage = async (text: string, introduceSelf?: boolean) => {
+		if (!licenseStatus?.isValid) {
+			toast.warning("当前许可证无效，请先完成离线激活");
+			return;
+		}
+
 		const userMsg: Message = {
 			id: messagesRef.current.length,
 			text,
@@ -109,6 +116,11 @@ export const ChatContainer: React.FC = () => {
 					scrollbarWidth: "none",
 				}}
 			>
+				{!licenseStatus?.isValid ? (
+					<div className="mx-4 mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4 text-sm text-amber-100">
+						许可证状态: {licenseStatus?.reason ?? "未加载"}。点击顶部“许可证”生成设备请求码并导入授权。
+					</div>
+				) : null}
 				<MessageList messages={messages} isTyping={isTyping} />
 			</div>
 
