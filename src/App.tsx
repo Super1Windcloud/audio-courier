@@ -14,8 +14,10 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster, toast } from "sonner";
 import { ChatContainer } from "@/components/ChatContainer";
 import { LicenseSignerApp } from "@/components/LicenseSignerApp.tsx";
+import { UpdateDialog } from "@/components/UpdateDialog.tsx";
 import { logError, logInfo } from "@/lib/logger.ts";
 import { registryGlobalShortCuts } from "@/lib/system.ts";
+import { checkForUpdate, downloadAndInstallUpdate } from "@/lib/updater.ts";
 import useAppStateStore from "@/stores";
 import type { LicenseStatus } from "@/types/license.ts";
 
@@ -81,7 +83,16 @@ class SignerErrorBoundary extends Component<
 
 function App() {
 	const didRun = useRef(false);
+	const didCheckForUpdates = useRef(false);
 	const [windowLabel, setWindowLabel] = useState<string | null>(null);
+	const [availableUpdate, setAvailableUpdate] = useState<Awaited<
+		ReturnType<typeof checkForUpdate>
+	> | null>(null);
+	const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
+	const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
+	const [updateProgressTotalBytes, setUpdateProgressTotalBytes] = useState(0);
+	const [updateProgressDownloadedBytes, setUpdateProgressDownloadedBytes] =
+		useState(0);
 	const updateLicenseStatus = useAppStateStore(
 		(state) => state.updateLicenseStatus,
 	);
@@ -134,6 +145,52 @@ function App() {
 		invoke("show_window").then();
 	}, [isSignerMode, updateLicenseStatus]);
 
+	useEffect(() => {
+		if (isSignerMode || didCheckForUpdates.current) {
+			return;
+		}
+
+		didCheckForUpdates.current = true;
+
+		void checkForUpdate()
+			.then((update) => {
+				if (!update) {
+					console.log("[updater] no update available");
+					logInfo("startup updater: no update available");
+					return;
+				}
+
+				logInfo(`startup updater: found version ${update.version}`);
+				setAvailableUpdate(update);
+				setUpdateDialogOpen(true);
+			})
+			.catch((error) => {
+				console.error("startup updater check failed", error);
+				logError("startup updater check failed", error);
+			});
+	}, [isSignerMode]);
+
+	const handleInstallUpdate = async () => {
+		if (!availableUpdate || isInstallingUpdate) {
+			return;
+		}
+
+		setIsInstallingUpdate(true);
+		setUpdateProgressDownloadedBytes(0);
+		setUpdateProgressTotalBytes(0);
+
+		try {
+			await downloadAndInstallUpdate(availableUpdate, (event) => {
+				setUpdateProgressTotalBytes(event.totalBytes);
+				setUpdateProgressDownloadedBytes(event.downloadedBytes);
+			});
+		} catch (error) {
+			logError("startup updater install failed", error);
+			toast.error(String(error));
+			setIsInstallingUpdate(false);
+		}
+	};
+
 	if (isSignerMode) {
 		return (
 			<SignerErrorBoundary>
@@ -154,10 +211,23 @@ function App() {
 	return (
 		<BrowserRouter>
 			<Suspense fallback={<Home />}>
-				<Routes>
-					<Route path="/" element={<Home />} />
-					<Route path="/conversation" element={<Conversation />} />
-				</Routes>
+				<>
+					<Routes>
+						<Route path="/" element={<Home />} />
+						<Route path="/conversation" element={<Conversation />} />
+					</Routes>
+					<UpdateDialog
+						open={updateDialogOpen}
+						update={availableUpdate}
+						isInstalling={isInstallingUpdate}
+						progressTotalBytes={updateProgressTotalBytes}
+						progressDownloadedBytes={updateProgressDownloadedBytes}
+						onOpenChange={setUpdateDialogOpen}
+						onInstall={() => {
+							void handleInstallUpdate();
+						}}
+					/>
+				</>
 			</Suspense>
 		</BrowserRouter>
 	);

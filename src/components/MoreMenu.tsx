@@ -18,6 +18,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import { runUpdater } from "@/lib/updater.ts";
 import useAppStateStore, { type TranscribeVendor } from "@/stores";
 import { HOTKEYS, MODEL_OPTIONS, type ModelOption } from "@/types/llm.ts";
 
@@ -67,7 +68,6 @@ export function MoreMenu() {
 
 		setIsUpdating(true);
 		try {
-			const { runUpdater } = await import("@/lib/updater.ts");
 			await runUpdater();
 		} finally {
 			setIsUpdating(false);

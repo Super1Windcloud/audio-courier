@@ -1,7 +1,7 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { toast } from "sonner";
 
-function formatBytes(bytes?: number) {
+export function formatBytes(bytes?: number) {
 	if (!bytes || Number.isNaN(bytes)) {
 		return "";
 	}
@@ -9,7 +9,7 @@ function formatBytes(bytes?: number) {
 	return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function toErrorMessage(error: unknown) {
+export function toErrorMessage(error: unknown) {
 	if (error instanceof Error) {
 		return error.message;
 	}
@@ -17,27 +17,29 @@ function toErrorMessage(error: unknown) {
 	return String(error);
 }
 
-export async function checkAndInstallUpdate() {
-	const update = await check();
-	if (!update) {
-		toast.success("当前已是最新版本");
-		return;
-	}
-
-	toast.message(`发现新版本 ${update.version}`, {
-		description: update.body ?? "开始下载并安装更新包",
-	});
-
-	await downloadAndInstallUpdate(update);
+export async function checkForUpdate() {
+	return await check();
 }
 
-async function downloadAndInstallUpdate(update: Update) {
+export async function downloadAndInstallUpdate(
+	update: Update,
+	onProgress?: (event: {
+		stage: "started" | "progress" | "finished";
+		totalBytes: number;
+		downloadedBytes: number;
+	}) => void,
+) {
 	let totalBytes = 0;
 	let downloadedBytes = 0;
 
 	await update.downloadAndInstall((event) => {
 		if (event.event === "Started") {
 			totalBytes = event.data.contentLength ?? 0;
+			onProgress?.({
+				stage: "started",
+				totalBytes,
+				downloadedBytes,
+			});
 			toast.message("开始下载更新", {
 				description: totalBytes
 					? `更新包大小约 ${formatBytes(totalBytes)}`
@@ -48,7 +50,17 @@ async function downloadAndInstallUpdate(update: Update) {
 
 		if (event.event === "Progress") {
 			downloadedBytes += event.data.chunkLength;
+			onProgress?.({
+				stage: "progress",
+				totalBytes,
+				downloadedBytes,
+			});
 			if (totalBytes > 0 && downloadedBytes >= totalBytes) {
+				onProgress?.({
+					stage: "finished",
+					totalBytes,
+					downloadedBytes,
+				});
 				toast.message("更新包下载完成", {
 					description: "正在启动安装流程",
 				});
@@ -63,7 +75,17 @@ async function downloadAndInstallUpdate(update: Update) {
 
 export async function runUpdater() {
 	try {
-		await checkAndInstallUpdate();
+		const update = await checkForUpdate();
+		if (!update) {
+			console.log("[updater] no update available");
+			return;
+		}
+
+		toast.message(`发现新版本 ${update.version}`, {
+			description: update.body ?? "开始下载并安装更新包",
+		});
+
+		await downloadAndInstallUpdate(update);
 	} catch (error) {
 		toast.error("更新失败", {
 			description: toErrorMessage(error),
