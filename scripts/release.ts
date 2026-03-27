@@ -336,7 +336,7 @@ async function collectArtifacts(input: {
 			platform: preferred.platform,
 			signature: (await readFile(preferred.signaturePath, "utf8")).trim(),
 			url: `https://github.com/${input.repository}/releases/download/${input.tagName}/${encodeURIComponent(
-				path.basename(preferred.artifactPath),
+				sanitizeGitHubAssetName(path.basename(preferred.artifactPath)),
 			)}`,
 		},
 	};

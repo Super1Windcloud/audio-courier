@@ -22,6 +22,8 @@ pull :
 release:
     pnpm release
 
+build:
+    pnpm release:build
 
 clean :
    cd  src-tauri &&  cargo clean
