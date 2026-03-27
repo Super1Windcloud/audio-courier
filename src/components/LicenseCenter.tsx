@@ -104,7 +104,11 @@ export function LicenseCenter() {
 							<span
 								className={`rounded-full px-3 py-1 text-xs ${licenseStatus?.isValid ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-200"}`}
 							>
-								{licenseStatus?.isValid ? "已激活" : "未激活"}
+								{licenseStatus?.isHostSigner
+									? "宿主机"
+									: licenseStatus?.isValid
+										? "已激活"
+										: "未激活"}
 							</span>
 						</div>
 						<p className="text-xs text-slate-400">

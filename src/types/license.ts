@@ -10,6 +10,7 @@ export interface ActivationRequest {
 export interface LicenseStatus {
 	isActivated: boolean;
 	isValid: boolean;
+	isHostSigner: boolean;
 	reason: string;
 	checkedAt: string;
 	userId: string | null;

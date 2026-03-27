@@ -95,19 +95,15 @@ fn open_license_signer(app: tauri::AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    WebviewWindowBuilder::new(
-        &app,
-        "license-signer",
-        WebviewUrl::App("index.html?mode=license-signer".into()),
-    )
-    .title("License Signer")
-    .inner_size(980.0, 820.0)
-    .min_inner_size(860.0, 720.0)
-    .center()
-    .resizable(true)
-    .visible(true)
-    .build()
-    .map_err(|err| format!("创建签名窗口失败: {err}"))?;
+    WebviewWindowBuilder::new(&app, "license-signer", WebviewUrl::App("index.html".into()))
+        .title("License Signer")
+        .inner_size(980.0, 820.0)
+        .min_inner_size(860.0, 720.0)
+        .center()
+        .resizable(true)
+        .visible(true)
+        .build()
+        .map_err(|err| format!("创建签名窗口失败: {err}"))?;
 
     Ok(())
 }

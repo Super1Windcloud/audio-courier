@@ -1,6 +1,7 @@
 import "./App.css";
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { toast } from "sonner";
 import { Toaster } from "sonner";
@@ -28,11 +29,11 @@ function Home() {
 
 function App() {
 	const didRun = useRef(false);
+	const [windowLabel] = useState(() => getCurrentWindow().label);
 	const updateLicenseStatus = useAppStateStore(
 		(state) => state.updateLicenseStatus,
 	);
-	const isSignerMode =
-		new URLSearchParams(window.location.search).get("mode") === "license-signer";
+	const isSignerMode = windowLabel === "license-signer";
 
 	useEffect(() => {
 		const handleContextMenu = (e: MouseEvent) => {

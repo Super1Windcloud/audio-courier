@@ -49,6 +49,7 @@ pub struct SignedLicense {
 pub struct LicenseStatus {
     pub is_activated: bool,
     pub is_valid: bool,
+    pub is_host_signer: bool,
     pub reason: String,
     pub checked_at: DateTime<Utc>,
     pub user_id: Option<String>,
@@ -199,6 +200,7 @@ pub fn evaluate_license(license: &SignedLicense) -> LicenseStatus {
     LicenseStatus {
         is_activated: true,
         is_valid: true,
+        is_host_signer: false,
         reason: "许可证有效".to_string(),
         checked_at,
         user_id: Some(license.payload.user_id.clone()),
@@ -217,13 +219,34 @@ pub fn load_license_status(app: &AppHandle) -> Result<LicenseStatus, String> {
     let license_path = license_file_path(app)?;
     let device_fingerprint = compute_device_fingerprint()?;
     let device_hint = device_hint();
+    let checked_at = Utc::now();
+
+    if ensure_signer_access().is_ok() {
+        return Ok(LicenseStatus {
+            is_activated: true,
+            is_valid: true,
+            is_host_signer: true,
+            reason: "当前机器是签名宿主机，已跳过许可证校验".to_string(),
+            checked_at,
+            user_id: Some("signer-host".to_string()),
+            license_id: Some("signer-host".to_string()),
+            issued_at: None,
+            expires_at: None,
+            max_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            features: vec!["host-signer".to_string(), "pro".to_string()],
+            current_version: env!("CARGO_PKG_VERSION").to_string(),
+            device_hint,
+            device_fingerprint,
+        });
+    }
 
     if !license_path.exists() {
         return Ok(LicenseStatus {
             is_activated: false,
             is_valid: false,
+            is_host_signer: false,
             reason: "未导入许可证".to_string(),
-            checked_at: Utc::now(),
+            checked_at,
             user_id: None,
             license_id: None,
             issued_at: None,
@@ -363,6 +386,7 @@ fn invalid_status(
     LicenseStatus {
         is_activated: true,
         is_valid: false,
+        is_host_signer: false,
         reason,
         checked_at,
         user_id: Some(license.payload.user_id.clone()),
