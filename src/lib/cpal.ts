@@ -3,7 +3,21 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 import { logError, logInfo } from "@/lib/logger.ts";
 import useAppStateStore from "@/stores";
-import { convertTraditionalChinese } from "../../scripts/opencc.ts";
+
+let traditionalChineseConverter:
+	| ((content: string) => string)
+	| null = null;
+
+async function convertTraditionalChinese(content: string) {
+	if (!traditionalChineseConverter) {
+		const { convertTraditionalChinese: convert } = await import(
+			"../../scripts/opencc.ts"
+		);
+		traditionalChineseConverter = convert;
+	}
+
+	return traditionalChineseConverter(content);
+}
 
 let unlistener: UnlistenFn | null = null;
 let errorUnlistener: UnlistenFn | null = null;
@@ -26,7 +40,7 @@ export async function startAudioLoopbackRecognition(
 
 	let content: string = "";
 
-	unlistener = await listen<string>("transcription_result", (event) => {
+	unlistener = await listen<string>("transcription_result", async (event) => {
 		logInfo(`transcription_result received length=${event.payload.length}`);
 		if (
 			selectedAsrVendor.toLowerCase() === "assemblyai" ||
@@ -35,7 +49,7 @@ export async function startAudioLoopbackRecognition(
 		) {
 			content = event.payload;
 		} else if (selectedAsrVendor.toLowerCase() === "gladia") {
-			content = convertTraditionalChinese(event.payload);
+			content = await convertTraditionalChinese(event.payload);
 		} else {
 			content += event.payload;
 		}

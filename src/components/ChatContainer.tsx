@@ -2,7 +2,6 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import TitleBar from "@/components/TitleBar.tsx";
-import { llmInterviewChatStreamOutput } from "@/lib/llm.ts";
 import useAppStateStore from "@/stores";
 import { MessageInput } from "./MessageInput";
 import { MessageList } from "./MessageList";
@@ -80,6 +79,7 @@ export const ChatContainer: React.FC = () => {
 
 			setIsTyping(true);
 
+			const { llmInterviewChatStreamOutput } = await import("@/lib/llm.ts");
 			await llmInterviewChatStreamOutput(
 				text,
 				introduceSelf ? import.meta.env.VITE_INTERVIEW_PROMPT : llmPromptStore,
