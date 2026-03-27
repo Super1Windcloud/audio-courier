@@ -627,7 +627,7 @@ async function uploadReleaseAsset(input: {
 
 	if (response.status === 422) {
 		const errorText = await response.text();
-		if (errorText.includes("\"already_exists\"")) {
+		if (errorText.includes('"already_exists"')) {
 			await deleteReleaseAssetByName({
 				token: input.token,
 				release: input.release,
