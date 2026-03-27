@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import { copyText } from "@/lib/clipboard.ts";
 import { logError, logInfo } from "@/lib/logger.ts";
 import type {
 	ActivationRequest,
@@ -103,9 +104,13 @@ export function LicenseSignerApp({
 			});
 			const content = JSON.stringify(result, null, 2);
 			setLicenseJson(content);
-			await navigator.clipboard.writeText(content);
+			const copied = await copyText(content);
 			logInfo(`license-signer sign succeeded licenseId=${result.licenseId}`);
-			toast.success("许可证已签发并复制到剪贴板");
+			toast.success(
+				copied
+					? "许可证已签发并复制到剪贴板"
+					: "许可证已签发，请手动复制下方内容",
+			);
 		} catch (error) {
 			logError("license-signer sign failed", error);
 			toast.error(String(error));
@@ -119,7 +124,11 @@ export function LicenseSignerApp({
 			toast.warning("当前没有已签发的 license.json");
 			return;
 		}
-		await navigator.clipboard.writeText(licenseJson);
+		const copied = await copyText(licenseJson);
+		if (!copied) {
+			toast.warning("当前环境不允许自动复制，请手动复制许可证内容");
+			return;
+		}
 		logInfo("license-signer copied signed license");
 		toast.success("许可证已复制");
 	};

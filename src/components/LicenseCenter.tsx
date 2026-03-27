@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import { copyText } from "@/lib/clipboard.ts";
 import useAppStateStore from "@/stores";
 import type { ActivationRequest, LicenseStatus } from "@/types/license.ts";
 
@@ -178,8 +179,12 @@ export function LicenseCenter() {
 			);
 			const content = JSON.stringify(request, null, 2);
 			setRequestJson(content);
-			await navigator.clipboard.writeText(content);
-			toast.success("设备请求码已生成并复制到剪贴板");
+			const copied = await copyText(content);
+			toast.success(
+				copied
+					? "设备请求码已生成并复制到剪贴板"
+					: "设备请求码已生成，请手动复制下方内容",
+			);
 		} catch (error) {
 			toast.error(String(error));
 		} finally {
@@ -192,8 +197,12 @@ export function LicenseCenter() {
 			toast.warning("请先生成设备请求码");
 			return;
 		}
-		await navigator.clipboard.writeText(requestJson);
-		toast.success("设备请求码已复制");
+		const copied = await copyText(requestJson);
+		if (copied) {
+			toast.success("设备请求码已复制");
+			return;
+		}
+		toast.warning("当前环境不允许自动复制，请手动复制请求码");
 	};
 
 	const handleImportLicense = async () => {
