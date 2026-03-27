@@ -5,6 +5,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { LicenseCenter } from "@/components/LicenseCenter.tsx";
+import { logError, logInfo } from "@/lib/logger.ts";
 import type { SignerStatus } from "@/types/license.ts";
 
 const TitleBar: React.FC = () => {
@@ -32,9 +33,12 @@ const TitleBar: React.FC = () => {
 	};
 
 	const handleOpenSigner = async () => {
+		logInfo("request-open-license-signer");
 		try {
 			await invoke("open_license_signer");
+			logInfo("open-license-signer-invoke-succeeded");
 		} catch (error) {
+			logError("open-license-signer-invoke-failed", error);
 			toast.error(String(error));
 		}
 	};
@@ -43,9 +47,13 @@ const TitleBar: React.FC = () => {
 		invoke<SignerStatus>("get_signer_status")
 			.then((status) => {
 				setSignerStatus(status);
+				logInfo(
+					`signer-status-loaded allowed=${status.isAllowed} configured=${status.isConfigured}`,
+				);
 			})
-			.catch(() => {
+			.catch((error) => {
 				setSignerStatus(null);
+				logError("get_signer_status failed in TitleBar", error);
 			});
 	}, []);
 

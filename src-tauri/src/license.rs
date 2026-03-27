@@ -1,6 +1,7 @@
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use chrono::{DateTime, Utc};
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use log::{info, warn};
 use rand::distr::{Alphanumeric, SampleString};
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -75,7 +76,7 @@ pub struct SignerStatus {
 }
 
 pub fn build_activation_request(user_id: Option<String>) -> Result<ActivationRequest, String> {
-    Ok(ActivationRequest {
+    let request = ActivationRequest {
         app_id: env!("CARGO_PKG_NAME").to_string(),
         app_version: env!("CARGO_PKG_VERSION").to_string(),
         user_id: user_id
@@ -84,7 +85,12 @@ pub fn build_activation_request(user_id: Option<String>) -> Result<ActivationReq
         device_fingerprint: compute_device_fingerprint()?,
         device_hint: device_hint(),
         request_time: Utc::now(),
-    })
+    };
+    info!(
+        "activation request built user_id={} device_hint={}",
+        request.user_id, request.device_hint
+    );
+    Ok(request)
 }
 
 pub fn sign_license(
@@ -125,6 +131,10 @@ pub fn sign_license_from_request_json(
     let request: ActivationRequest = serde_json::from_str(raw_request)
         .map_err(|err| format!("激活请求 JSON 解析失败: {err}"))?;
     let private_key = private_key_from_env()?;
+    info!(
+        "signing license from request user_id={} device_hint={}",
+        user_id, request.device_hint
+    );
     sign_license(
         request,
         user_id,
@@ -155,10 +165,18 @@ pub fn evaluate_license(license: &SignedLicense) -> LicenseStatus {
     let checked_at = Utc::now();
 
     if let Err(err) = verify_license(license) {
+        warn!(
+            "license verify failed license_id={}: {}",
+            license.payload.license_id, err
+        );
         return invalid_status(err, checked_at, device_hint, device_fingerprint, license);
     }
 
     if license.payload.device_fingerprint != device_fingerprint {
+        warn!(
+            "license device mismatch license_id={} current_device_hint={}",
+            license.payload.license_id, device_hint
+        );
         return invalid_status(
             "许可证绑定的设备与当前机器不匹配".to_string(),
             checked_at,
@@ -169,6 +187,7 @@ pub fn evaluate_license(license: &SignedLicense) -> LicenseStatus {
     }
 
     if checked_at > license.payload.expires_at {
+        warn!("license expired license_id={}", license.payload.license_id);
         return invalid_status(
             "许可证已过期".to_string(),
             checked_at,
@@ -187,6 +206,10 @@ pub fn evaluate_license(license: &SignedLicense) -> LicenseStatus {
 
     if let (Some(current), Some(max)) = (current_version, max_version) {
         if current > max {
+            warn!(
+                "license version out of range license_id={} current={} max={}",
+                license.payload.license_id, current, max
+            );
             return invalid_status(
                 "当前软件版本超出许可证授权范围".to_string(),
                 checked_at,
@@ -222,6 +245,7 @@ pub fn load_license_status(app: &AppHandle) -> Result<LicenseStatus, String> {
     let checked_at = Utc::now();
 
     if ensure_signer_access().is_ok() {
+        info!("load_license_status resolved to host signer");
         return Ok(LicenseStatus {
             is_activated: true,
             is_valid: true,
@@ -241,6 +265,10 @@ pub fn load_license_status(app: &AppHandle) -> Result<LicenseStatus, String> {
     }
 
     if !license_path.exists() {
+        info!(
+            "load_license_status no license file at {}",
+            license_path.display()
+        );
         return Ok(LicenseStatus {
             is_activated: false,
             is_valid: false,
@@ -262,13 +290,25 @@ pub fn load_license_status(app: &AppHandle) -> Result<LicenseStatus, String> {
     let content =
         fs::read_to_string(&license_path).map_err(|err| format!("读取许可证失败: {}", err))?;
     let license = parse_license(&content)?;
+    info!(
+        "load_license_status evaluating persisted license license_id={}",
+        license.payload.license_id
+    );
     Ok(evaluate_license(&license))
 }
 
 pub fn persist_license(app: &AppHandle, raw_license: &str) -> Result<LicenseStatus, String> {
     let license = parse_license(raw_license)?;
+    info!(
+        "persist_license received license_id={} user_id={}",
+        license.payload.license_id, license.payload.user_id
+    );
     let status = evaluate_license(&license);
     if !status.is_valid {
+        warn!(
+            "persist_license rejected license_id={}: {}",
+            license.payload.license_id, status.reason
+        );
         return Err(status.reason);
     }
 
@@ -282,6 +322,8 @@ pub fn persist_license(app: &AppHandle, raw_license: &str) -> Result<LicenseStat
         serde_json::to_vec_pretty(&license).map_err(|err| err.to_string())?,
     )
     .map_err(|err| format!("写入许可证失败: {}", err))?;
+
+    info!("persist_license wrote {}", license_path.display());
 
     Ok(status)
 }
@@ -329,6 +371,9 @@ pub fn signer_status() -> SignerStatus {
     let current_device_fingerprint = compute_device_fingerprint().ok();
     let current_device_hint = device_hint();
     let access_result = ensure_signer_access();
+    if let Err(err) = &access_result {
+        warn!("signer_status access denied: {}", err);
+    }
 
     match (private_key_from_env(), access_result) {
         (Ok(_), Ok(_)) => SignerStatus {
@@ -459,9 +504,11 @@ pub fn ensure_signer_access() -> Result<(), String> {
 
     let current_fingerprint = compute_device_fingerprint()?;
     if allowed_fingerprint.trim() != current_fingerprint {
+        warn!("signer access fingerprint mismatch");
         return Err("当前机器未被授权打开签名器".to_string());
     }
 
+    info!("signer access granted");
     Ok(())
 }
 

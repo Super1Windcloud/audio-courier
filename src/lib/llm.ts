@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
+import { logError, logInfo } from "@/lib/logger.ts";
 import type { ModelOption } from "@/types/llm.ts";
 
 export async function llmInterviewChatStreamOutput(
@@ -9,9 +10,7 @@ export async function llmInterviewChatStreamOutput(
 	currentModel: ModelOption,
 	renderCallback: (chunk: string) => void,
 ) {
-	console.log("currentModel", currentModel);
-	console.log("currentQuestion", question);
-	console.log("llmPrompt", llmPrompt);
+	logInfo(`llm-start model=${currentModel} questionLength=${question.length}`);
 	let result = "";
 
 	const requestId = Math.random().toString(36).substring(2, 15);
@@ -34,6 +33,7 @@ export async function llmInterviewChatStreamOutput(
 		})
 		.catch((err) => {
 			console.error("invoke llmModel Error", err);
+			logError("invoke llmModel Error", err);
 			toast.error(`invoke llm err ${err}`);
 		})
 		.finally(() => {

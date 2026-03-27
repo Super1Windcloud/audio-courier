@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import { logError, logInfo } from "@/lib/logger.ts";
 import type {
 	ActivationRequest,
 	SignedLicense,
@@ -50,10 +51,15 @@ export function LicenseSignerApp() {
 
 	const loadSignerStatus = useCallback(async () => {
 		setIsLoadingStatus(true);
+		logInfo("license-signer load status");
 		try {
 			const status = await invoke<SignerStatus>("get_signer_status");
 			setSignerStatus(status);
+			logInfo(
+				`license-signer status loaded allowed=${status.isAllowed} configured=${status.isConfigured}`,
+			);
 		} catch (error) {
+			logError("license-signer load status failed", error);
 			toast.error(String(error));
 		} finally {
 			setIsLoadingStatus(false);
@@ -77,6 +83,7 @@ export function LicenseSignerApp() {
 		}
 
 		setIsSigning(true);
+		logInfo("license-signer start sign request");
 		try {
 			const result = await invoke<SignedLicense>("sign_activation_license", {
 				rawRequest: requestJson,
@@ -91,8 +98,10 @@ export function LicenseSignerApp() {
 			const content = JSON.stringify(result, null, 2);
 			setLicenseJson(content);
 			await navigator.clipboard.writeText(content);
+			logInfo(`license-signer sign succeeded licenseId=${result.licenseId}`);
 			toast.success("许可证已签发并复制到剪贴板");
 		} catch (error) {
+			logError("license-signer sign failed", error);
 			toast.error(String(error));
 		} finally {
 			setIsSigning(false);
@@ -105,6 +114,7 @@ export function LicenseSignerApp() {
 			return;
 		}
 		await navigator.clipboard.writeText(licenseJson);
+		logInfo("license-signer copied signed license");
 		toast.success("许可证已复制");
 	};
 

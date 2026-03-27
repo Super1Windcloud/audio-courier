@@ -2,6 +2,7 @@ import {
 	startAudioLoopbackRecognition,
 	stopAudioLoopbackRecognition,
 } from "@/lib/cpal.ts";
+import { logError } from "@/lib/logger.ts";
 import type { TranscribeVendor } from "@/stores";
 
 declare global {
@@ -90,6 +91,7 @@ function getRecognition(): SpeechRecognition {
 
 	recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
 		console.error("SpeechRecognition error:", event.error, event.message);
+		logError("SpeechRecognition error", `${event.error}: ${event.message}`);
 	};
 
 	recognitionInstance = recognition;

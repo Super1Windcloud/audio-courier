@@ -50,6 +50,8 @@ speechmatics = { version = "0.4.0", path = "speechmatics-rs", default-features =
 deepgram = "0.9.1"
 bytes = "1.11.1"
 futures = "0.3.32"
+tauri-plugin-log = "2"
+log = "0.4"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"

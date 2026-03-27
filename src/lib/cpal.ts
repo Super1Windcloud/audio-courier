@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { toast } from "sonner";
+import { logError, logInfo } from "@/lib/logger.ts";
 import useAppStateStore from "@/stores";
 import { convertTraditionalChinese } from "../../scripts/opencc.ts";
 
@@ -26,7 +27,7 @@ export async function startAudioLoopbackRecognition(
 	let content: string = "";
 
 	unlistener = await listen<string>("transcription_result", (event) => {
-		console.log("识别扬声器结果:", event.payload);
+		logInfo(`transcription_result received length=${event.payload.length}`);
 		if (
 			selectedAsrVendor.toLowerCase() === "assemblyai" ||
 			selectedAsrVendor.toLowerCase() === "revai" ||
@@ -42,6 +43,7 @@ export async function startAudioLoopbackRecognition(
 	});
 	errorUnlistener = await listen<string>("transcription_error", (event) => {
 		console.error("transcription error:", event.payload);
+		logError("transcription_error received", event.payload);
 		toast.error(`transcription error${event.payload}`);
 		const appState = useAppStateStore.getState();
 		if (appState.isRecording) {
@@ -56,6 +58,7 @@ export async function startAudioLoopbackRecognition(
 		captureInterval,
 	}).catch((err) => {
 		console.error("invoke start output audio recognition failed", err);
+		logError("invoke start output audio recognition failed", err);
 		toast.error(`invoke start audio capture err${err}`);
 	});
 }
@@ -64,6 +67,7 @@ export async function stopAudioLoopbackRecognition() {
 	await invoke("stop_recognize_audio_stream_from_speaker_loopback").catch(
 		(err) => {
 			console.error("invoke stop output audio recognition failed", err);
+			logError("invoke stop output audio recognition failed", err);
 			toast.error(`invoke stop audio capture err${err}`);
 		},
 	);
