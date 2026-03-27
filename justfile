@@ -15,7 +15,7 @@ pull :
    git pull repo main
 
 release:
-    just push &&  git push repo  main:release
+    pnpm release
 
 
 clean :

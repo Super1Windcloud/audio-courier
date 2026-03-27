@@ -5,63 +5,44 @@ import {
 import { logError } from "@/lib/logger.ts";
 import type { TranscribeVendor } from "@/stores";
 
+interface BrowserSpeechRecognition extends EventTarget {
+	lang: string;
+	continuous: boolean;
+	interimResults: boolean;
+	start(): void;
+	stop(): void;
+	abort(): void;
+	onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+	onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
+}
+
+interface BrowserSpeechRecognitionEvent extends Event {
+	results: SpeechRecognitionResultList;
+}
+
+interface BrowserSpeechRecognitionErrorEvent extends Event {
+	error: string;
+	message: string;
+}
+
+type SpeechRecognitionClass = new () => BrowserSpeechRecognition;
+
 declare global {
 	interface Window {
-		SpeechRecognition: SpeechRecognitionConstructor;
-		webkitSpeechRecognition: SpeechRecognitionConstructor;
-	}
-
-	interface SpeechRecognitionConstructor {
-		new (): SpeechRecognition;
-	}
-
-	interface SpeechRecognition extends EventTarget {
-		lang: string;
-		continuous: boolean;
-		interimResults: boolean;
-		start(): void;
-		stop(): void;
-		abort(): void;
-
-		onaudioend: ((this: SpeechRecognition, ev: Event) => void) | null;
-		onaudiostart: ((this: SpeechRecognition, ev: Event) => void) | null;
-		onend: ((this: SpeechRecognition, ev: Event) => void) | null;
-		onerror:
-			| ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => void)
-			| null;
-		onnomatch:
-			| ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void)
-			| null;
-		onresult:
-			| ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void)
-			| null;
-		onsoundend: ((this: SpeechRecognition, ev: Event) => void) | null;
-		onsoundstart: ((this: SpeechRecognition, ev: Event) => void) | null;
-		onspeechend: ((this: SpeechRecognition, ev: Event) => void) | null;
-		onspeechstart: ((this: SpeechRecognition, ev: Event) => void) | null;
-		onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
-	}
-
-	interface SpeechRecognitionEvent extends Event {
-		resultIndex: number;
-		results: SpeechRecognitionResultList;
-	}
-
-	interface SpeechRecognitionErrorEvent extends Event {
-		error: string;
-		message: string;
+		SpeechRecognition?: SpeechRecognitionClass;
+		webkitSpeechRecognition?: SpeechRecognitionClass;
 	}
 }
 
-let recognitionInstance: SpeechRecognition | null = null;
 let activeCallback: ((msg: string) => void) | null = null;
+let recognitionInstance: BrowserSpeechRecognition | null = null;
 
-function getRecognition(): SpeechRecognition {
+function getRecognition(): BrowserSpeechRecognition {
 	if (recognitionInstance) return recognitionInstance;
 
 	const win = window as Window & {
-		SpeechRecognition?: SpeechRecognitionConstructor;
-		webkitSpeechRecognition?: SpeechRecognitionConstructor;
+		SpeechRecognition?: SpeechRecognitionClass;
+		webkitSpeechRecognition?: SpeechRecognitionClass;
 	};
 	const SpeechRecognitionClass =
 		win.SpeechRecognition ?? win.webkitSpeechRecognition;
@@ -73,7 +54,7 @@ function getRecognition(): SpeechRecognition {
 	recognition.continuous = true;
 	recognition.interimResults = true;
 
-	recognition.onresult = (event: SpeechRecognitionEvent) => {
+	recognition.onresult = (event: BrowserSpeechRecognitionEvent) => {
 		let finalTranscript = "";
 		let interimTranscript = "";
 
@@ -89,7 +70,7 @@ function getRecognition(): SpeechRecognition {
 		if (activeCallback) activeCallback(finalTranscript + interimTranscript);
 	};
 
-	recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+	recognition.onerror = (event: BrowserSpeechRecognitionErrorEvent) => {
 		console.error("SpeechRecognition error:", event.error, event.message);
 		logError("SpeechRecognition error", `${event.error}: ${event.message}`);
 	};
