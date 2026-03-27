@@ -29,7 +29,13 @@ function toUtcIsoString(value: string) {
 	return date.toISOString();
 }
 
-export function LicenseSignerApp() {
+interface LicenseSignerAppProps {
+	embedded?: boolean;
+}
+
+export function LicenseSignerApp({
+	embedded = false,
+}: LicenseSignerAppProps = {}) {
 	const [requestJson, setRequestJson] = useState("");
 	const [userId, setUserId] = useState("");
 	const [expiresAt, setExpiresAt] = useState(defaultExpiryValue);
@@ -120,8 +126,12 @@ export function LicenseSignerApp() {
 
 	if (signerStatus && !signerStatus.isAllowed) {
 		return (
-			<div className="min-h-screen bg-[radial-gradient(circle_at_top,#2f1f1f_0%,#141414_55%,#080808_100%)] px-6 py-6 text-white">
-				<div className="mx-auto flex min-h-[70vh] max-w-3xl items-center justify-center">
+			<div
+				className={`${embedded ? "text-white" : "min-h-screen bg-[radial-gradient(circle_at_top,#2f1f1f_0%,#141414_55%,#080808_100%)] px-6 py-6 text-white"}`}
+			>
+				<div
+					className={`mx-auto flex ${embedded ? "max-w-none" : "min-h-[70vh] max-w-3xl"} items-center justify-center`}
+				>
 					<div className="w-full rounded-3xl border border-red-400/15 bg-black/30 p-8 backdrop-blur">
 						<p className="text-xs uppercase tracking-[0.35em] text-red-200/70">
 							Signer Locked
@@ -143,8 +153,12 @@ export function LicenseSignerApp() {
 	}
 
 	return (
-		<div className="min-h-screen bg-[radial-gradient(circle_at_top,#21405d_0%,#0b1322_45%,#050814_100%)] px-6 py-6 text-white">
-			<div className="mx-auto flex max-w-6xl flex-col gap-6">
+		<div
+			className={`${embedded ? "pb-2 text-white" : "min-h-screen bg-[radial-gradient(circle_at_top,#21405d_0%,#0b1322_45%,#050814_100%)] px-6 py-6 text-white"}`}
+		>
+			<div
+				className={`mx-auto flex ${embedded ? "max-w-none" : "max-w-6xl"} flex-col gap-6`}
+			>
 				<div className="flex items-center justify-between rounded-3xl border border-cyan-400/15 bg-black/20 px-6 py-5 backdrop-blur">
 					<div>
 						<p className="text-xs uppercase tracking-[0.35em] text-cyan-200/70">

@@ -1,10 +1,8 @@
-import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { FileSignature } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { LicenseCenter } from "@/components/LicenseCenter.tsx";
+import { LicenseSignerCenter } from "@/components/LicenseSignerCenter.tsx";
 import { logError, logInfo } from "@/lib/logger.ts";
 import type { SignerStatus } from "@/types/license.ts";
 
@@ -32,19 +30,9 @@ const TitleBar: React.FC = () => {
 		await window.close();
 	};
 
-	const handleOpenSigner = async () => {
-		logInfo("request-open-license-signer");
-		try {
-			await invoke("open_license_signer");
-			logInfo("open-license-signer-invoke-succeeded");
-		} catch (error) {
-			logError("open-license-signer-invoke-failed", error);
-			toast.error(String(error));
-		}
-	};
-
 	useEffect(() => {
-		invoke<SignerStatus>("get_signer_status")
+		import("@tauri-apps/api/core")
+			.then(({ invoke }) => invoke<SignerStatus>("get_signer_status"))
 			.then((status) => {
 				setSignerStatus(status);
 				logInfo(
@@ -65,16 +53,7 @@ const TitleBar: React.FC = () => {
 			<div className="pl-2" style={{ WebkitAppRegion: "no-drag" }}>
 				<div className="flex items-center gap-2">
 					<LicenseCenter />
-					{signerStatus?.isAllowed ? (
-						<button
-							type="button"
-							onClick={handleOpenSigner}
-							className="inline-flex h-8 items-center gap-2 rounded-md px-3 text-sm text-gray-200 transition-colors hover:bg-white/10 hover:text-white"
-						>
-							<FileSignature className="size-4" />
-							签名器
-						</button>
-					) : null}
+					<LicenseSignerCenter signerStatus={signerStatus} />
 				</div>
 			</div>
 			<div

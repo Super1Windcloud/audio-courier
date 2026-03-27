@@ -1,10 +1,4 @@
-import {
-	attachConsole,
-	debug,
-	error,
-	info,
-	warn,
-} from "@tauri-apps/plugin-log";
+import { debug, error, info, warn } from "@tauri-apps/plugin-log";
 
 let didInit = false;
 
@@ -27,7 +21,6 @@ export async function initializeAppLogger() {
 		return;
 	}
 	didInit = true;
-	await attachConsole();
 	await info("frontend logger initialized");
 }
 
