@@ -4,8 +4,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
 	Component,
 	lazy,
-	Suspense,
 	type ReactNode,
+	Suspense,
 	useEffect,
 	useRef,
 	useState,

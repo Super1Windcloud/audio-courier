@@ -55,7 +55,11 @@ fn all_known_log_paths() -> Vec<PathBuf> {
                     .join("logs")
                     .join(APP_LOG_FILE_NAME),
             );
-            paths.push(local_app_data.join(APP_PRODUCT_NAME).join(APP_LOG_FILE_NAME));
+            paths.push(
+                local_app_data
+                    .join(APP_PRODUCT_NAME)
+                    .join(APP_LOG_FILE_NAME),
+            );
             paths.push(
                 local_app_data
                     .join(APP_PRODUCT_NAME)
