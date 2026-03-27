@@ -43,14 +43,14 @@ export function LicenseSignerCenter({
 					签名器
 				</button>
 			</DialogTrigger>
-			<DialogContent className="max-h-[88vh] overflow-hidden border-white/10 bg-slate-950 text-white sm:max-w-6xl">
+			<DialogContent className="flex max-h-[88vh] flex-col overflow-hidden border-white/10 bg-slate-950 text-white sm:max-w-6xl">
 				<DialogHeader>
 					<DialogTitle>激活许可签名器</DialogTitle>
 					<DialogDescription className="text-slate-300">
 						这里直接在主应用里签发 license.json，不再创建新的 Tauri 窗口。
 					</DialogDescription>
 				</DialogHeader>
-				<div className="overflow-y-auto pr-1">
+				<div className="min-h-0 flex-1 overflow-y-auto pr-1">
 					<LicenseSignerApp embedded />
 				</div>
 			</DialogContent>

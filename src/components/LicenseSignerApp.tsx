@@ -163,10 +163,10 @@ export function LicenseSignerApp({
 
 	return (
 		<div
-			className={`${embedded ? "pb-2 text-white" : "min-h-screen bg-[radial-gradient(circle_at_top,#21405d_0%,#0b1322_45%,#050814_100%)] px-6 py-6 text-white"}`}
+			className={`${embedded ? "min-h-0 text-white" : "min-h-screen bg-[radial-gradient(circle_at_top,#21405d_0%,#0b1322_45%,#050814_100%)] px-6 py-6 text-white"}`}
 		>
 			<div
-				className={`mx-auto flex ${embedded ? "max-w-none" : "max-w-6xl"} flex-col gap-6`}
+				className={`mx-auto flex ${embedded ? "max-w-none pb-2" : "max-w-6xl"} flex-col gap-6`}
 			>
 				<div className="flex items-center justify-between rounded-3xl border border-cyan-400/15 bg-black/20 px-6 py-5 backdrop-blur">
 					<div>
@@ -226,36 +226,9 @@ export function LicenseSignerApp({
 										} catch {}
 									}
 								}}
-								rows={18}
+								rows={9}
 								className="border-white/10 bg-slate-950/80 font-mono text-xs text-slate-100"
 								placeholder="粘贴 activation_request.json"
-							/>
-						</section>
-
-						<section className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-							<div className="mb-4">
-								<h2 className="text-lg font-medium">签发结果</h2>
-								<p className="text-sm text-slate-300">
-									签名完成后会输出完整的 license.json，可直接发给用户。
-								</p>
-							</div>
-							<div className="mb-3 flex justify-end">
-								<Button
-									type="button"
-									variant="outline"
-									className="border-white/10 bg-white/5 text-white"
-									onClick={handleCopyLicense}
-								>
-									<Copy className="size-4" />
-									复制 license.json
-								</Button>
-							</div>
-							<Textarea
-								value={licenseJson}
-								readOnly
-								rows={18}
-								className="border-white/10 bg-slate-950/80 font-mono text-xs text-slate-100"
-								placeholder="签发后这里会出现 license.json"
 							/>
 						</section>
 					</div>
@@ -390,6 +363,33 @@ export function LicenseSignerApp({
 						</section>
 					</div>
 				</div>
+
+				<section className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+					<div className="mb-4">
+						<h2 className="text-lg font-medium">签发结果</h2>
+						<p className="text-sm text-slate-300">
+							签名完成后会输出完整的 license.json，可直接发给用户。
+						</p>
+					</div>
+					<div className="mb-3 flex justify-end">
+						<Button
+							type="button"
+							variant="outline"
+							className="border-white/10 bg-white/5 text-white"
+							onClick={handleCopyLicense}
+						>
+							<Copy className="size-4" />
+							复制 license.json
+						</Button>
+					</div>
+					<Textarea
+						value={licenseJson}
+						readOnly
+						rows={9}
+						className="border-white/10 bg-slate-950/80 font-mono text-xs text-slate-100"
+						placeholder="签发后这里会出现 license.json"
+					/>
+				</section>
 			</div>
 		</div>
 	);
