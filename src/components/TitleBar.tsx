@@ -49,8 +49,13 @@ const TitleBar: React.FC = () => {
 		<div
 			className="w-full flex justify-between items-center h-10 select-none bg-transparent"
 			style={{ WebkitAppRegion: "drag" }}
+			data-tauri-drag-region
 		>
-			<div className="pl-2" style={{ WebkitAppRegion: "no-drag" }}>
+			<div
+				className="pl-2"
+				style={{ WebkitAppRegion: "no-drag" }}
+				data-tauri-drag-region={false}
+			>
 				<div className="flex items-center gap-2">
 					<LicenseCenter />
 					<LicenseSignerCenter signerStatus={signerStatus} />
@@ -59,6 +64,7 @@ const TitleBar: React.FC = () => {
 			<div
 				className="flex items-center gap-1 pr-2"
 				style={{ WebkitAppRegion: "no-drag" }}
+				data-tauri-drag-region={false}
 			>
 				{/* 最小化 */}
 				<button
