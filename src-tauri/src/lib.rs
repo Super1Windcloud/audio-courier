@@ -19,6 +19,7 @@ use license::{
 pub use llm::*;
 use log::{error, info, warn};
 pub use loopback::*;
+use provider_config::{ProviderEnvPresets, provider_env_presets_from_env};
 use std::path::PathBuf;
 use tauri::LogicalSize;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
@@ -158,6 +159,12 @@ fn toggle_devtools(window: tauri::WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn get_provider_env_presets() -> ProviderEnvPresets {
+    info!("get_provider_env_presets invoked");
+    provider_env_presets_from_env()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     reset_app_log_files();
@@ -228,6 +235,7 @@ pub fn run() {
             sign_activation_license,
             open_license_signer,
             toggle_devtools,
+            get_provider_env_presets,
             chat_with_llm_provider,
             siliconflow_free,
             siliconflow_pro,

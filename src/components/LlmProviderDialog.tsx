@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input.tsx";
 import useAppStateStore from "@/stores";
 import {
 	createDefaultLlmProviderSettings,
+	getLlmProviderStatus,
 	type LlmProviderSettings,
 } from "@/types/provider.ts";
 
@@ -22,16 +23,25 @@ function LabeledField({
 	onChange,
 	placeholder,
 	description,
+	status,
 }: {
 	label: string;
 	value: string;
 	onChange: (value: string) => void;
 	placeholder?: string;
 	description?: string;
+	status?: string;
 }) {
 	return (
 		<div className="grid gap-2">
-			<span className="text-sm font-medium text-white">{label}</span>
+			<div className="flex items-center justify-between gap-3">
+				<span className="text-sm font-medium text-white">{label}</span>
+				{status ? (
+					<span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] text-slate-200">
+						{status}
+					</span>
+				) : null}
+			</div>
 			<Input
 				value={value}
 				onChange={(event) => onChange(event.target.value)}
@@ -73,6 +83,7 @@ export function LlmProviderDialog({
 	onOpenChange: (open: boolean) => void;
 }) {
 	const settings = useAppStateStore((state) => state.llmProviderSettings);
+	const presets = useAppStateStore((state) => state.envProviderPresets.llm);
 	const updateSettings = useAppStateStore(
 		(state) => state.updateLlmProviderSettings,
 	);
@@ -95,8 +106,9 @@ export function LlmProviderDialog({
 					<DialogTitle>大模型 API 配置</DialogTitle>
 					<DialogDescription className="text-slate-300">
 						这里的配置只影响大模型请求，不影响转录供应商。API Key 留空时会回退到
-						release 内置的 `.env.local` 值；OpenAI、Gemini
-						和自定义兼容供应商还支持自定义 Base URL 与模型名。
+						dev 模式下的 `.env` 或 production 模式下内置的 `.env.local`
+						预设；OpenAI、Gemini 和自定义兼容供应商还支持自定义 Base URL
+						与模型名。
 					</DialogDescription>
 				</DialogHeader>
 
@@ -115,7 +127,14 @@ export function LlmProviderDialog({
 										siliconflowApiKey: value,
 									}))
 								}
-								placeholder="SILICONFLOW_API_KEY"
+								placeholder={getLlmProviderStatus(
+									draft.siliconflowApiKey,
+									presets.siliconflowApiKey,
+								)}
+								status={getLlmProviderStatus(
+									draft.siliconflowApiKey,
+									presets.siliconflowApiKey,
+								)}
 							/>
 							<LabeledField
 								label="Doubao API Key"
@@ -123,7 +142,14 @@ export function LlmProviderDialog({
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, doubaoApiKey: value }))
 								}
-								placeholder="DOUBAO_API_KEY"
+								placeholder={getLlmProviderStatus(
+									draft.doubaoApiKey,
+									presets.doubaoApiKey,
+								)}
+								status={getLlmProviderStatus(
+									draft.doubaoApiKey,
+									presets.doubaoApiKey,
+								)}
 							/>
 							<LabeledField
 								label="Kimi API Key"
@@ -131,7 +157,14 @@ export function LlmProviderDialog({
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, kimiApiKey: value }))
 								}
-								placeholder="KIMI_API_KEY"
+								placeholder={getLlmProviderStatus(
+									draft.kimiApiKey,
+									presets.kimiApiKey,
+								)}
+								status={getLlmProviderStatus(
+									draft.kimiApiKey,
+									presets.kimiApiKey,
+								)}
 							/>
 							<LabeledField
 								label="Zhipu API Key"
@@ -139,7 +172,14 @@ export function LlmProviderDialog({
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, zhipuApiKey: value }))
 								}
-								placeholder="ZHIPU_API_KEY"
+								placeholder={getLlmProviderStatus(
+									draft.zhipuApiKey,
+									presets.zhipuApiKey,
+								)}
+								status={getLlmProviderStatus(
+									draft.zhipuApiKey,
+									presets.zhipuApiKey,
+								)}
 							/>
 							<LabeledField
 								label="DeepSeek API Key"
@@ -147,7 +187,14 @@ export function LlmProviderDialog({
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, deepseekApiKey: value }))
 								}
-								placeholder="DEEPSEEK_API_KEY"
+								placeholder={getLlmProviderStatus(
+									draft.deepseekApiKey,
+									presets.deepseekApiKey,
+								)}
+								status={getLlmProviderStatus(
+									draft.deepseekApiKey,
+									presets.deepseekApiKey,
+								)}
 							/>
 							<LabeledField
 								label="Ali Qwen API Key"
@@ -155,7 +202,14 @@ export function LlmProviderDialog({
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, aliQwenApiKey: value }))
 								}
-								placeholder="ALI_QWEN_QWQ_API_KEY"
+								placeholder={getLlmProviderStatus(
+									draft.aliQwenApiKey,
+									presets.aliQwenApiKey,
+								)}
+								status={getLlmProviderStatus(
+									draft.aliQwenApiKey,
+									presets.aliQwenApiKey,
+								)}
 							/>
 						</div>
 					</Section>
@@ -171,7 +225,14 @@ export function LlmProviderDialog({
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, openaiApiKey: value }))
 								}
-								placeholder="OPENAI_API_KEY"
+								placeholder={getLlmProviderStatus(
+									draft.openaiApiKey,
+									presets.openaiApiKey,
+								)}
+								status={getLlmProviderStatus(
+									draft.openaiApiKey,
+									presets.openaiApiKey,
+								)}
 							/>
 							<LabeledField
 								label="OpenAI Model"
@@ -208,7 +269,14 @@ export function LlmProviderDialog({
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, geminiApiKey: value }))
 								}
-								placeholder="GEMINI_API_KEY"
+								placeholder={getLlmProviderStatus(
+									draft.geminiApiKey,
+									presets.geminiApiKey,
+								)}
+								status={getLlmProviderStatus(
+									draft.geminiApiKey,
+									presets.geminiApiKey,
+								)}
 								description="如果这里留空，后端会回退到 GEMINI_API_KEY 或 GOOGLE_GENAI_API_KEY。"
 							/>
 							<LabeledField
@@ -271,7 +339,14 @@ export function LlmProviderDialog({
 										customOpenAiApiKey: value,
 									}))
 								}
-								placeholder="CUSTOM_OPENAI_API_KEY"
+								placeholder={getLlmProviderStatus(
+									draft.customOpenAiApiKey,
+									presets.customOpenAiApiKey,
+								)}
+								status={getLlmProviderStatus(
+									draft.customOpenAiApiKey,
+									presets.customOpenAiApiKey,
+								)}
 							/>
 							<LabeledField
 								label="Base URL"

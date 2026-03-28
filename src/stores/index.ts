@@ -10,10 +10,13 @@ import type { LicenseStatus } from "@/types/license.ts";
 import { MODEL_OPTIONS, type ModelOption } from "@/types/llm.ts";
 import {
 	createDefaultLlmProviderSettings,
+	createDefaultProviderEnvPresets,
 	createDefaultTranscriptProviderSettings,
 	type LlmProviderSettings,
 	normalizeLlmProviderSettings,
+	normalizeProviderEnvPresets,
 	normalizeTranscriptProviderSettings,
+	type ProviderEnvPresets,
 	TRANSCRIBE_VENDORS,
 	type TranscribeVendor,
 	type TranscriptProviderSettings,
@@ -68,6 +71,9 @@ interface AppStateStore {
 	updateTranscriptProviderSettings: (
 		target: TranscriptProviderSettings,
 	) => void;
+
+	envProviderPresets: ProviderEnvPresets;
+	updateEnvProviderPresets: (target: ProviderEnvPresets) => void;
 }
 
 type PersistedAppConfigState = Pick<
@@ -84,6 +90,7 @@ type PersistedAppConfigState = Pick<
 	| "uiTextTone"
 	| "llmProviderSettings"
 	| "transcriptProviderSettings"
+	| "envProviderPresets"
 >;
 
 const DEFAULT_LLM_PROMPT = import.meta.env.VITE_PROMPT || "";
@@ -134,6 +141,7 @@ function createDefaultPersistedConfigState(): PersistedAppConfigState {
 		uiTextTone: normalizeUiTextTone(LEGACY_UI_DEFAULTS.uiTextTone),
 		llmProviderSettings: createDefaultLlmProviderSettings(),
 		transcriptProviderSettings: createDefaultTranscriptProviderSettings(),
+		envProviderPresets: createDefaultProviderEnvPresets(),
 	};
 }
 
@@ -193,6 +201,9 @@ function normalizePersistedAppConfigState(
 		transcriptProviderSettings: normalizeTranscriptProviderSettings(
 			persistedState.transcriptProviderSettings,
 		),
+		envProviderPresets: normalizeProviderEnvPresets(
+			persistedState.envProviderPresets,
+		),
 	};
 }
 
@@ -212,6 +223,7 @@ function pickPersistedAppConfigState(
 		uiTextTone: state.uiTextTone,
 		llmProviderSettings: state.llmProviderSettings,
 		transcriptProviderSettings: state.transcriptProviderSettings,
+		envProviderPresets: state.envProviderPresets,
 	};
 }
 
@@ -240,6 +252,10 @@ const useAppStateStore = create<AppStateStore>()(
 					transcriptProviderSettings:
 						normalizeTranscriptProviderSettings(target),
 				});
+			},
+			envProviderPresets: defaultPersistedConfigState.envProviderPresets,
+			updateEnvProviderPresets: (target: ProviderEnvPresets) => {
+				set({ envProviderPresets: normalizeProviderEnvPresets(target) });
 			},
 			updatePreRecorded: (target: boolean) => {
 				set({ isUsePreRecorded: target });

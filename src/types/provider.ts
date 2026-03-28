@@ -55,6 +55,11 @@ export interface TranscriptProviderSettings {
 	revaiMetadata: string;
 }
 
+export interface ProviderEnvPresets {
+	llm: LlmProviderSettings;
+	transcript: TranscriptProviderSettings;
+}
+
 function readString(value: unknown, fallback = "") {
 	return typeof value === "string" ? value : fallback;
 }
@@ -163,4 +168,62 @@ export function normalizeTranscriptProviderSettings(
 		revaiLanguage: readString(raw.revaiLanguage, defaults.revaiLanguage),
 		revaiMetadata: readString(raw.revaiMetadata),
 	};
+}
+
+export function createDefaultProviderEnvPresets(): ProviderEnvPresets {
+	return {
+		llm: createDefaultLlmProviderSettings(),
+		transcript: createDefaultTranscriptProviderSettings(),
+	};
+}
+
+export function normalizeProviderEnvPresets(
+	value: unknown,
+): ProviderEnvPresets {
+	const defaults = createDefaultProviderEnvPresets();
+	if (!value || typeof value !== "object") {
+		return defaults;
+	}
+
+	const raw = value as Partial<ProviderEnvPresets>;
+
+	return {
+		llm: normalizeLlmProviderSettings(raw.llm),
+		transcript: normalizeTranscriptProviderSettings(raw.transcript),
+	};
+}
+
+export function hasConfiguredValue(value: string) {
+	return value.trim().length > 0;
+}
+
+export function hasAnyTranscriptApiKeyConfigured(
+	settings: TranscriptProviderSettings,
+) {
+	return [
+		settings.deepgramApiKey,
+		settings.assemblyApiKey,
+		settings.gladiaApiKey,
+		settings.speechmaticsApiKey,
+		settings.revaiApiKey,
+	].some(hasConfiguredValue);
+}
+
+export function getTranscriptProviderStatus(apiKey: string) {
+	return hasConfiguredValue(apiKey) ? "已激活" : "未激活";
+}
+
+export function getLlmProviderStatus(
+	localApiKey: string,
+	presetApiKey: string,
+) {
+	if (hasConfiguredValue(localApiKey)) {
+		return "已激活";
+	}
+
+	if (hasConfiguredValue(presetApiKey)) {
+		return "免费额度";
+	}
+
+	return "未激活";
 }

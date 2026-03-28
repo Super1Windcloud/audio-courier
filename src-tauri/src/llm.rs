@@ -1,6 +1,8 @@
 mod api;
 use crate::provider_config::{
-    LlmRuntimeConfig, resolve_required_string, resolve_string_or_default,
+    ALI_QWEN_ENV_KEYS, DEEPSEEK_ENV_KEYS, DOUBAO_ENV_KEYS, GEMINI_ENV_KEYS, KIMI_ENV_KEYS,
+    LlmRuntimeConfig, OPENAI_ENV_KEYS, SILICONFLOW_ENV_KEYS, ZHIPU_ENV_KEYS,
+    resolve_required_string, resolve_string_or_default,
 };
 use api::*;
 use rand::{RngExt, rng as thread_rng};
@@ -126,7 +128,7 @@ fn resolve_provider(
             base_url: "https://api.siliconflow.cn/v1".to_string(),
             api_key: resolve_required_string(
                 runtime_config.siliconflow_api_key.as_deref(),
-                &["SILICONFLOW_API_KEY"],
+                SILICONFLOW_ENV_KEYS,
                 "SILICONFLOW_API_KEY",
             )?,
             max_tokens: 4096,
@@ -138,7 +140,7 @@ fn resolve_provider(
             base_url: "https://ark.cn-beijing.volces.com/api/v3".to_string(),
             api_key: resolve_required_string(
                 runtime_config.doubao_api_key.as_deref(),
-                &["DOUBAO_API_KEY"],
+                DOUBAO_ENV_KEYS,
                 "DOUBAO_API_KEY",
             )?,
             max_tokens: 4096,
@@ -150,7 +152,7 @@ fn resolve_provider(
             base_url: "https://ark.cn-beijing.volces.com/api/v3".to_string(),
             api_key: resolve_required_string(
                 runtime_config.doubao_api_key.as_deref(),
-                &["DOUBAO_API_KEY"],
+                DOUBAO_ENV_KEYS,
                 "DOUBAO_API_KEY",
             )?,
             max_tokens: 4096,
@@ -162,7 +164,7 @@ fn resolve_provider(
             base_url: "https://api.moonshot.cn/v1".to_string(),
             api_key: resolve_required_string(
                 runtime_config.kimi_api_key.as_deref(),
-                &["KIMI_API_KEY"],
+                KIMI_ENV_KEYS,
                 "KIMI_API_KEY",
             )?,
             max_tokens: 4096,
@@ -174,7 +176,7 @@ fn resolve_provider(
             base_url: "https://open.bigmodel.cn/api/paas/v4".to_string(),
             api_key: resolve_required_string(
                 runtime_config.zhipu_api_key.as_deref(),
-                &["ZHIPU_API_KEY"],
+                ZHIPU_ENV_KEYS,
                 "ZHIPU_API_KEY",
             )?,
             max_tokens: 4096,
@@ -186,7 +188,7 @@ fn resolve_provider(
             base_url: "https://api.deepseek.com".to_string(),
             api_key: resolve_required_string(
                 runtime_config.deepseek_api_key.as_deref(),
-                &["DEEPSEEK_API_KEY"],
+                DEEPSEEK_ENV_KEYS,
                 "DEEPSEEK_API_KEY",
             )?,
             max_tokens: 4096,
@@ -198,7 +200,7 @@ fn resolve_provider(
             base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1".to_string(),
             api_key: resolve_required_string(
                 runtime_config.ali_qwen_api_key.as_deref(),
-                &["ALI_QWEN_QWQ_API_KEY"],
+                ALI_QWEN_ENV_KEYS,
                 "ALI_QWEN_QWQ_API_KEY",
             )?,
             max_tokens: 4096,
@@ -210,7 +212,7 @@ fn resolve_provider(
             base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1".to_string(),
             api_key: resolve_required_string(
                 runtime_config.ali_qwen_api_key.as_deref(),
-                &["ALI_QWEN_QWQ_API_KEY"],
+                ALI_QWEN_ENV_KEYS,
                 "ALI_QWEN_QWQ_API_KEY",
             )?,
             max_tokens: 4096,
@@ -222,7 +224,7 @@ fn resolve_provider(
             base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1".to_string(),
             api_key: resolve_required_string(
                 runtime_config.ali_qwen_api_key.as_deref(),
-                &["ALI_QWEN_QWQ_API_KEY"],
+                ALI_QWEN_ENV_KEYS,
                 "ALI_QWEN_QWQ_API_KEY",
             )?,
             max_tokens: 4096,
@@ -242,7 +244,7 @@ fn resolve_provider(
             ),
             api_key: resolve_required_string(
                 runtime_config.openai_api_key.as_deref(),
-                &["OPENAI_API_KEY"],
+                OPENAI_ENV_KEYS,
                 "OPENAI_API_KEY",
             )?,
             max_tokens: 4096,
@@ -262,7 +264,7 @@ fn resolve_provider(
             ),
             api_key: resolve_required_string(
                 runtime_config.gemini_api_key.as_deref(),
-                &["GEMINI_API_KEY", "GOOGLE_GENAI_API_KEY"],
+                GEMINI_ENV_KEYS,
                 "GEMINI_API_KEY",
             )?,
             max_tokens: 4096,

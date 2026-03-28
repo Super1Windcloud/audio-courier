@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { MoreVertical, RotateCcw, Save, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { LlmProviderDialog } from "@/components/LlmProviderDialog.tsx";
 import { TranscriptProviderDialog } from "@/components/TranscriptProviderDialog.tsx";
@@ -28,7 +28,10 @@ import useAppStateStore, {
 	type UiTextTone,
 } from "@/stores";
 import { HOTKEYS, MODEL_LABELS, MODEL_OPTIONS } from "@/types/llm.ts";
-import { TRANSCRIBE_VENDOR_LABELS } from "@/types/provider.ts";
+import {
+	hasAnyTranscriptApiKeyConfigured,
+	TRANSCRIBE_VENDOR_LABELS,
+} from "@/types/provider.ts";
 
 export function MoreMenu() {
 	const appState = useAppStateStore();
@@ -48,6 +51,7 @@ export function MoreMenu() {
 	const [isTranscriptConfigDialogOpen, setIsTranscriptConfigDialogOpen] =
 		useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
+	const didAutoOpenTranscriptDialog = useRef(false);
 	const [promptDraft, setPromptDraft] = useState(appState.llmPrompt);
 	const [interviewPromptDraft, setInterviewPromptDraft] = useState(
 		appState.interviewPrompt,
@@ -118,6 +122,23 @@ export function MoreMenu() {
 
 		setIsPromptDialogOpen(true);
 	}, [shouldOpenPromptDialogOnStartup]);
+
+	useEffect(() => {
+		if (didAutoOpenTranscriptDialog.current) {
+			return;
+		}
+
+		if (isPromptDialogOpen) {
+			return;
+		}
+
+		if (hasAnyTranscriptApiKeyConfigured(appState.transcriptProviderSettings)) {
+			return;
+		}
+
+		didAutoOpenTranscriptDialog.current = true;
+		setIsTranscriptConfigDialogOpen(true);
+	}, [appState.transcriptProviderSettings, isPromptDialogOpen]);
 
 	const handleCheckUpdate = async () => {
 		if (isUpdating) {

@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input.tsx";
 import useAppStateStore from "@/stores";
 import {
 	createDefaultTranscriptProviderSettings,
+	getTranscriptProviderStatus,
 	type TranscriptProviderSettings,
 } from "@/types/provider.ts";
 
@@ -22,16 +23,25 @@ function LabeledField({
 	onChange,
 	placeholder,
 	description,
+	status,
 }: {
 	label: string;
 	value: string;
 	onChange: (value: string) => void;
 	placeholder?: string;
 	description?: string;
+	status?: string;
 }) {
 	return (
 		<div className="grid gap-2">
-			<span className="text-sm font-medium text-white">{label}</span>
+			<div className="flex items-center justify-between gap-3">
+				<span className="text-sm font-medium text-white">{label}</span>
+				{status ? (
+					<span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] text-slate-200">
+						{status}
+					</span>
+				) : null}
+			</div>
 			<Input
 				value={value}
 				onChange={(event) => onChange(event.target.value)}
@@ -97,8 +107,8 @@ export function TranscriptProviderDialog({
 					<DialogTitle>转录供应商 API 配置</DialogTitle>
 					<DialogDescription className="text-slate-300">
 						这里的配置只影响语音转录供应商，不影响大模型对话。API Key
-						留空时会回退到 release 内置的 `.env.local`
-						值；语言、模型和实时地址会使用这里的值覆盖默认行为。
+						留空时会回退到 dev 模式下的 `.env` 或 production 模式下内置的
+						`.env.local` 预设；语言、模型和实时地址会使用这里的值覆盖默认行为。
 					</DialogDescription>
 				</DialogHeader>
 
@@ -111,7 +121,8 @@ export function TranscriptProviderDialog({
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, deepgramApiKey: value }))
 								}
-								placeholder="DEEPGRAM_API_KEY"
+								placeholder={getTranscriptProviderStatus(draft.deepgramApiKey)}
+								status={getTranscriptProviderStatus(draft.deepgramApiKey)}
 							/>
 							<LabeledField
 								label="Deepgram Language"
@@ -137,7 +148,8 @@ export function TranscriptProviderDialog({
 							onChange={(value) =>
 								setDraft((current) => ({ ...current, assemblyApiKey: value }))
 							}
-							placeholder="ASSEMBLY_API_KEY"
+							placeholder={getTranscriptProviderStatus(draft.assemblyApiKey)}
+							status={getTranscriptProviderStatus(draft.assemblyApiKey)}
 						/>
 					</Section>
 
@@ -152,7 +164,8 @@ export function TranscriptProviderDialog({
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, gladiaApiKey: value }))
 								}
-								placeholder="GLADIA_API_KEY"
+								placeholder={getTranscriptProviderStatus(draft.gladiaApiKey)}
+								status={getTranscriptProviderStatus(draft.gladiaApiKey)}
 							/>
 							<LabeledField
 								label="Gladia Language"
@@ -190,7 +203,10 @@ export function TranscriptProviderDialog({
 										speechmaticsApiKey: value,
 									}))
 								}
-								placeholder="SPEECHMATICS_API_KEY"
+								placeholder={getTranscriptProviderStatus(
+									draft.speechmaticsApiKey,
+								)}
+								status={getTranscriptProviderStatus(draft.speechmaticsApiKey)}
 							/>
 							<LabeledField
 								label="Speechmatics Language"
@@ -227,7 +243,8 @@ export function TranscriptProviderDialog({
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, revaiApiKey: value }))
 								}
-								placeholder="REVAI_API_KEY"
+								placeholder={getTranscriptProviderStatus(draft.revaiApiKey)}
+								status={getTranscriptProviderStatus(draft.revaiApiKey)}
 							/>
 							<LabeledField
 								label="RevAI Language"
