@@ -20,6 +20,8 @@ interface AppStateStore {
 
 	llmPrompt: string;
 	updateLLMPrompt: (target: string) => void;
+	interviewPrompt: string;
+	updateInterviewPrompt: (target: string) => void;
 	currentQuestion: string;
 	updateQuestion: (target: string) => void;
 
@@ -117,6 +119,10 @@ const useAppStateStore = create<AppStateStore>((set) => ({
 	llmPrompt: import.meta.env.VITE_PROMPT || "",
 	updateLLMPrompt: (target: string) => {
 		set({ llmPrompt: target });
+	},
+	interviewPrompt: import.meta.env.VITE_INTERVIEW_PROMPT || "",
+	updateInterviewPrompt: (target: string) => {
+		set({ interviewPrompt: target });
 	},
 	currentQuestion: "",
 	updateQuestion: (target: string) => {

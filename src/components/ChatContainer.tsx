@@ -26,6 +26,9 @@ export const ChatContainer: React.FC = () => {
 	const [messages, setMessages] = useState<Message[]>(messagesRef.current);
 	const [isTyping, setIsTyping] = useState(false);
 	const llmPromptStore = useAppStateStore((state) => state.llmPrompt);
+	const interviewPromptStore = useAppStateStore(
+		(state) => state.interviewPrompt,
+	);
 	const currentSelectedModel = useAppStateStore(
 		(state) => state.currentSelectedModel,
 	);
@@ -64,7 +67,7 @@ export const ChatContainer: React.FC = () => {
 	);
 
 	const handleSendMessage = useCallback(
-		async (text: string, introduceSelf?: boolean) => {
+		async (text: string, useInterviewPrompt?: boolean) => {
 			if (!isAuthorized) {
 				toast.warning("当前许可证无效，请先完成离线激活");
 				return;
@@ -94,7 +97,7 @@ export const ChatContainer: React.FC = () => {
 			const { llmInterviewChatStreamOutput } = await import("@/lib/llm.ts");
 			await llmInterviewChatStreamOutput(
 				text,
-				introduceSelf ? import.meta.env.VITE_INTERVIEW_PROMPT : llmPromptStore,
+				useInterviewPrompt ? interviewPromptStore : llmPromptStore,
 				currentSelectedModel,
 				(content) => {
 					setIsTyping(false);
@@ -104,6 +107,7 @@ export const ChatContainer: React.FC = () => {
 		},
 		[
 			currentSelectedModel,
+			interviewPromptStore,
 			isAuthorized,
 			llmPromptStore,
 			updateSpecificBotMessage,
@@ -124,11 +128,16 @@ export const ChatContainer: React.FC = () => {
 
 	useEffect(() => {
 		if (didRun.current) return;
+		if (!import.meta.env.VITE_INIT_MESSAGE) return;
+		if (licenseStatus === null || !isAuthorized) return;
+
 		didRun.current = true;
-		if (import.meta.env.VITE_INIT_MESSAGE) {
-			handleSendMessage(import.meta.env.VITE_INIT_MESSAGE, true).then();
-		}
-	}, [handleSendMessage]);
+		handleSendMessage(import.meta.env.VITE_INIT_MESSAGE, true).catch(
+			(error) => {
+				console.error("init message failed", error);
+			},
+		);
+	}, [handleSendMessage, isAuthorized, licenseStatus]);
 
 	return (
 		<div className="flex h-screen w-screen">

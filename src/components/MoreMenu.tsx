@@ -35,6 +35,9 @@ export function MoreMenu() {
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
 	const [promptDraft, setPromptDraft] = useState(appState.llmPrompt);
+	const [interviewPromptDraft, setInterviewPromptDraft] = useState(
+		appState.interviewPrompt,
+	);
 	const TRANSCRIBE_VENDORS: TranscribeVendor[] = [
 		"assemblyai",
 		"deepgram",
@@ -57,9 +60,13 @@ export function MoreMenu() {
 		{ value: "dark", label: "深色文字" },
 	];
 	const defaultPrompt = import.meta.env.VITE_PROMPT || "";
-	const promptCharacterCount = promptDraft.length;
-	const hasPromptChanges = promptDraft !== appState.llmPrompt;
-	const isUsingDefaultPrompt = promptDraft === defaultPrompt;
+	const defaultInterviewPrompt = import.meta.env.VITE_INTERVIEW_PROMPT || "";
+	const hasPromptChanges =
+		promptDraft !== appState.llmPrompt ||
+		interviewPromptDraft !== appState.interviewPrompt;
+	const isUsingDefaultPrompt =
+		promptDraft === defaultPrompt &&
+		interviewPromptDraft === defaultInterviewPrompt;
 
 	useEffect(() => {
 		invoke("get_audio_stream_devices_names").then((result) => {
@@ -84,7 +91,8 @@ export function MoreMenu() {
 		}
 
 		setPromptDraft(appState.llmPrompt);
-	}, [appState.llmPrompt, isDialogOpen]);
+		setInterviewPromptDraft(appState.interviewPrompt);
+	}, [appState.interviewPrompt, appState.llmPrompt, isDialogOpen]);
 
 	const handleCheckUpdate = async () => {
 		if (isUpdating) {
@@ -101,12 +109,14 @@ export function MoreMenu() {
 
 	const handlePromptSave = () => {
 		appState.updateLLMPrompt(promptDraft);
+		appState.updateInterviewPrompt(interviewPromptDraft);
 		setIsDialogOpen(false);
 		toast.success("提示词已保存");
 	};
 
 	const handlePromptReset = () => {
 		setPromptDraft(defaultPrompt);
+		setInterviewPromptDraft(defaultInterviewPrompt);
 	};
 
 	return (
@@ -344,7 +354,7 @@ export function MoreMenu() {
 				</DropdownMenuContent>
 			</DropdownMenu>
 			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-				<DialogContent className="prompt-editor-dialog border-none p-0 text-white sm:max-w-[680px]">
+				<DialogContent className="prompt-editor-dialog max-h-[88vh] overflow-hidden border-none p-0 text-white sm:max-w-[760px]">
 					<div className="prompt-editor-shell">
 						<div className="prompt-editor-orb prompt-editor-orb-left" />
 						<div className="prompt-editor-orb prompt-editor-orb-right" />
@@ -356,10 +366,10 @@ export function MoreMenu() {
 									System Prompt
 								</div>
 								<DialogTitle className="prompt-editor-title">
-									塑造回答语气、深度与追问节奏
+									同时管理常规对话与自我介绍提示词
 								</DialogTitle>
 								<DialogDescription className="prompt-editor-description">
-									这里定义系统提示词。保存后会用于后续消息，不会回写历史回答。
+									常规提示词会参与后续请求；自我介绍提示词只用于开场自我介绍那一次请求，不会参与后续请求。
 								</DialogDescription>
 							</DialogHeader>
 
@@ -368,69 +378,99 @@ export function MoreMenu() {
 									{hasPromptChanges ? "未保存更改" : "当前已同步"}
 								</div>
 								<div className="prompt-editor-chip prompt-editor-chip-muted">
-									{promptCharacterCount} 字符
+									常规 {promptDraft.length} 字符
+								</div>
+								<div className="prompt-editor-chip prompt-editor-chip-muted">
+									自我介绍 {interviewPromptDraft.length} 字符
 								</div>
 							</div>
 
-							<div className="prompt-editor-field">
-								<div className="prompt-editor-field-label">
-									<span>提示词内容</span>
-									<span>支持多行编辑</span>
+							<div className="prompt-editor-scroll">
+								<div className="prompt-editor-field">
+									<div className="prompt-editor-field-label">
+										<span>常规对话提示词</span>
+										<span>用于所有普通聊天与语音转文字后的对话</span>
+									</div>
+									<p className="prompt-editor-field-description">
+										建议描述长期角色设定、回答风格、语言偏好和输出深度。
+									</p>
+									<Textarea
+										value={promptDraft}
+										onChange={(e) => {
+											setPromptDraft(e.target.value);
+										}}
+										placeholder="请输入常规对话提示词..."
+										className="prompt-editor-textarea"
+										autoFocus
+										style={{
+											scrollbarWidth: "none",
+										}}
+										rows={8}
+										onFocus={(e) =>
+											e.currentTarget.setSelectionRange(
+												e.currentTarget.value.length,
+												e.currentTarget.value.length,
+											)
+										}
+									/>
 								</div>
-								<Textarea
-									value={promptDraft}
-									onChange={(e) => {
-										setPromptDraft(e.target.value);
-									}}
-									placeholder="请输入提示词..."
-									className="prompt-editor-textarea"
-									autoFocus
-									style={{
-										scrollbarWidth: "none",
-									}}
-									rows={10}
-									onFocus={(e) =>
-										e.currentTarget.setSelectionRange(
-											e.currentTarget.value.length,
-											e.currentTarget.value.length,
-										)
-									}
-								/>
-							</div>
 
-							<div className="prompt-editor-note">
-								建议在这里描述角色设定、回答风格、语言偏好和追问力度，避免把临时问题写进系统提示词。
-							</div>
+								<div className="prompt-editor-field">
+									<div className="prompt-editor-field-label">
+										<span>自我介绍提示词</span>
+										<span>仅用于 `VITE_INIT_MESSAGE` 触发的那一次请求</span>
+									</div>
+									<p className="prompt-editor-field-description">
+										适合写面试场景、身份口径、回答结构和需要优先强调的经历。
+									</p>
+									<Textarea
+										value={interviewPromptDraft}
+										onChange={(e) => {
+											setInterviewPromptDraft(e.target.value);
+										}}
+										placeholder="请输入自我介绍专用提示词..."
+										className="prompt-editor-textarea prompt-editor-textarea-compact"
+										style={{
+											scrollbarWidth: "none",
+										}}
+										rows={7}
+									/>
+								</div>
 
-							<div className="prompt-editor-actions">
-								<Button
-									type="button"
-									variant="ghost"
-									className="prompt-editor-secondary-button"
-									onClick={handlePromptReset}
-									disabled={isUsingDefaultPrompt}
-								>
-									<RotateCcw className="h-4 w-4" />
-									恢复默认
-								</Button>
-								<div className="prompt-editor-actions-right">
+								<div className="prompt-editor-note">
+									每次请求只会携带一份提示词。开场自我介绍请求使用自我介绍提示词，之后的请求继续使用常规提示词。
+								</div>
+
+								<div className="prompt-editor-actions">
 									<Button
 										type="button"
 										variant="ghost"
-										className="prompt-editor-tertiary-button"
-										onClick={() => setIsDialogOpen(false)}
+										className="prompt-editor-secondary-button"
+										onClick={handlePromptReset}
+										disabled={isUsingDefaultPrompt}
 									>
-										取消
+										<RotateCcw className="h-4 w-4" />
+										恢复默认
 									</Button>
-									<Button
-										type="button"
-										className="prompt-editor-primary-button"
-										onClick={handlePromptSave}
-										disabled={!hasPromptChanges}
-									>
-										<Save className="h-4 w-4" />
-										保存提示词
-									</Button>
+									<div className="prompt-editor-actions-right">
+										<Button
+											type="button"
+											variant="ghost"
+											className="prompt-editor-tertiary-button"
+											onClick={() => setIsDialogOpen(false)}
+										>
+											取消
+										</Button>
+										<Button
+											type="button"
+											className="prompt-editor-primary-button"
+											onClick={handlePromptSave}
+											disabled={!hasPromptChanges}
+										>
+											<Save className="h-4 w-4" />
+											保存提示词
+										</Button>
+									</div>
 								</div>
 							</div>
 						</div>
