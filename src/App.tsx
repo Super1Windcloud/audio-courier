@@ -1,4 +1,5 @@
 import "./App.css";
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
@@ -158,7 +159,14 @@ function App() {
 
 	const checkForUpdates = useEffectEvent(
 		async (source: "startup" | "manual") => {
-			const update = await checkForUpdate();
+			const [currentVersion, update] = await Promise.all([
+				getVersion(),
+				checkForUpdate(),
+			]);
+			const remoteVersion = update?.version ?? currentVersion;
+			console.log(
+				`[updater] ${source} current=${currentVersion} remote=${remoteVersion}`,
+			);
 			if (!update) {
 				console.log("[updater] no update available");
 				logInfo(`${source} updater: no update available`);

@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type React from "react";
 import { useEffect, useState } from "react";
+import { AboutDialog } from "@/components/AboutDialog.tsx";
 import { LicenseCenter } from "@/components/LicenseCenter.tsx";
 import { LicenseSignerCenter } from "@/components/LicenseSignerCenter.tsx";
 import { logError, logInfo } from "@/lib/logger.ts";
@@ -57,6 +58,7 @@ const TitleBar: React.FC = () => {
 				data-tauri-drag-region={false}
 			>
 				<div className="flex items-center gap-2">
+					<AboutDialog />
 					<LicenseCenter />
 					<LicenseSignerCenter signerStatus={signerStatus} />
 				</div>

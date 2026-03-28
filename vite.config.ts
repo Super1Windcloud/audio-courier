@@ -8,6 +8,7 @@ const host = process.env.TAURI_DEV_HOST;
 console.log("host", host);
 export default defineConfig(async () => ({
 	plugins: [react(), tailwindcss()],
+	cacheDir: ".vite",
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),
@@ -15,6 +16,7 @@ export default defineConfig(async () => ({
 	},
 
 	optimizeDeps: {
+		force: true,
 		exclude: ["lucide-react"],
 	},
 	clearScreen: false,
