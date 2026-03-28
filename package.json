@@ -9,6 +9,7 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "vite",
+    "bump:version": "tsx scripts/bump-version.ts",
     "taze": "npx taze latest -w",
     "build": "tsc && vite build",
     "preview": "vite preview",

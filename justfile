@@ -20,6 +20,7 @@ pull :
    git pull repo main
 
 release:
+    pnpm bump:version
     pnpm release
 
 build:
