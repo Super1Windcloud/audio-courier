@@ -120,7 +120,7 @@ fn remove_log_file_if_exists(path: &Path) {
 }
 
 pub fn load_env_variables() {
-    const ENV_CONTENT: &str = include_str!("../.env");
+    const ENV_CONTENT: &str = include_str!("../.env.local");
 
     let mut vars: HashMap<String, String> = HashMap::new();
 

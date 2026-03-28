@@ -1,6 +1,13 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import {
+	APP_CONFIG_STATE_KEY,
+	createAppConfigStorage,
+	readLegacyUiConfigDefaults,
+} from "@/lib/appConfig.ts";
+import { logError } from "@/lib/logger.ts";
 import type { LicenseStatus } from "@/types/license.ts";
-import type { ModelOption } from "@/types/llm.ts";
+import { MODEL_OPTIONS, type ModelOption } from "@/types/llm.ts";
 
 export type TranscribeVendor =
 	| "assemblyai"
@@ -51,106 +58,217 @@ interface AppStateStore {
 	updateUiTextTone: (target: UiTextTone) => void;
 }
 
-const UI_OPACITY_STORAGE_KEY = "audio-courier-ui-opacity";
-const UI_TEXT_TONE_STORAGE_KEY = "audio-courier-ui-text-tone";
+type PersistedAppConfigState = Pick<
+	AppStateStore,
+	| "currentSelectedModel"
+	| "currentAudioChannel"
+	| "llmPrompt"
+	| "interviewPrompt"
+	| "isStartScrollToBottom"
+	| "useRemoteModelTranscribe"
+	| "captureInterval"
+	| "isUsePreRecorded"
+	| "uiOpacity"
+	| "uiTextTone"
+>;
+
+const DEFAULT_LLM_PROMPT = import.meta.env.VITE_PROMPT || "";
+const DEFAULT_INTERVIEW_PROMPT = import.meta.env.VITE_INTERVIEW_PROMPT || "";
+const LEGACY_UI_DEFAULTS = readLegacyUiConfigDefaults();
+const TRANSCRIBE_VENDORS: readonly TranscribeVendor[] = [
+	"assemblyai",
+	"deepgram",
+	"gladia",
+	"revai",
+	"speechmatics",
+];
 
 function normalizeUiOpacity(target: number) {
 	return Math.min(1, Math.max(0.3, Number(target.toFixed(2))));
 }
 
-function readInitialUiOpacity() {
-	if (typeof window === "undefined") {
-		return 1;
-	}
-
-	const rawValue = window.localStorage.getItem(UI_OPACITY_STORAGE_KEY);
-	if (!rawValue) {
-		return 1;
-	}
-
-	const parsedValue = Number(rawValue);
-	if (Number.isNaN(parsedValue)) {
-		return 1;
-	}
-
-	return normalizeUiOpacity(parsedValue);
+function normalizeUiTextTone(target: unknown): UiTextTone {
+	return target === "dark" ? "dark" : "light";
 }
 
-function readInitialUiTextTone(): UiTextTone {
-	if (typeof window === "undefined") {
-		return "light";
+function normalizeCaptureInterval(target: unknown) {
+	if (typeof target !== "number" || Number.isNaN(target)) {
+		return 2;
 	}
 
-	const rawValue = window.localStorage.getItem(UI_TEXT_TONE_STORAGE_KEY);
-	return rawValue === "dark" ? "dark" : "light";
+	return Math.max(1, Math.round(target));
 }
 
-const useAppStateStore = create<AppStateStore>((set) => ({
-	uiOpacity: readInitialUiOpacity(),
-	updateUiOpacity: (target: number) => {
-		const nextOpacity = normalizeUiOpacity(target);
-		if (typeof window !== "undefined") {
-			window.localStorage.setItem(UI_OPACITY_STORAGE_KEY, String(nextOpacity));
-		}
-		set({ uiOpacity: nextOpacity });
-	},
-	uiTextTone: readInitialUiTextTone(),
-	updateUiTextTone: (target: UiTextTone) => {
-		if (typeof window !== "undefined") {
-			window.localStorage.setItem(UI_TEXT_TONE_STORAGE_KEY, target);
-		}
-		set({ uiTextTone: target });
-	},
-	isUsePreRecorded: false,
-	updatePreRecorded: (target: boolean) => {
-		set({ isUsePreRecorded: target });
-	},
-	licenseStatus: null,
-	updateLicenseStatus: (target: LicenseStatus | null) => {
-		set({ licenseStatus: target });
-	},
-	currentSelectedModel: "siliconflow_pro",
-	updateCurrentSelectedModel: (target: ModelOption) =>
-		set({ currentSelectedModel: target }),
+function isModelOption(target: unknown): target is ModelOption {
+	return (
+		typeof target === "string" &&
+		(MODEL_OPTIONS as readonly string[]).includes(target)
+	);
+}
 
-	currentAudioChannel: "",
-	updateCurrentAudioChannel: (target: string) =>
-		set({ currentAudioChannel: target }),
-	llmPrompt: import.meta.env.VITE_PROMPT || "",
-	updateLLMPrompt: (target: string) => {
-		set({ llmPrompt: target });
-	},
-	interviewPrompt: import.meta.env.VITE_INTERVIEW_PROMPT || "",
-	updateInterviewPrompt: (target: string) => {
-		set({ interviewPrompt: target });
-	},
-	currentQuestion: "",
-	updateQuestion: (target: string) => {
-		set({ currentQuestion: target });
-	},
-	isStartScrollToBottom: false,
-	updateScrollToBottom: (target: boolean) => {
-		set({ isStartScrollToBottom: target });
-	},
+function isTranscribeVendor(target: unknown): target is TranscribeVendor {
+	return (
+		typeof target === "string" &&
+		(TRANSCRIBE_VENDORS as readonly string[]).includes(target)
+	);
+}
 
-	useRemoteModelTranscribe: "deepgram",
-	updateRemoteModelTranscribe: (target: TranscribeVendor) => {
-		set({ useRemoteModelTranscribe: target });
-	},
+function createDefaultPersistedConfigState(): PersistedAppConfigState {
+	return {
+		currentSelectedModel: "siliconflow_pro",
+		currentAudioChannel: "",
+		llmPrompt: DEFAULT_LLM_PROMPT,
+		interviewPrompt: DEFAULT_INTERVIEW_PROMPT,
+		isStartScrollToBottom: false,
+		useRemoteModelTranscribe: "deepgram",
+		captureInterval: 2,
+		isUsePreRecorded: false,
+		uiOpacity: normalizeUiOpacity(LEGACY_UI_DEFAULTS.uiOpacity ?? 1),
+		uiTextTone: normalizeUiTextTone(LEGACY_UI_DEFAULTS.uiTextTone),
+	};
+}
 
-	captureInterval: 2,
-	updateCaptureInterval: (target: number) => {
-		set({ captureInterval: target });
-	},
+function normalizePersistedAppConfigState(
+	target: unknown,
+	currentState: PersistedAppConfigState,
+): PersistedAppConfigState {
+	if (!target || typeof target !== "object") {
+		return currentState;
+	}
 
-	isRecording: false,
-	recordingStartedAt: null,
-	updateIsRecording: (target: boolean) => {
-		set({
-			isRecording: target,
-			recordingStartedAt: target ? Date.now() : null,
-		});
-	},
-}));
+	const persistedState = target as Partial<PersistedAppConfigState>;
+
+	return {
+		currentSelectedModel: isModelOption(persistedState.currentSelectedModel)
+			? persistedState.currentSelectedModel
+			: currentState.currentSelectedModel,
+		currentAudioChannel:
+			typeof persistedState.currentAudioChannel === "string"
+				? persistedState.currentAudioChannel
+				: currentState.currentAudioChannel,
+		llmPrompt:
+			typeof persistedState.llmPrompt === "string"
+				? persistedState.llmPrompt
+				: currentState.llmPrompt,
+		interviewPrompt:
+			typeof persistedState.interviewPrompt === "string"
+				? persistedState.interviewPrompt
+				: currentState.interviewPrompt,
+		isStartScrollToBottom:
+			typeof persistedState.isStartScrollToBottom === "boolean"
+				? persistedState.isStartScrollToBottom
+				: currentState.isStartScrollToBottom,
+		useRemoteModelTranscribe: isTranscribeVendor(
+			persistedState.useRemoteModelTranscribe,
+		)
+			? persistedState.useRemoteModelTranscribe
+			: currentState.useRemoteModelTranscribe,
+		captureInterval: normalizeCaptureInterval(
+			persistedState.captureInterval ?? currentState.captureInterval,
+		),
+		isUsePreRecorded:
+			typeof persistedState.isUsePreRecorded === "boolean"
+				? persistedState.isUsePreRecorded
+				: currentState.isUsePreRecorded,
+		uiOpacity: normalizeUiOpacity(
+			typeof persistedState.uiOpacity === "number"
+				? persistedState.uiOpacity
+				: currentState.uiOpacity,
+		),
+		uiTextTone: normalizeUiTextTone(
+			persistedState.uiTextTone ?? currentState.uiTextTone,
+		),
+	};
+}
+
+function pickPersistedAppConfigState(
+	state: AppStateStore,
+): PersistedAppConfigState {
+	return {
+		currentSelectedModel: state.currentSelectedModel,
+		currentAudioChannel: state.currentAudioChannel,
+		llmPrompt: state.llmPrompt,
+		interviewPrompt: state.interviewPrompt,
+		isStartScrollToBottom: state.isStartScrollToBottom,
+		useRemoteModelTranscribe: state.useRemoteModelTranscribe,
+		captureInterval: state.captureInterval,
+		isUsePreRecorded: state.isUsePreRecorded,
+		uiOpacity: state.uiOpacity,
+		uiTextTone: state.uiTextTone,
+	};
+}
+
+const defaultPersistedConfigState = createDefaultPersistedConfigState();
+
+const useAppStateStore = create<AppStateStore>()(
+	persist(
+		(set) => ({
+			...defaultPersistedConfigState,
+			updateUiOpacity: (target: number) => {
+				set({ uiOpacity: normalizeUiOpacity(target) });
+			},
+			updateUiTextTone: (target: UiTextTone) => {
+				set({ uiTextTone: normalizeUiTextTone(target) });
+			},
+			updatePreRecorded: (target: boolean) => {
+				set({ isUsePreRecorded: target });
+			},
+			licenseStatus: null,
+			updateLicenseStatus: (target: LicenseStatus | null) => {
+				set({ licenseStatus: target });
+			},
+			updateCurrentSelectedModel: (target: ModelOption) =>
+				set({ currentSelectedModel: target }),
+			updateCurrentAudioChannel: (target: string) =>
+				set({ currentAudioChannel: target }),
+			updateLLMPrompt: (target: string) => {
+				set({ llmPrompt: target });
+			},
+			updateInterviewPrompt: (target: string) => {
+				set({ interviewPrompt: target });
+			},
+			currentQuestion: "",
+			updateQuestion: (target: string) => {
+				set({ currentQuestion: target });
+			},
+			updateScrollToBottom: (target: boolean) => {
+				set({ isStartScrollToBottom: target });
+			},
+			updateRemoteModelTranscribe: (target: TranscribeVendor) => {
+				set({ useRemoteModelTranscribe: target });
+			},
+			updateCaptureInterval: (target: number) => {
+				set({ captureInterval: normalizeCaptureInterval(target) });
+			},
+			isRecording: false,
+			recordingStartedAt: null,
+			updateIsRecording: (target: boolean) => {
+				set({
+					isRecording: target,
+					recordingStartedAt: target ? Date.now() : null,
+				});
+			},
+		}),
+		{
+			name: APP_CONFIG_STATE_KEY,
+			storage: createAppConfigStorage<PersistedAppConfigState>(),
+			partialize: pickPersistedAppConfigState,
+			skipHydration: true,
+			version: 1,
+			merge: (persistedState, currentState) => ({
+				...currentState,
+				...normalizePersistedAppConfigState(
+					persistedState,
+					pickPersistedAppConfigState(currentState),
+				),
+			}),
+			onRehydrateStorage: () => (_, error) => {
+				if (error) {
+					logError("rehydrate-app-config failed", error);
+				}
+			},
+		},
+	),
+);
 
 export default useAppStateStore;

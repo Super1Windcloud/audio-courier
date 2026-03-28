@@ -13,5 +13,5 @@ app.log
 
 .env
 .idea
-
+.env.local
 *.log

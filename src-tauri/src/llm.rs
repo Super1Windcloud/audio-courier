@@ -25,16 +25,7 @@ impl FlowArgs {
     }
 }
 
-const FREE_MODELS: [&str; 8] = [
-    "Qwen/Qwen2.5-Coder-32B-Instruct", // 0.15S
-    "Qwen/Qwen2.5-7B-Instruct",        //0.22S
-    "Qwen/Qwen2-7B-Instruct",          // 0.1S
-    "tencent/Hunyuan-MT-7B",           //0.17S
-    "THUDM/GLM-Z1-9B-0414",            // 0.22S
-    "THUDM/GLM-4-9B-0414",             //0.5S
-    "internlm/internlm2_5-7b-chat",    //0.11S
-    "THUDM/glm-4-9b-chat",             //0.35S
-];
+const FREE_MODELS: [&str; 0] = [];
 
 pub fn siliconflow_free_models() -> &'static [&'static str] {
     &FREE_MODELS
@@ -81,9 +72,8 @@ pub async fn siliconflow_free(
     siliconflow_free_with_model(app, flow_args, random_model).await
 }
 
-const PRO_MODELS: [&str; 11] = [
+const PRO_MODELS: [&str; 10] = [
     "Pro/Qwen/Qwen2.5-7B-Instruct",    //0.17S
-    "Pro/THUDM/glm-4-9b-chat",         //0.27S
     "Qwen/Qwen2.5-14B-Instruct",       // 0.21S
     "Qwen/Qwen2.5-Coder-32B-Instruct", //0.14S
     "Qwen/Qwen2.5-32B-Instruct",       // 0.23S

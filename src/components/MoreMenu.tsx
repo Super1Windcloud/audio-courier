@@ -25,12 +25,20 @@ import useAppStateStore, {
 	type TranscribeVendor,
 	type UiTextTone,
 } from "@/stores";
-import { HOTKEYS, MODEL_OPTIONS, type ModelOption } from "@/types/llm.ts";
+import { HOTKEYS, MODEL_OPTIONS } from "@/types/llm.ts";
 
 export function MoreMenu() {
-	const [currentModel, setCurrentModel] =
-		useState<ModelOption>("siliconflow_pro");
 	const appState = useAppStateStore();
+	const currentAudioChannel = useAppStateStore(
+		(state) => state.currentAudioChannel,
+	);
+	const currentModel = useAppStateStore((state) => state.currentSelectedModel);
+	const updateCurrentAudioChannel = useAppStateStore(
+		(state) => state.updateCurrentAudioChannel,
+	);
+	const updateCurrentSelectedModel = useAppStateStore(
+		(state) => state.updateCurrentSelectedModel,
+	);
 	const [audioChannels, setAudioChannels] = useState<string[]>([]);
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
@@ -69,21 +77,22 @@ export function MoreMenu() {
 		interviewPromptDraft === defaultInterviewPrompt;
 
 	useEffect(() => {
-		invoke("get_audio_stream_devices_names").then((result) => {
-			if (typeof result === "object" && Array.isArray(result)) {
-				// console.log("audio devices ", result);
+		void invoke<string[]>("get_audio_stream_devices_names")
+			.then((result) => {
 				setAudioChannels(result);
-				appState.updateCurrentAudioChannel(result[0]);
-			} else {
-				toast.error("No audio streams output device  found");
-			}
-		});
-	}, [appState.updateCurrentAudioChannel]);
+				if (result.length === 0) {
+					toast.error("No audio streams output device found");
+					return;
+				}
 
-	useEffect(() => {
-		appState.updateCurrentSelectedModel(currentModel);
-		console.log(currentModel);
-	}, [currentModel, appState.updateCurrentSelectedModel]);
+				if (!currentAudioChannel || !result.includes(currentAudioChannel)) {
+					updateCurrentAudioChannel(result[0]);
+				}
+			})
+			.catch((error) => {
+				toast.error(String(error));
+			});
+	}, [currentAudioChannel, updateCurrentAudioChannel]);
 
 	useEffect(() => {
 		if (!isDialogOpen) {
@@ -235,7 +244,7 @@ export function MoreMenu() {
 									className={`data-[highlighted]:bg-gray-500 ${
 										currentModel === model ? "font-bold" : ""
 									}`}
-									onClick={() => setCurrentModel(model)}
+									onClick={() => updateCurrentSelectedModel(model)}
 								>
 									{model}
 									{currentModel === model && (
