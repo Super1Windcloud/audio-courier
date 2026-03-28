@@ -13,10 +13,11 @@ import {
 	useState,
 } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { ChatContainer } from "@/components/ChatContainer";
 import { LicenseSignerApp } from "@/components/LicenseSignerApp.tsx";
 import { UpdateDialog } from "@/components/UpdateDialog.tsx";
+import { Toaster } from "@/components/ui/sonner.tsx";
 import { logError, logInfo } from "@/lib/logger.ts";
 import { registryGlobalShortCuts } from "@/lib/system.ts";
 import {
@@ -90,6 +91,7 @@ class SignerErrorBoundary extends Component<
 function App() {
 	const didRun = useRef(false);
 	const didCheckForUpdates = useRef(false);
+	const didRequestWindowShow = useRef(false);
 	const [windowLabel, setWindowLabel] = useState<string | null>(null);
 	const [availableUpdate, setAvailableUpdate] = useState<Awaited<
 		ReturnType<typeof checkForUpdate>
@@ -148,8 +150,25 @@ function App() {
 				toast.error(String(error));
 			});
 		registryGlobalShortCuts().then();
-		invoke("show_window").then();
 	}, [isSignerMode, updateLicenseStatus]);
+
+	useEffect(() => {
+		if (isSignerMode || didRequestWindowShow.current) {
+			return;
+		}
+
+		didRequestWindowShow.current = true;
+
+		const frameId = window.requestAnimationFrame(() => {
+			void invoke("show_window").catch((error) => {
+				logError("show_window failed", error);
+			});
+		});
+
+		return () => {
+			window.cancelAnimationFrame(frameId);
+		};
+	}, [isSignerMode]);
 
 	const checkForUpdates = useEffectEvent(
 		async (source: "startup" | "manual") => {

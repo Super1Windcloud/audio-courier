@@ -19,7 +19,8 @@ pub use llm::*;
 use log::{error, info, warn};
 pub use loopback::*;
 use std::path::PathBuf;
-use tauri::{LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::LogicalSize;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_log::{Target, TargetKind};
 pub use utils::*;
 
@@ -34,7 +35,6 @@ fn show_window(window: tauri::Window) -> Result<(), String> {
     if let Some(splash) = splash {
         splash.close().unwrap();
     }
-    window.center().unwrap();
     window
         .set_size(LogicalSize::<i32>::from((800, 900)))
         .unwrap();
