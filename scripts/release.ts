@@ -335,14 +335,13 @@ async function collectArtifacts(input: {
 	if (allArtifacts.length === 0) {
 		return {
 			uploads: [] as UploadAsset[],
-			platformEntries: {} as Record<string, { signature: string; url: string }>,
+			platformEntries: {} as Record<string, PlatformEntry>,
 		};
 	}
 
 	// Prepare all artifacts for upload
 	const uploadPromises: Promise<UploadAsset>[] = [];
-	const platformEntries: Record<string, { signature: string; url: string }> =
-		{};
+	const platformEntries: Record<string, PlatformEntryWithKind> = {};
 
 	for (const item of allArtifacts) {
 		uploadPromises.push(
@@ -364,9 +363,15 @@ async function collectArtifacts(input: {
 
 			// Add to manifest entries (prioritize kinds by order)
 			const currentEntry = platformEntries[item.platform];
-			const priority = ["nsis", "dmg", "appimage", "app-tar", "msi"];
+			const priority: PreferredArtifact["kind"][] = [
+				"nsis",
+				"dmg",
+				"appimage",
+				"app-tar",
+				"msi",
+			];
 			const currentKindIndex = currentEntry
-				? priority.indexOf((currentEntry as any).kind)
+				? priority.indexOf(currentEntry.kind)
 				: 99;
 			const newKindIndex = priority.indexOf(item.kind);
 
@@ -376,22 +381,23 @@ async function collectArtifacts(input: {
 					url: `https://github.com/${input.repository}/releases/download/${input.tagName}/${encodeURIComponent(
 						sanitizeGitHubAssetName(path.basename(item.artifactPath)),
 					)}`,
-				} as any;
-				(platformEntries[item.platform] as any).kind = item.kind;
+					kind: item.kind,
+				};
 			}
 		}
 	}
 
 	const uploads = await Promise.all(uploadPromises);
-
-	// Clean up temporary kind markers
-	for (const key in platformEntries) {
-		delete (platformEntries[key] as any).kind;
-	}
+	const manifestEntries = Object.fromEntries(
+		Object.entries(platformEntries).map(([key, { kind: _kind, ...entry }]) => [
+			key,
+			entry,
+		]),
+	) as Record<string, PlatformEntry>;
 
 	return {
 		uploads,
-		platformEntries,
+		platformEntries: manifestEntries,
 	};
 }
 
@@ -428,14 +434,6 @@ function classifyArtifact(filePath: string, targetTriple: string | null) {
 		kind,
 		platform: `${osName}-${arch}`,
 	} as const;
-}
-
-function platformKey(osName: string, targetTriple: string | null) {
-	if (targetTriple) {
-		return `${osName}-${archFromTargetTriple(targetTriple)}`;
-	}
-
-	return `${osName}-${archFromNode(process.arch)}`;
 }
 
 function archFromTargetTriple(targetTriple: string) {
@@ -780,6 +778,11 @@ type UploadAsset = {
 	buffer: Buffer;
 };
 
+type PlatformEntry = {
+	signature: string;
+	url: string;
+};
+
 type PreferredArtifact = {
 	artifactPath: string;
 	signaturePath: string;
@@ -787,6 +790,10 @@ type PreferredArtifact = {
 	kind: "nsis" | "dmg" | "appimage" | "app-tar" | "msi";
 	platform: string;
 	relatedFiles: string[];
+};
+
+type PlatformEntryWithKind = PlatformEntry & {
+	kind: PreferredArtifact["kind"];
 };
 
 type GitHubAsset = {
@@ -807,11 +814,5 @@ type LatestJson = {
 	version: string;
 	notes: string;
 	pub_date: string;
-	platforms: Record<
-		string,
-		{
-			signature: string;
-			url: string;
-		}
-	>;
+	platforms: Record<string, PlatformEntry>;
 };
