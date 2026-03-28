@@ -1,6 +1,8 @@
 import { Mic, SendHorizontal, Trash2 } from "lucide-react";
 import type React from "react";
 import {
+	lazy,
+	Suspense,
 	useCallback,
 	useEffect,
 	useEffectEvent,
@@ -11,9 +13,10 @@ import { toast } from "sonner";
 import type { Message } from "@/components/ChatContainer.tsx";
 import { MoreMenu } from "@/components/MoreMenu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
-import Waruls from "@/components/Waruls.tsx";
 import { startAudioRecognition, stopAudioRecognition } from "@/lib/audio.ts";
 import useAppStateStore from "@/stores";
+
+const Waruls = lazy(() => import("@/components/Waruls.tsx"));
 
 interface MessageInputProps {
 	onSendMessage: (text: string) => void;
@@ -51,6 +54,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	const isAuthorized = Boolean(
 		licenseStatus?.isValid || licenseStatus?.isHostSigner,
 	);
+	const shouldUseWaruls =
+		typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
 
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const wasRecordingRef = useRef(recordingState);
@@ -197,13 +202,39 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 				/>
 
 				{recordingState ? (
-					<div className="relative h-16 w-16 shrink-0 overflow-visible">
-						<Waruls
-							className="h-full w-full"
-							onToggle={toggleRecording}
+					shouldUseWaruls ? (
+						<div className="relative h-16 w-16 shrink-0 overflow-visible">
+							<Suspense
+								fallback={
+									<span
+										title={
+											canStopRecording ? "停止语音" : "录音中...3秒后可停止"
+										}
+									>
+										<Mic
+											onClick={toggleRecording}
+											className="cursor-pointer text-red-500"
+										/>
+									</span>
+								}
+							>
+								<Waruls
+									className="h-full w-full"
+									onToggle={toggleRecording}
+									title={canStopRecording ? "停止语音" : "录音中...3秒后可停止"}
+								/>
+							</Suspense>
+						</div>
+					) : (
+						<span
 							title={canStopRecording ? "停止语音" : "录音中...3秒后可停止"}
-						/>
-					</div>
+						>
+							<Mic
+								onClick={toggleRecording}
+								className="cursor-pointer text-red-500"
+							/>
+						</span>
+					)
 				) : (
 					<span title="开始语音">
 						<Mic
