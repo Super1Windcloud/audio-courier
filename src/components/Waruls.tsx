@@ -1,30 +1,65 @@
+import type React from "react";
 import styled from "styled-components";
 
-const Loader = () => {
+interface WarulsProps {
+	onToggle?: () => void;
+	title?: string;
+	className?: string;
+	scale?: number;
+}
+
+const Waruls: React.FC<WarulsProps> = ({
+	onToggle,
+	title,
+	className,
+	scale = 0.64,
+}) => {
 	return (
-		<StyledWrapper>
-			<div className="loader">
-				<svg width={100} height={100} viewBox="0 0 100 100">
-					<title>Waruls Loader</title>
-					<defs>
-						<mask id="clipping">
-							<polygon points="0,0 100,0 100,100 0,100" fill="black" />
-							<polygon points="25,25 75,25 50,75" fill="white" />
-							<polygon points="50,25 75,75 25,75" fill="white" />
-							<polygon points="35,35 65,35 50,65" fill="white" />
-							<polygon points="35,35 65,35 50,65" fill="white" />
-							<polygon points="35,35 65,35 50,65" fill="white" />
-							<polygon points="35,35 65,35 50,65" fill="white" />
-						</mask>
-					</defs>
-				</svg>
-				<div className="box" />
-			</div>
+		<StyledWrapper className={className}>
+			<button
+				type="button"
+				className="loader-button"
+				onClick={onToggle}
+				title={title}
+				style={{ "--size": scale } as React.CSSProperties}
+			>
+				<div className="loader">
+					<svg width={100} height={100} viewBox="0 0 100 100">
+						<title>Waruls Loader</title>
+						<defs>
+							<mask id="clipping">
+								<polygon points="0,0 100,0 100,100 0,100" fill="black" />
+								<polygon points="25,25 75,25 50,75" fill="white" />
+								<polygon points="50,25 75,75 25,75" fill="white" />
+								<polygon points="35,35 65,35 50,65" fill="white" />
+								<polygon points="35,35 65,35 50,65" fill="white" />
+								<polygon points="35,35 65,35 50,65" fill="white" />
+								<polygon points="35,35 65,35 50,65" fill="white" />
+							</mask>
+						</defs>
+					</svg>
+					<div className="box" />
+				</div>
+			</button>
 		</StyledWrapper>
 	);
 };
 
 const StyledWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .loader-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
   .loader {
     --color-one: #ffbf48;
     --color-two: #be4a1d;
@@ -32,7 +67,6 @@ const StyledWrapper = styled.div`
     --color-four: #bf4a1d80;
     --color-five: #ffbf4740;
     --time-animation: 2s;
-    --size: 1; /* You can change the size */
     position: relative;
     border-radius: 50%;
     transform: scale(var(--size));
@@ -170,4 +204,4 @@ const StyledWrapper = styled.div`
   }
 `;
 
-export default Loader;
+export default Waruls;
