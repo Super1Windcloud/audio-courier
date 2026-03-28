@@ -179,6 +179,8 @@
 .prompt-editor-dialog {
 	position: fixed;
 	z-index: 60;
+	display: flex;
+	flex-direction: column;
 	overflow: hidden;
 	border-radius: 2rem;
 	border: 1px solid rgb(255 255 255 / 0.14);
@@ -248,6 +250,10 @@
 
 .prompt-editor-shell {
 	position: relative;
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-height: 0;
 	padding: 2rem;
 	overflow: hidden;
 }
@@ -255,16 +261,19 @@
 .prompt-editor-content {
 	position: relative;
 	display: flex;
+	flex: 1 1 auto;
 	flex-direction: column;
 	gap: 1.25rem;
+	min-height: 0;
 	z-index: 1;
 }
 
 .prompt-editor-scroll {
 	display: flex;
+	flex: 1 1 auto;
 	flex-direction: column;
 	gap: 1rem;
-	max-height: calc(88vh - 13rem);
+	min-height: 0;
 	padding-right: 0.25rem;
 	margin-right: -0.25rem;
 	overflow-y: auto;
@@ -384,6 +393,7 @@
 
 .prompt-editor-field {
 	position: relative;
+	flex-shrink: 0;
 	overflow: hidden;
 	padding: 1.1rem;
 	border: 1px solid rgb(255 255 255 / 0.14);
@@ -426,6 +436,7 @@
 }
 
 .prompt-editor-field-description {
+	flex-shrink: 0;
 	margin-bottom: 0.85rem;
 	color: rgb(226 232 240 / 0.72);
 	font-size: 0.9rem;
@@ -434,7 +445,10 @@
 
 .prompt-editor-textarea {
 	position: relative;
-	min-height: 19rem;
+	display: block;
+	flex-shrink: 0;
+	height: 20rem;
+	min-height: 20rem;
 	padding: 1.15rem 1.2rem;
 	border: 1px solid rgb(255 255 255 / 0.08);
 	border-radius: 1.35rem;
@@ -450,7 +464,8 @@
 }
 
 .prompt-editor-textarea-compact {
-	min-height: 12rem;
+	height: 14rem;
+	min-height: 14rem;
 }
 
 .prompt-editor-textarea::-webkit-scrollbar {
@@ -474,6 +489,7 @@
 }
 
 .prompt-editor-note {
+	flex-shrink: 0;
 	max-width: 60ch;
 	color: rgb(226 232 240 / 0.74);
 	font-size: 0.92rem;
@@ -482,6 +498,7 @@
 
 .prompt-editor-actions {
 	display: flex;
+	flex-shrink: 0;
 	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
@@ -568,13 +585,15 @@
 	}
 
 	.prompt-editor-textarea {
-		min-height: 14rem;
+		height: 15rem;
+		min-height: 15rem;
 		padding: 1rem;
 		border-radius: 1.15rem;
 	}
 
 	.prompt-editor-textarea-compact {
-		min-height: 10rem;
+		height: 11rem;
+		min-height: 11rem;
 	}
 
 	.prompt-editor-actions,

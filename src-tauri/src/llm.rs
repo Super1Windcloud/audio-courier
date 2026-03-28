@@ -81,9 +81,8 @@ pub async fn siliconflow_free(
     siliconflow_free_with_model(app, flow_args, random_model).await
 }
 
-const PRO_MODELS: [&str; 13] = [
+const PRO_MODELS: [&str; 12] = [
     "Pro/Qwen/Qwen2.5-7B-Instruct",     //0.17S
-    "Pro/Qwen/Qwen2-7B-Instruct",       // 0.11S
     "Pro/THUDM/glm-4-9b-chat",          //0.27S
     "Qwen/Qwen2.5-14B-Instruct",        // 0.21S
     "Qwen/Qwen2.5-Coder-32B-Instruct",  //0.14S
