@@ -175,7 +175,7 @@ pub fn run() {
                     }),
                     Target::new(TargetKind::Webview),
                 ])
-                .level(tauri_plugin_log::log::LevelFilter::Info)
+                .level(log::LevelFilter::Info)
                 .build(),
         )
         .setup(move |app| {
@@ -185,6 +185,7 @@ pub fn run() {
                 env!("CARGO_PKG_VERSION")
             );
             #[cfg(desktop)]
+            #[allow(unused_qualifications)]
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
