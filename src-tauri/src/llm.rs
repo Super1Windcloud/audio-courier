@@ -94,7 +94,7 @@ pub async fn siliconflow_pro_with_model(
     flow_args: FlowArgs,
     model: &str,
 ) -> Result<String, String> {
-    let api_key = get_env_key("SiliconflowVLM");
+    let api_key = get_env_key("SILICONFLOW_API_KEY");
     let messages = vec![
         json!({"role":"assistant","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
@@ -130,7 +130,7 @@ pub async fn siliconflow_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Resu
 
 #[tauri::command]
 pub async fn doubao_lite(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
-    let api_key = get_env_key("DOUBAO");
+    let api_key = get_env_key("DOUBAO_API_KEY");
     let messages = vec![
         json!({"role":"system","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
@@ -154,7 +154,7 @@ pub async fn doubao_lite(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<S
 
 #[tauri::command]
 pub async fn doubao_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
-    let api_key = get_env_key("DOUBAO");
+    let api_key = get_env_key("DOUBAO_API_KEY");
     let messages = vec![
         json!({"role":"assistant","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
@@ -181,7 +181,7 @@ pub async fn doubao_seed_flash(
     app: tauri::AppHandle,
     flow_args: FlowArgs,
 ) -> Result<String, String> {
-    let api_key = get_env_key("DOUBAO");
+    let api_key = get_env_key("DOUBAO_API_KEY");
     let messages = vec![
         json!({"role":"assistant","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
@@ -205,7 +205,7 @@ pub async fn doubao_seed_flash(
 
 #[tauri::command]
 pub async fn doubao_seed(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
-    let api_key = get_env_key("DOUBAO");
+    let api_key = get_env_key("DOUBAO_API_KEY");
     let messages = vec![
         json!({"role":"assistant","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
@@ -230,7 +230,7 @@ pub async fn doubao_seed(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<S
 #[tauri::command]
 
 pub async fn kimi(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
-    let api_key = get_env_key("KIMI");
+    let api_key = get_env_key("KIMI_API_KEY");
     let messages = vec![
         json!({"role":"system","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
@@ -255,7 +255,7 @@ pub async fn kimi(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, 
 #[tauri::command]
 
 pub async fn zhipu(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
-    let api_key = get_env_key("ZHIPU");
+    let api_key = get_env_key("ZHIPU_API_KEY");
     let messages = vec![
         json!({"role":"system","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
@@ -280,7 +280,7 @@ pub async fn zhipu(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String,
 #[tauri::command]
 
 pub async fn deepseek_api(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
-    let api_key = get_env_key("DEEPSEEK");
+    let api_key = get_env_key("DEEPSEEK_API_KEY");
     let messages = vec![
         json!({"role":"system","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
@@ -305,7 +305,7 @@ pub async fn deepseek_api(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<
 #[tauri::command]
 
 pub async fn ali_qwen_2_5(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
-    let api_key = get_env_key("ALI_QWEN_QWQ");
+    let api_key = get_env_key("ALI_QWEN_QWQ_API_KEY");
     let messages = vec![
         json!({"role":"system","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
@@ -332,7 +332,7 @@ pub async fn ali_qwen_plus_latest(
     app: tauri::AppHandle,
     flow_args: FlowArgs,
 ) -> Result<String, String> {
-    let api_key = get_env_key("ALI_QWEN_QWQ");
+    let api_key = get_env_key("ALI_QWEN_QWQ_API_KEY");
     let messages = vec![
         json!({"role":"system","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
@@ -356,7 +356,7 @@ pub async fn ali_qwen_plus_latest(
 
 #[tauri::command]
 pub async fn ali_qwen_max(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
-    let api_key = get_env_key("ALI_QWEN_QWQ");
+    let api_key = get_env_key("ALI_QWEN_QWQ_API_KEY");
     let messages = vec![
         json!({"role":"system","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
