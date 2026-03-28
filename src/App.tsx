@@ -91,7 +91,15 @@ class SignerErrorBoundary extends Component<
 function App() {
 	const didRun = useRef(false);
 	const didCheckForUpdates = useRef(false);
-	const [windowLabel, setWindowLabel] = useState<string | null>(null);
+	const [windowLabel] = useState<string | null>(() => {
+		try {
+			return getCurrentWindow().label;
+		} catch (error) {
+			console.error("failed-to-read-window-label", error);
+			logError("failed-to-read-window-label", error);
+			return null;
+		}
+	});
 	const [availableUpdate, setAvailableUpdate] = useState<Awaited<
 		ReturnType<typeof checkForUpdate>
 	> | null>(null);
@@ -110,34 +118,23 @@ function App() {
 			"license-signer";
 
 	useEffect(() => {
-		// On macOS, requestAnimationFrame might be suspended for hidden windows.
-		// Using a simple timeout to ensure the first paint attempt is registered.
-		const timer = setTimeout(() => {
-			invoke("show_window")
-				.then(() => console.log("show_window: success"))
-				.catch((err) => {
-					console.error("show_window: failed", err);
-					logError("show_window_failed", err);
-				});
-		}, 200);
-
-		return () => clearTimeout(timer);
-	}, []);
-
-	useEffect(() => {
-		try {
-			setWindowLabel(getCurrentWindow().label);
-		} catch (error) {
-			console.error("failed-to-read-window-label", error);
-			logError("failed-to-read-window-label", error);
-		}
-	}, []);
-
-	useEffect(() => {
 		logInfo(
 			`app-mounted label=${windowLabel ?? "unknown"} hash=${window.location.hash || "-"}`,
 		);
 	}, [windowLabel]);
+
+	useEffect(() => {
+		if (windowLabel !== "main" || isSignerMode) {
+			return;
+		}
+
+		void invoke("show_window")
+			.then(() => console.log("show_window: success"))
+			.catch((err) => {
+				console.error("show_window: failed", err);
+				logError("show_window_failed", err);
+			});
+	}, [isSignerMode, windowLabel]);
 
 	useEffect(() => {
 		const handleContextMenu = (e: MouseEvent) => {

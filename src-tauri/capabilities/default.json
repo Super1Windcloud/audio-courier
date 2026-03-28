@@ -18,6 +18,6 @@
 		"updater:default",
 		"log:default",
 		"opener:default",
-		"allow-all-commands"
+		"process:allow-restart"
 	]
 }

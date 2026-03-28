@@ -196,9 +196,14 @@ pub fn run() {
             );
             #[cfg(desktop)]
             #[allow(unused_qualifications)]
-            app.handle()
-                .plugin(tauri_plugin_updater::Builder::new().build())
-                .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
+            {
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())
+                    .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
+                app.handle()
+                    .plugin(tauri_plugin_process::init())
+                    .map_err(|err| -> Box<dyn std::error::Error> { Box::new(err) })?;
+            }
 
             info!("tauri app setup completed");
 

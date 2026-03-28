@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { config as loadDotenv } from "dotenv";
@@ -12,6 +12,7 @@ const bundleDir = path.join(
 	"release",
 	"bundle",
 );
+const macosBundleDir = path.join(bundleDir, "macos");
 const tauriConfigPath = path.join(rootDir, "src-tauri", "tauri.conf.json");
 const cargoTomlPath = path.join(rootDir, "src-tauri", "Cargo.toml");
 const packageJsonPath = path.join(rootDir, "package.json");
@@ -49,6 +50,8 @@ async function main() {
 			`published ${releaseContext.tagName} with ${releaseContext.uploadedAssets.length} asset(s)`,
 		);
 	}
+
+	await cleanupMacOsBundle();
 }
 
 function loadEnvFiles() {
@@ -133,6 +136,11 @@ async function buildRelease(version: string) {
 			CI: "true",
 		},
 	});
+}
+
+async function cleanupMacOsBundle() {
+	await rm(macosBundleDir, { recursive: true, force: true });
+	console.log(`removed ${path.relative(rootDir, macosBundleDir)}`);
 }
 
 async function ensureSigningEnv() {

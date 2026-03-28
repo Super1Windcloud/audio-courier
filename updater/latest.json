@@ -1,14 +1,14 @@
 {
   "version": "1.0.6",
   "notes": "Release 1.0.6",
-  "pub_date": "2026-03-28T06:48:00.498Z",
+  "pub_date": "2026-03-28T07:26:05.136Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY3E3L0ducEp5QnYvQzZUeFJTTTRFSVpRMjJXZk1CQktnNkVRYXdqeEVSSDFhV09BdWtrd0R5aXdlTGFTdzJXNEczaGM0NkhhMXE0YnlyN05jZG9SUE1UMmt6STlYUlE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0Njc2MDgxCWZpbGU6QXVkaW8gQ291cmllcl8xLjAuNl94NjQtc2V0dXAuZXhlCmZOckhkSEFEbTM3MWJIeDhvSlc4QTA0anFLZDA2djFpTGhvSzBrR2JhSXJsREhLRWZQTFpPcVJDS0hsb1RKT1ArTTZadTNXb2dhd1RCTmxIcU4vOEJ3PT0K",
       "url": "https://github.com/super1windcloud/audio-courier/releases/download/audio-courier-v1.0.6/Audio.Courier_1.0.6_x64-setup.exe"
     },
     "darwin-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY3E3L0ducEp5Qm1IQWxKMHNBZWFCSlZqZmc5RnU3cndLQkpKaVdzL3g5c25xTzJ6MjVlYy9lc1ByUTE2ZkVZWXAwaUg4MkdHb3liY1RDYlFZZFhFb3VLS3dWTlBydkFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0NjgwNDY4CWZpbGU6QXVkaW8gQ291cmllci5hcHAudGFyLmd6CmM5aEdCNDVkSkUwY3I5ZS9BaDNJcXJFKy9FZ3pHL05NZSs1TUlkejd0aVJmb3BUYVhSa1EyVXZFaXlNbDdzdklFQ1BjSG9sWnFHZFBiSU1qcFpncUJRPT0K",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY3E3L0ducEp5QmpGeTJ6QTlwTThaVHk5T0pkRW9tRVJNMVZOL29ZbWNlSzNzS3VhbU5HWlpsVGxYK3Z6c1NWTm5Wc0M3Unh6T25GbXEzVHliM0VmS0t4Z1J5OFkvOWdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0NjgyNzUzCWZpbGU6QXVkaW8gQ291cmllci5hcHAudGFyLmd6CmZpaXpmV0pxaWlDUkh4RHo1RnJYSitBNFdhWEhxYUtTSUJ4SzZ2K2llV0phWUlaWGFMOUpyeWpwZUVOMGNrcUErY1NndldUR2JGdlc4L3FzYlN4ZURRPT0K",
       "url": "https://github.com/super1windcloud/audio-courier/releases/download/audio-courier-v1.0.6/Audio.Courier.app.tar.gz"
     }
   }
