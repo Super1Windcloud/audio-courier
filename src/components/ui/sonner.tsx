@@ -17,8 +17,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
 					success: "border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.2)]",
 					error: "border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.2)]",
 					info: "border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]",
-					warning: "border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]",
-					default: "border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]",
+					warning:
+						"border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]",
+					default:
+						"border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]",
 					description: "text-slate-300",
 					actionButton: "bg-cyan-300 text-slate-950 hover:bg-cyan-200",
 					cancelButton: "bg-white/10 text-slate-200 hover:bg-white/16",
