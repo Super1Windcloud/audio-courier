@@ -18,8 +18,10 @@ pub fn is_dev() -> bool {
 }
 
 pub fn reset_app_log_files() {
-    for path in all_known_log_paths() {
-        truncate_log_file(&path);
+    truncate_log_file(&primary_plain_log_path());
+
+    for path in legacy_log_paths() {
+        remove_log_file_if_exists(&path);
     }
 }
 
@@ -42,19 +44,27 @@ fn truncate_log_file(path: &Path) {
     let _ = File::create(path);
 }
 
-fn all_known_log_paths() -> Vec<PathBuf> {
+fn primary_plain_log_path() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(local_app_data) = env::var_os("LOCALAPPDATA") {
+            return PathBuf::from(local_app_data)
+                .join(APP_IDENTIFIER)
+                .join("logs")
+                .join(APP_LOG_FILE_NAME);
+        }
+    }
+
+    PathBuf::from(APP_LOG_FILE_NAME)
+}
+
+fn legacy_log_paths() -> Vec<PathBuf> {
     let mut paths = Vec::new();
 
     #[cfg(target_os = "windows")]
     {
         if let Some(local_app_data) = env::var_os("LOCALAPPDATA") {
             let local_app_data = PathBuf::from(local_app_data);
-            paths.push(
-                local_app_data
-                    .join(APP_IDENTIFIER)
-                    .join("logs")
-                    .join(APP_LOG_FILE_NAME),
-            );
             paths.push(
                 local_app_data
                     .join(APP_PRODUCT_NAME)
@@ -68,22 +78,14 @@ fn all_known_log_paths() -> Vec<PathBuf> {
         }
     }
 
-    paths.push(PathBuf::from(APP_LOG_FILE_NAME));
     paths.push(PathBuf::from(LEGACY_APP_LOG_FILE_NAME));
     paths
 }
 
-fn primary_plain_log_path() -> PathBuf {
-    #[cfg(target_os = "windows")]
-    {
-        if let Some(local_app_data) = env::var_os("LOCALAPPDATA") {
-            return PathBuf::from(local_app_data)
-                .join(APP_PRODUCT_NAME)
-                .join(APP_LOG_FILE_NAME);
-        }
+fn remove_log_file_if_exists(path: &Path) {
+    if path.exists() {
+        let _ = std::fs::remove_file(path);
     }
-
-    PathBuf::from(APP_LOG_FILE_NAME)
 }
 
 pub fn load_env_variables() {
