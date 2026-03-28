@@ -35,7 +35,7 @@ const Conversation = lazy(() =>
 
 function Home() {
 	return (
-		<div className="h-screen w-full bg-transparent">
+		<div className="h-screen w-full">
 			<ChatContainer />
 			<Toaster
 				position="top-center"
@@ -102,17 +102,11 @@ function App() {
 	const updateLicenseStatus = useAppStateStore(
 		(state) => state.updateLicenseStatus,
 	);
-	const uiOpacity = useAppStateStore((state) => state.uiOpacity);
 	const isSignerMode =
 		windowLabel === "license-signer" ||
 		window.location.hash === "#license-signer" ||
 		new URLSearchParams(window.location.search).get("mode") ===
 			"license-signer";
-	const isLowOpacityMode = uiOpacity <= 0.6;
-	const appShellStyle = {
-		opacity: uiOpacity,
-		transition: "opacity 180ms ease-out",
-	};
 
 	useEffect(() => {
 		try {
@@ -246,11 +240,7 @@ function App() {
 
 	if (isSignerMode) {
 		return (
-			<div
-				className={isLowOpacityMode ? "low-opacity-shell" : undefined}
-				data-low-opacity={isLowOpacityMode}
-				style={appShellStyle}
-			>
+			<div>
 				<SignerErrorBoundary>
 					<Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
 						<LicenseSignerApp />
@@ -268,11 +258,7 @@ function App() {
 	}
 
 	return (
-		<div
-			className={isLowOpacityMode ? "low-opacity-shell" : undefined}
-			data-low-opacity={isLowOpacityMode}
-			style={appShellStyle}
-		>
+		<div>
 			<BrowserRouter>
 				<Suspense fallback={<Home />}>
 					<Routes>

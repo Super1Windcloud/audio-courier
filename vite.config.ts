@@ -7,32 +7,32 @@ const host = process.env.TAURI_DEV_HOST;
 
 console.log("host", host);
 export default defineConfig(async () => ({
-	plugins: [react(), tailwindcss()],
-	cacheDir: ".vite",
-	resolve: {
-		alias: {
-			"@": path.resolve(__dirname, "./src"),
-		},
-	},
+  plugins: [react(), tailwindcss()],
+  cacheDir: ".vite",
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
 
-	optimizeDeps: {
-		force: true,
-		exclude: ["lucide-react"],
-	},
-	clearScreen: false,
-	server: {
-		port: 1420,
-		strictPort: true,
-		host: host || false,
-		hmr: host
-			? {
-					protocol: "ws",
-					host,
-					port: 1421,
-				}
-			: undefined,
-		watch: {
-			ignored: ["**/src-tauri/**"],
-		},
-	},
+  optimizeDeps: {
+    force: true,
+    exclude: ["lucide-react"],
+  },
+  clearScreen: false,
+  server: {
+    port: 1420,
+    strictPort: true,
+    host: host || false,
+    hmr: host
+      ? {
+          protocol: "ws",
+          host,
+          port: 1421,
+        }
+      : undefined,
+    watch: {
+      ignored: ["**/src-tauri/**"],
+    },
+  },
 }));

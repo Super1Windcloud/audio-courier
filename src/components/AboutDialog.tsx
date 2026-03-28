@@ -1,5 +1,5 @@
 import { getVersion } from "@tauri-apps/api/app";
-import { Github, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import {
@@ -68,7 +68,6 @@ export const AboutDialog: React.FC = () => {
 							rel="noreferrer"
 							className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
 						>
-							<Github className="w-4 h-4" />
 							GitHub 仓库
 						</a>
 					</div>

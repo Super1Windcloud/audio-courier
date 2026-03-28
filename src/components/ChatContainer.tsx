@@ -119,34 +119,36 @@ export const ChatContainer: React.FC = () => {
 	}, [handleSendMessage]);
 
 	return (
-		<div className="flex flex-col h-screen w-screen justify-center">
-			<div className="flex-shrink-0">
-				<TitleBar />
-			</div>
-			<div
-				className="flex-1 overflow-auto max-w-5xl w-full  self-center"
-				style={{
-					overflow: "auto",
-					scrollBehavior: "smooth",
-					scrollbarWidth: "none",
-				}}
-			>
-				{!isAuthorized ? (
-					<div className="mx-4 mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4 text-sm text-amber-100">
-						许可证状态: {licenseStatus?.reason ?? "未加载"}
-						。点击顶部“许可证”生成设备请求码并导入授权。
-					</div>
-				) : null}
-				<MessageList messages={messages} isTyping={isTyping} />
-			</div>
+		<div className="flex h-screen w-screen">
+			<div className="flex h-full w-full flex-col overflow-hidden border border-white/14 bg-[linear-gradient(180deg,rgba(114,71,102,0.72)_0%,rgba(44,79,113,0.62)_100%)] backdrop-blur-xl">
+				<div className="flex-shrink-0 border-b border-white/10">
+					<TitleBar />
+				</div>
+				<div
+					className="flex-1 w-full overflow-auto self-center"
+					style={{
+						overflow: "auto",
+						scrollBehavior: "smooth",
+						scrollbarWidth: "none",
+					}}
+				>
+					{!isAuthorized ? (
+						<div className="mx-4 mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4 text-sm text-amber-100">
+							许可证状态: {licenseStatus?.reason ?? "未加载"}
+							。点击顶部“许可证”生成设备请求码并导入授权。
+						</div>
+					) : null}
+					<MessageList messages={messages} isTyping={isTyping} />
+				</div>
 
-			<div className="flex-shrink-0 bg-transparent  w-full  max-w-5xl self-center">
-				<MessageInput
-					onSendMessage={handleSendMessage}
-					onClearConversation={handleClearConversation}
-					setIsTyping={setIsTyping}
-					setMessages={setMessages}
-				/>
+				<div className="w-full flex-shrink-0 self-center border-t border-white/10 bg-black/10">
+					<MessageInput
+						onSendMessage={handleSendMessage}
+						onClearConversation={handleClearConversation}
+						setIsTyping={setIsTyping}
+						setMessages={setMessages}
+					/>
+				</div>
 			</div>
 		</div>
 	);
