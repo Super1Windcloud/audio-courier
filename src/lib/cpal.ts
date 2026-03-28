@@ -25,8 +25,9 @@ export async function startAudioLoopbackRecognition(
 	audioDevice: string,
 	selectedAsrVendor: string,
 	captureInterval: number,
-	_isUsePreRecorded: boolean,
+	isUsePreRecorded: boolean,
 ) {
+	void isUsePreRecorded;
 	if (unlistener) {
 		unlistener();
 		unlistener = null;
@@ -37,6 +38,8 @@ export async function startAudioLoopbackRecognition(
 	}
 
 	let content: string = "";
+	const transcriptProviderSettings =
+		useAppStateStore.getState().transcriptProviderSettings;
 
 	unlistener = await listen<string>("transcription_result", async (event) => {
 		logInfo(`transcription_result received length=${event.payload.length}`);
@@ -68,6 +71,7 @@ export async function startAudioLoopbackRecognition(
 		deviceName: audioDevice,
 		selectedAsrVendor,
 		captureInterval,
+		transcriptConfig: transcriptProviderSettings,
 	}).catch((err) => {
 		console.error("invoke start output audio recognition failed", err);
 		logError("invoke start output audio recognition failed", err);

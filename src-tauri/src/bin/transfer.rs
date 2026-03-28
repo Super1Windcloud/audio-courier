@@ -40,6 +40,7 @@ fn main() {
         auto_chunk_buffer: false,
         selected_asr_vendor: vendor.to_string(),
         status_callback: None,
+        transcript_config: None,
     };
 
     if let Ok(handle) = start_record_audio_with_writer(params) {

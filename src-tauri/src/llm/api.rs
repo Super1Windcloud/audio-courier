@@ -56,7 +56,10 @@ pub async fn call_model_api(
 
     // 发送请求并处理基本网络错误
     let response = client
-        .post(format!("{}/chat/completions", req.base_url))
+        .post(format!(
+            "{}/chat/completions",
+            req.base_url.trim_end_matches('/')
+        ))
         .header("Authorization", format!("Bearer {}", req.api_key))
         .json(&json!({
             "model": req.model,

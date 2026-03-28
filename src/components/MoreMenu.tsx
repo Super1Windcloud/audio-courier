@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { MoreVertical, RotateCcw, Save, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { LlmProviderDialog } from "@/components/LlmProviderDialog.tsx";
+import { TranscriptProviderDialog } from "@/components/TranscriptProviderDialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
 	Dialog,
@@ -25,7 +27,8 @@ import useAppStateStore, {
 	type TranscribeVendor,
 	type UiTextTone,
 } from "@/stores";
-import { HOTKEYS, MODEL_OPTIONS } from "@/types/llm.ts";
+import { HOTKEYS, MODEL_LABELS, MODEL_OPTIONS } from "@/types/llm.ts";
+import { TRANSCRIBE_VENDOR_LABELS } from "@/types/provider.ts";
 
 export function MoreMenu() {
 	const appState = useAppStateStore();
@@ -40,6 +43,10 @@ export function MoreMenu() {
 		(state) => state.updateCurrentSelectedModel,
 	);
 	const [audioChannels, setAudioChannels] = useState<string[]>([]);
+	const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
+	const [isLlmConfigDialogOpen, setIsLlmConfigDialogOpen] = useState(false);
+	const [isTranscriptConfigDialogOpen, setIsTranscriptConfigDialogOpen] =
+		useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
 	const [promptDraft, setPromptDraft] = useState(appState.llmPrompt);
 	const [interviewPromptDraft, setInterviewPromptDraft] = useState(
@@ -52,13 +59,6 @@ export function MoreMenu() {
 		"revai",
 		"speechmatics",
 	];
-	const VENDOR_LABELS: Record<TranscribeVendor, string> = {
-		assemblyai: "AssemblyAI(English)",
-		deepgram: "DeepGram",
-		gladia: "Gladia",
-		revai: "RevAI",
-		speechmatics: "Speechmatics",
-	};
 	const UI_OPACITY_OPTIONS = [
 		100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30,
 	];
@@ -68,12 +68,15 @@ export function MoreMenu() {
 	];
 	const defaultPrompt = import.meta.env.VITE_PROMPT || "";
 	const defaultInterviewPrompt = import.meta.env.VITE_INTERVIEW_PROMPT || "";
+	const modelLabels = {
+		...MODEL_LABELS,
+		custom_openai:
+			appState.llmProviderSettings.customOpenAiName.trim() ||
+			MODEL_LABELS.custom_openai,
+	};
 	const shouldOpenPromptDialogOnStartup =
 		defaultPrompt.trim().length === 0 ||
 		defaultInterviewPrompt.trim().length === 0;
-	const [isDialogOpen, setIsDialogOpen] = useState(
-		shouldOpenPromptDialogOnStartup,
-	);
 	const hasPromptChanges =
 		promptDraft !== appState.llmPrompt ||
 		interviewPromptDraft !== appState.interviewPrompt;
@@ -100,13 +103,21 @@ export function MoreMenu() {
 	}, [currentAudioChannel, updateCurrentAudioChannel]);
 
 	useEffect(() => {
-		if (!isDialogOpen) {
+		if (!isPromptDialogOpen) {
 			return;
 		}
 
 		setPromptDraft(appState.llmPrompt);
 		setInterviewPromptDraft(appState.interviewPrompt);
-	}, [appState.interviewPrompt, appState.llmPrompt, isDialogOpen]);
+	}, [appState.interviewPrompt, appState.llmPrompt, isPromptDialogOpen]);
+
+	useEffect(() => {
+		if (!shouldOpenPromptDialogOnStartup) {
+			return;
+		}
+
+		setIsPromptDialogOpen(true);
+	}, [shouldOpenPromptDialogOnStartup]);
 
 	const handleCheckUpdate = async () => {
 		if (isUpdating) {
@@ -124,7 +135,7 @@ export function MoreMenu() {
 	const handlePromptSave = () => {
 		appState.updateLLMPrompt(promptDraft);
 		appState.updateInterviewPrompt(interviewPromptDraft);
-		setIsDialogOpen(false);
+		setIsPromptDialogOpen(false);
 		toast.success("提示词已保存");
 	};
 
@@ -144,10 +155,22 @@ export function MoreMenu() {
 					className="w-40 bg-gray-600 text-white border-0"
 				>
 					<DropdownMenuItem
-						onClick={() => setIsDialogOpen(true)}
+						onClick={() => setIsPromptDialogOpen(true)}
 						className="data-[highlighted]:bg-gray-500"
 					>
 						提示词
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						onClick={() => setIsLlmConfigDialogOpen(true)}
+						className="data-[highlighted]:bg-gray-500"
+					>
+						模型 API
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						onClick={() => setIsTranscriptConfigDialogOpen(true)}
+						className="data-[highlighted]:bg-gray-500"
+					>
+						转录 API
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						onClick={handleCheckUpdate}
@@ -251,7 +274,7 @@ export function MoreMenu() {
 									}`}
 									onClick={() => updateCurrentSelectedModel(model)}
 								>
-									{model}
+									{modelLabels[model]}
 									{currentModel === model && (
 										<span className="ml-2 text-green-400">✔</span>
 									)}
@@ -279,7 +302,7 @@ export function MoreMenu() {
 									}`}
 									onClick={() => appState.updateRemoteModelTranscribe(vendor)}
 								>
-									{VENDOR_LABELS[vendor]}
+									{TRANSCRIBE_VENDOR_LABELS[vendor]}
 									{appState.useRemoteModelTranscribe === vendor && (
 										<span className="ml-2 text-green-400">✔</span>
 									)}
@@ -367,7 +390,15 @@ export function MoreMenu() {
 					</DropdownMenuSub>
 				</DropdownMenuContent>
 			</DropdownMenu>
-			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+			<LlmProviderDialog
+				open={isLlmConfigDialogOpen}
+				onOpenChange={setIsLlmConfigDialogOpen}
+			/>
+			<TranscriptProviderDialog
+				open={isTranscriptConfigDialogOpen}
+				onOpenChange={setIsTranscriptConfigDialogOpen}
+			/>
+			<Dialog open={isPromptDialogOpen} onOpenChange={setIsPromptDialogOpen}>
 				<DialogContent className="prompt-editor-dialog max-h-[88vh] overflow-hidden border-none p-0 text-white sm:max-w-[760px]">
 					<div className="prompt-editor-shell">
 						<div className="prompt-editor-orb prompt-editor-orb-left" />
@@ -476,7 +507,7 @@ export function MoreMenu() {
 											type="button"
 											variant="ghost"
 											className="prompt-editor-tertiary-button"
-											onClick={() => setIsDialogOpen(false)}
+											onClick={() => setIsPromptDialogOpen(false)}
 										>
 											取消
 										</Button>

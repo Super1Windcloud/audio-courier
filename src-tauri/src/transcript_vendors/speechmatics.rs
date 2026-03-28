@@ -1,7 +1,9 @@
+use crate::provider_config::{
+    TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
+};
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use speechmatics::realtime::models::ConversationConfig;
 use speechmatics::realtime::{ReadMessage, RealtimeSession, SessionConfig, models};
-use std::env;
 use std::io;
 use std::pin::Pin;
 use std::sync::Mutex;
@@ -22,13 +24,21 @@ impl SpeechmaticsTranscriber {
         sample_rate: u32,
         callback: PcmCallback,
         status_callback: Option<StatusCallback>,
+        transcript_config: TranscriptRuntimeConfig,
     ) -> Result<Self, String> {
-        let api_key = env::var("SPEECHMATICS_API_KEY")
-            .map_err(|e| format!("Missing SPEECHMATICS_API_KEY environment variable: {e}"))?;
-        let language = env::var("SPEECHMATICS_LANGUAGE")
-            .ok()
-            .filter(|value| !value.is_empty());
-        let url = Some("wss://eu2.rt.speechmatics.com/v2/".to_string());
+        let api_key = resolve_required_string(
+            transcript_config.speechmatics_api_key.as_deref(),
+            &["SPEECHMATICS_API_KEY"],
+            "SPEECHMATICS_API_KEY",
+        )?;
+        let language = resolve_optional_string(
+            transcript_config.speechmatics_language.as_deref(),
+            &["SPEECHMATICS_LANGUAGE"],
+        );
+        let url = resolve_optional_string(
+            transcript_config.speechmatics_rt_url.as_deref(),
+            &["SPEECHMATICS_RT_URL"],
+        );
 
         let (sender, receiver) = mpsc::channel::<Vec<u8>>(64);
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();

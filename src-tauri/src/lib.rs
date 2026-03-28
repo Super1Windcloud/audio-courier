@@ -5,6 +5,7 @@ mod constant;
 pub mod license;
 mod llm;
 mod loopback;
+mod provider_config;
 mod transcript_vendors;
 mod utils;
 pub use audio_stream::*;
@@ -227,6 +228,7 @@ pub fn run() {
             sign_activation_license,
             open_license_signer,
             toggle_devtools,
+            chat_with_llm_provider,
             siliconflow_free,
             siliconflow_pro,
             doubao_lite,

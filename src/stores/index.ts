@@ -8,15 +8,19 @@ import {
 import { logError } from "@/lib/logger.ts";
 import type { LicenseStatus } from "@/types/license.ts";
 import { MODEL_OPTIONS, type ModelOption } from "@/types/llm.ts";
-
-export type TranscribeVendor =
-	| "assemblyai"
-	| "deepgram"
-	| "gladia"
-	| "revai"
-	| "speechmatics";
+import {
+	createDefaultLlmProviderSettings,
+	createDefaultTranscriptProviderSettings,
+	type LlmProviderSettings,
+	normalizeLlmProviderSettings,
+	normalizeTranscriptProviderSettings,
+	TRANSCRIBE_VENDORS,
+	type TranscribeVendor,
+	type TranscriptProviderSettings,
+} from "@/types/provider.ts";
 
 export type UiTextTone = "light" | "dark";
+export type { TranscribeVendor } from "@/types/provider.ts";
 
 interface AppStateStore {
 	currentSelectedModel: ModelOption;
@@ -56,6 +60,14 @@ interface AppStateStore {
 
 	uiTextTone: UiTextTone;
 	updateUiTextTone: (target: UiTextTone) => void;
+
+	llmProviderSettings: LlmProviderSettings;
+	updateLlmProviderSettings: (target: LlmProviderSettings) => void;
+
+	transcriptProviderSettings: TranscriptProviderSettings;
+	updateTranscriptProviderSettings: (
+		target: TranscriptProviderSettings,
+	) => void;
 }
 
 type PersistedAppConfigState = Pick<
@@ -70,18 +82,13 @@ type PersistedAppConfigState = Pick<
 	| "isUsePreRecorded"
 	| "uiOpacity"
 	| "uiTextTone"
+	| "llmProviderSettings"
+	| "transcriptProviderSettings"
 >;
 
 const DEFAULT_LLM_PROMPT = import.meta.env.VITE_PROMPT || "";
 const DEFAULT_INTERVIEW_PROMPT = import.meta.env.VITE_INTERVIEW_PROMPT || "";
 const LEGACY_UI_DEFAULTS = readLegacyUiConfigDefaults();
-const TRANSCRIBE_VENDORS: readonly TranscribeVendor[] = [
-	"assemblyai",
-	"deepgram",
-	"gladia",
-	"revai",
-	"speechmatics",
-];
 
 function normalizeUiOpacity(target: number) {
 	return Math.min(1, Math.max(0.3, Number(target.toFixed(2))));
@@ -125,6 +132,8 @@ function createDefaultPersistedConfigState(): PersistedAppConfigState {
 		isUsePreRecorded: false,
 		uiOpacity: normalizeUiOpacity(LEGACY_UI_DEFAULTS.uiOpacity ?? 1),
 		uiTextTone: normalizeUiTextTone(LEGACY_UI_DEFAULTS.uiTextTone),
+		llmProviderSettings: createDefaultLlmProviderSettings(),
+		transcriptProviderSettings: createDefaultTranscriptProviderSettings(),
 	};
 }
 
@@ -178,6 +187,12 @@ function normalizePersistedAppConfigState(
 		uiTextTone: normalizeUiTextTone(
 			persistedState.uiTextTone ?? currentState.uiTextTone,
 		),
+		llmProviderSettings: normalizeLlmProviderSettings(
+			persistedState.llmProviderSettings,
+		),
+		transcriptProviderSettings: normalizeTranscriptProviderSettings(
+			persistedState.transcriptProviderSettings,
+		),
 	};
 }
 
@@ -195,6 +210,8 @@ function pickPersistedAppConfigState(
 		isUsePreRecorded: state.isUsePreRecorded,
 		uiOpacity: state.uiOpacity,
 		uiTextTone: state.uiTextTone,
+		llmProviderSettings: state.llmProviderSettings,
+		transcriptProviderSettings: state.transcriptProviderSettings,
 	};
 }
 
@@ -209,6 +226,20 @@ const useAppStateStore = create<AppStateStore>()(
 			},
 			updateUiTextTone: (target: UiTextTone) => {
 				set({ uiTextTone: normalizeUiTextTone(target) });
+			},
+			llmProviderSettings: defaultPersistedConfigState.llmProviderSettings,
+			updateLlmProviderSettings: (target: LlmProviderSettings) => {
+				set({ llmProviderSettings: normalizeLlmProviderSettings(target) });
+			},
+			transcriptProviderSettings:
+				defaultPersistedConfigState.transcriptProviderSettings,
+			updateTranscriptProviderSettings: (
+				target: TranscriptProviderSettings,
+			) => {
+				set({
+					transcriptProviderSettings:
+						normalizeTranscriptProviderSettings(target),
+				});
 			},
 			updatePreRecorded: (target: boolean) => {
 				set({ isUsePreRecorded: target });

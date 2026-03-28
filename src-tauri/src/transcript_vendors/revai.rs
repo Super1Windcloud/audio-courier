@@ -1,11 +1,13 @@
 #![allow(clippy::collapsible_if)]
 
+use crate::provider_config::{
+    TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
+};
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 #[cfg(target_os = "windows")]
 use native_tls::TlsConnector;
 use serde_json::Value;
-use std::env;
 use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
@@ -35,11 +37,21 @@ impl RevAiTranscriber {
         sample_rate: u32,
         callback: PcmCallback,
         status_callback: Option<StatusCallback>,
+        transcript_config: TranscriptRuntimeConfig,
     ) -> Result<Self, String> {
-        let api_key = env::var("REVAI_API_KEY")
-            .map_err(|e| format!("Missing REVAI_API_KEY environment variable: {e}"))?;
-        let metadata = env::var("REVAI_METADATA").ok();
-        let language = env::var("REVAI_LANGUAGE").ok();
+        let api_key = resolve_required_string(
+            transcript_config.revai_api_key.as_deref(),
+            &["REVAI_API_KEY"],
+            "REVAI_API_KEY",
+        )?;
+        let metadata = resolve_optional_string(
+            transcript_config.revai_metadata.as_deref(),
+            &["REVAI_METADATA"],
+        );
+        let language = resolve_optional_string(
+            transcript_config.revai_language.as_deref(),
+            &["REVAI_LANGUAGE"],
+        );
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();

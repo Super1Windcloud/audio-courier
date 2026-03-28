@@ -1,9 +1,9 @@
 #![allow(clippy::collapsible_if)]
 
+use crate::provider_config::{TranscriptRuntimeConfig, resolve_required_string};
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use serde_json::{Value, json};
-use std::env;
 use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
@@ -23,9 +23,13 @@ impl AssemblyAiTranscriber {
         sample_rate: u32,
         callback: PcmCallback,
         status_callback: Option<StatusCallback>,
+        transcript_config: TranscriptRuntimeConfig,
     ) -> Result<Self, String> {
-        let api_key = env::var("ASSEMBLY_API_KEY")
-            .map_err(|e| format!("Missing ASSEMBLY_API_KEY environment variable: {e}"))?;
+        let api_key = resolve_required_string(
+            transcript_config.assembly_api_key.as_deref(),
+            &["ASSEMBLY_API_KEY"],
+            "ASSEMBLY_API_KEY",
+        )?;
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();

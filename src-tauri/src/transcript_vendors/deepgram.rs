@@ -1,3 +1,6 @@
+use crate::provider_config::{
+    TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
+};
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use bytes::{BufMut, Bytes, BytesMut};
 #[allow(unused_imports)]
@@ -10,7 +13,6 @@ use deepgram::{
 };
 use futures::channel::mpsc as futures_mpsc;
 use futures_util::{SinkExt, StreamExt};
-use std::env;
 use std::fmt;
 use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
@@ -28,9 +30,17 @@ impl DeepgramTranscriber {
         sample_rate: u32,
         callback: PcmCallback,
         status_callback: Option<StatusCallback>,
+        transcript_config: TranscriptRuntimeConfig,
     ) -> Result<Self, String> {
-        let api_key = env::var("DEEPGRAM_API_KEY")
-            .map_err(|e| format!("Missing DEEPGRAM_API_KEY environment variable: {e}"))?;
+        let api_key = resolve_required_string(
+            transcript_config.deepgram_api_key.as_deref(),
+            &["DEEPGRAM_API_KEY"],
+            "DEEPGRAM_API_KEY",
+        )?;
+        let language = resolve_optional_string(
+            transcript_config.deepgram_language.as_deref(),
+            &["DEEPGRAM_LANGUAGE"],
+        );
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
@@ -39,6 +49,7 @@ impl DeepgramTranscriber {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
             if let Err(err) = runtime.block_on(run_stream(
                 api_key,
+                language,
                 sample_rate,
                 callback,
                 receiver,
@@ -98,6 +109,7 @@ impl StreamingTranscriber for DeepgramTranscriber {
 
 async fn run_stream(
     api_key: String,
+    language: Option<String>,
     sample_rate: u32,
     callback: PcmCallback,
     mut audio_rx: mpsc::Receiver<Vec<i16>>,
@@ -109,7 +121,7 @@ async fn run_stream(
     let transcription = deepgram.transcription();
 
     let builder = transcription
-        .stream_request_with_options(build_stream_options())
+        .stream_request_with_options(build_stream_options(language.as_deref()))
         .keep_alive()
         .encoding(Encoding::Linear16)
         .sample_rate(sample_rate)
@@ -184,10 +196,10 @@ fn pcm_chunk_to_bytes(chunk: &[i16]) -> Bytes {
     buffer.freeze()
 }
 
-fn build_stream_options() -> Options {
+fn build_stream_options(language: Option<&str>) -> Options {
     let mut builder = Options::builder();
     let mut select_language = Language::zh_CN;
-    if let Some(language) = language_from_env() {
+    if let Some(language) = language_from_value(language) {
         select_language = language;
         builder = builder.language(select_language.clone());
     }
@@ -202,9 +214,8 @@ fn build_stream_options() -> Options {
     builder.build()
 }
 
-fn language_from_env() -> Option<Language> {
-    let raw = env::var("DEEPGRAM_LANGUAGE").ok()?;
-    let trimmed = raw.trim();
+fn language_from_value(value: Option<&str>) -> Option<Language> {
+    let trimmed = value?.trim();
     if trimmed.is_empty() {
         return None;
     }

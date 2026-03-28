@@ -1,11 +1,14 @@
 #![allow(clippy::collapsible_if)]
 
+use crate::provider_config::{
+    TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
+    resolve_string_or_default,
+};
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::env;
 use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
@@ -33,10 +36,22 @@ impl GladiaTranscriber {
         sample_rate: u32,
         callback: PcmCallback,
         status_callback: Option<StatusCallback>,
+        transcript_config: TranscriptRuntimeConfig,
     ) -> Result<Self, String> {
-        let api_key = env::var("GLADIA_API_KEY")
-            .map_err(|e| format!("Missing GLADIA_API_KEY environment variable: {e}"))?;
-        let language = env::var("GLADIA_LANGUAGE").ok();
+        let api_key = resolve_required_string(
+            transcript_config.gladia_api_key.as_deref(),
+            &["GLADIA_API_KEY"],
+            "GLADIA_API_KEY",
+        )?;
+        let language = resolve_optional_string(
+            transcript_config.gladia_language.as_deref(),
+            &["GLADIA_LANGUAGE"],
+        );
+        let model = resolve_string_or_default(
+            transcript_config.gladia_model.as_deref(),
+            &["GLADIA_MODEL"],
+            "solaria-1",
+        );
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
@@ -46,6 +61,7 @@ impl GladiaTranscriber {
             if let Err(err) = runtime.block_on(run_stream(
                 api_key,
                 language,
+                model,
                 sample_rate,
                 callback,
                 receiver,
@@ -112,12 +128,13 @@ impl StreamingTranscriber for GladiaTranscriber {
 async fn run_stream(
     api_key: String,
     language: Option<String>,
+    model: String,
     sample_rate: u32,
     callback: PcmCallback,
     mut audio_rx: mpsc::Receiver<Vec<i16>>,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), String> {
-    let ws_url = create_live_session(&api_key, sample_rate, language.as_deref()).await?;
+    let ws_url = create_live_session(&api_key, &model, sample_rate, language.as_deref()).await?;
     let uri: Uri = ws_url
         .parse()
         .map_err(|e| format!("Failed to parse Gladia websocket URI: {e}"))?;
@@ -349,11 +366,11 @@ fn is_error_payload(payload: &str) -> bool {
 
 async fn create_live_session(
     api_key: &str,
+    model: &str,
     sample_rate: u32,
     language: Option<&str>,
 ) -> Result<String, String> {
     let client = Client::new();
-    let model = env::var("GLADIA_MODEL").unwrap_or_else(|_| "solaria-1".to_string());
     let language_config = language
         .filter(|lang| !lang.is_empty())
         .map(|lang| LanguageConfig {
@@ -368,7 +385,7 @@ async fn create_live_session(
         channels: 1,
         endpointing: 0.4,
         maximum_duration_without_endpointing: 60,
-        model,
+        model: model.to_string(),
         language_config,
         messages_config: MessagesConfig {
             receive_partial_transcripts: RECEIVE_PARTIAL_TRANSCRIPTS,

@@ -1,6 +1,7 @@
 #![allow(clippy::needless_bool)]
 
 use crate::loopback::{RecordParams, start_record_audio_with_writer, stop_recording};
+use crate::provider_config::TranscriptRuntimeConfig;
 use cpal::traits::{DeviceTrait, HostTrait};
 use std::sync::{Arc, Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
@@ -67,6 +68,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     device_name: Option<String>,
     selected_asr_vendor: String,
     capture_interval: u32,
+    transcript_config: Option<TranscriptRuntimeConfig>,
 ) {
     let device = if let Some(name) = device_name {
         if name.contains("输入") {
@@ -102,6 +104,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
         auto_chunk_buffer: false,
         selected_asr_vendor,
         status_callback: Some(status_callback),
+        transcript_config,
     };
 
     if let Ok(handle) = start_record_audio_with_writer(params) {
