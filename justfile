@@ -30,7 +30,10 @@ publish:
 build:
     pnpm release:build
 
-clean :
+apple_arm:
+    RELEASE_TAURI_ARGS="--target aarch64-apple-darwin" just release
+
+clean:
    cd  src-tauri &&  cargo clean
 
 upgrade:

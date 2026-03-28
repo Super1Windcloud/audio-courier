@@ -55,6 +55,17 @@ fn primary_plain_log_path() -> PathBuf {
         }
     }
 
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(home) = env::var_os("HOME") {
+            return PathBuf::from(home)
+                .join("Library")
+                .join("Logs")
+                .join(APP_IDENTIFIER)
+                .join(APP_LOG_FILE_NAME);
+        }
+    }
+
     PathBuf::from(APP_LOG_FILE_NAME)
 }
 
@@ -74,6 +85,19 @@ fn legacy_log_paths() -> Vec<PathBuf> {
                 local_app_data
                     .join(APP_PRODUCT_NAME)
                     .join(LEGACY_APP_LOG_FILE_NAME),
+            );
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(home) = env::var_os("HOME") {
+            let home = PathBuf::from(home);
+            paths.push(
+                home.join("Library")
+                    .join("Application Support")
+                    .join(APP_IDENTIFIER)
+                    .join(APP_LOG_FILE_NAME),
             );
         }
     }

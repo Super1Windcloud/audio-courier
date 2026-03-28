@@ -165,7 +165,7 @@ async function publishRelease(version: string) {
 		version,
 	});
 
-	if (artifactContext.uploads.length === 0 || !artifactContext.manifestEntry) {
+	if (artifactContext.uploads.length === 0 || Object.keys(artifactContext.platformEntries).length === 0) {
 		throw new Error(
 			"no updater artifacts found. build first with a signing key so .sig files are generated",
 		);
@@ -203,10 +203,7 @@ async function publishRelease(version: string) {
 		pub_date: new Date().toISOString(),
 		platforms: {
 			...(currentLatest?.platforms ?? {}),
-			[artifactContext.manifestEntry.platform]: {
-				signature: artifactContext.manifestEntry.signature,
-				url: artifactContext.manifestEntry.url,
-			},
+			...artifactContext.platformEntries,
 		},
 	};
 
@@ -305,106 +302,115 @@ async function collectArtifacts(input: {
 	version: string;
 }) {
 	const files = await listFiles(input.bundleDir);
-	const preferred = findPreferredArtifact(
-		files,
-		input.targetTriple,
-		input.version,
-	);
+	const allArtifacts = files
+		.filter((filePath) => !filePath.endsWith(".sig"))
+		.map((filePath) => {
+			const metadata = classifyArtifact(filePath, input.targetTriple);
+			const signaturePath = `${filePath}.sig`;
+			return metadata
+				? {
+						...metadata,
+						artifactPath: filePath,
+						signaturePath,
+						hasSignature: files.includes(signaturePath),
+					}
+				: null;
+		})
+		.filter((item): item is PreferredArtifact & { hasSignature: boolean } => item !== null);
 
-	if (!preferred) {
+	if (allArtifacts.length === 0) {
 		return {
 			uploads: [] as UploadAsset[],
-			manifestEntry: null,
+			platformEntries: {} as Record<string, { signature: string; url: string }>,
 		};
 	}
 
-	const uploads = preferred.relatedFiles.map(async (filePath) => ({
-		name: path.basename(filePath),
-		contentType: contentTypeFor(filePath),
-		buffer: await readFile(filePath),
-	}));
+	// Prepare all artifacts for upload
+	const uploadPromises: Promise<UploadAsset>[] = [];
+	const platformEntries: Record<string, { signature: string; url: string }> = {};
 
-	return {
-		uploads: await Promise.all(uploads),
-		manifestEntry: {
-			platform: preferred.platform,
-			signature: (await readFile(preferred.signaturePath, "utf8")).trim(),
-			url: `https://github.com/${input.repository}/releases/download/${input.tagName}/${encodeURIComponent(
-				sanitizeGitHubAssetName(path.basename(preferred.artifactPath)),
-			)}`,
-		},
-	};
-}
+	for (const item of allArtifacts) {
+		uploadPromises.push(
+			(async () => ({
+				name: path.basename(item.artifactPath),
+				contentType: contentTypeFor(item.artifactPath),
+				buffer: await readFile(item.artifactPath),
+			}))(),
+		);
 
-function findPreferredArtifact(
-	files: string[],
-	targetTriple: string | null,
-	version: string,
-) {
-	const artifacts = files
-		.filter((filePath) => !filePath.endsWith(".sig"))
-		.map((filePath) => {
-			const signaturePath = `${filePath}.sig`;
-			return {
-				artifactPath: filePath,
-				signaturePath,
-				hasSignature: files.includes(signaturePath),
-			};
-		})
-		.filter((item) => item.hasSignature)
-		.filter((item) => path.basename(item.artifactPath).includes(`_${version}_`))
-		.map((item) => {
-			const metadata = classifyArtifact(item.artifactPath, targetTriple);
-			return metadata ? { ...item, ...metadata } : null;
-		})
-		.filter((item): item is PreferredArtifact => item !== null);
+		if (item.hasSignature) {
+			uploadPromises.push(
+				(async () => ({
+					name: path.basename(item.signaturePath),
+					contentType: contentTypeFor(item.signaturePath),
+					buffer: await readFile(item.signaturePath),
+				}))(),
+			);
 
-	const preferredOrder = ["nsis", "appimage", "app-tar", "msi"];
-	for (const kind of preferredOrder) {
-		const match = artifacts.find((item) => item.kind === kind);
-		if (match) {
-			return {
-				...match,
-				relatedFiles: [match.artifactPath, match.signaturePath],
-			};
+			// Add to manifest entries (prioritize kinds by order)
+			const currentEntry = platformEntries[item.platform];
+			const priority = ["nsis", "dmg", "appimage", "app-tar", "msi"];
+			const currentKindIndex = currentEntry ? priority.indexOf((currentEntry as any).kind) : 99;
+			const newKindIndex = priority.indexOf(item.kind);
+
+			if (newKindIndex < currentKindIndex) {
+				platformEntries[item.platform] = {
+					signature: (await readFile(item.signaturePath, "utf8")).trim(),
+					url: `https://github.com/${input.repository}/releases/download/${input.tagName}/${encodeURIComponent(
+						sanitizeGitHubAssetName(path.basename(item.artifactPath)),
+					)}`,
+				} as any;
+				(platformEntries[item.platform] as any).kind = item.kind;
+			}
 		}
 	}
 
-	return null;
+	const uploads = await Promise.all(uploadPromises);
+
+	// Clean up temporary kind markers
+	for (const key in platformEntries) {
+		delete (platformEntries[key] as any).kind;
+	}
+
+	return {
+		uploads,
+		platformEntries,
+	};
 }
 
 function classifyArtifact(filePath: string, targetTriple: string | null) {
 	const fileName = path.basename(filePath);
+	let osName = "";
+	if (fileName.endsWith(".AppImage")) osName = "linux";
+	else if (fileName.endsWith(".app.tar.gz") || fileName.endsWith(".dmg"))
+		osName = "darwin";
+	else if (fileName.endsWith(".msi") || fileName.endsWith(".exe"))
+		osName = "windows";
 
-	if (fileName.endsWith(".AppImage")) {
-		return {
-			kind: "appimage",
-			platform: platformKey("linux", targetTriple),
-		} as const;
-	}
+	if (!osName) return null;
 
-	if (fileName.endsWith(".app.tar.gz")) {
-		return {
-			kind: "app-tar",
-			platform: platformKey("darwin", targetTriple),
-		} as const;
-	}
+	// Inferred architecture
+	let arch = targetTriple
+		? archFromTargetTriple(targetTriple)
+		: archFromNode(process.arch);
+	if (fileName.includes("_x64") || fileName.includes("x86_64")) arch = "x86_64";
+	else if (fileName.includes("_aarch64") || fileName.includes("_arm64"))
+		arch = "aarch64";
 
-	if (fileName.endsWith(".msi")) {
-		return {
-			kind: "msi",
-			platform: platformKey("windows", targetTriple),
-		} as const;
-	}
+	const kind = fileName.endsWith(".AppImage")
+		? "appimage"
+		: fileName.endsWith(".app.tar.gz")
+			? "app-tar"
+			: fileName.endsWith(".dmg")
+				? "dmg"
+				: fileName.endsWith(".msi")
+					? "msi"
+					: "nsis";
 
-	if (fileName.endsWith(".exe")) {
-		return {
-			kind: "nsis",
-			platform: platformKey("windows", targetTriple),
-		} as const;
-	}
-
-	return null;
+	return {
+		kind,
+		platform: `${osName}-${arch}`,
+	} as const;
 }
 
 function platformKey(osName: string, targetTriple: string | null) {
@@ -761,7 +767,7 @@ type PreferredArtifact = {
 	artifactPath: string;
 	signaturePath: string;
 	hasSignature: boolean;
-	kind: "nsis" | "appimage" | "app-tar" | "msi";
+	kind: "nsis" | "dmg" | "appimage" | "app-tar" | "msi";
 	platform: string;
 	relatedFiles: string[];
 };
