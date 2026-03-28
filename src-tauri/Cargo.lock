@@ -292,7 +292,7 @@ checksum = "f93ebbf82d06013f4c41fe71303feb980cddd78496d904d06be627972de51a24"
 
 [[package]]
 name = "audio-courier"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "base64 0.22.1",
  "bytes",

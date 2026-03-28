@@ -14,3 +14,5 @@ app.log
 src/constant.rs
 .env
 .idea
+
+*.log
