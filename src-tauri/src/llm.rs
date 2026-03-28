@@ -39,6 +39,7 @@ struct ResolvedLlmProvider {
     max_tokens: u32,
     temperature: f32,
     prompt_role: &'static str,
+    enable_thinking: Option<bool>,
 }
 
 pub fn siliconflow_free_models() -> &'static [&'static str] {
@@ -65,6 +66,7 @@ pub async fn siliconflow_free_with_model(
             api_key,
             max_tokens: 4096,
             temperature: 0.7,
+            enable_thinking: None,
         },
         flow_args.request_id,
     )
@@ -86,17 +88,30 @@ pub async fn siliconflow_free(
     siliconflow_free_with_model(app, flow_args, random_model).await
 }
 
-const PRO_MODELS: [&str; 10] = [
-    "Pro/Qwen/Qwen2.5-7B-Instruct",    //0.17S
-    "Qwen/Qwen2.5-14B-Instruct",       // 0.21S
-    "Qwen/Qwen2.5-Coder-32B-Instruct", //0.14S
-    "Qwen/Qwen2.5-32B-Instruct",       // 0.23S
-    "THUDM/GLM-4-32B-0414",            //0.29S
-    "inclusionAI/Ling-flash-2.0",      // 0.4S
-    "Qwen/Qwen2.5-72B-Instruct-128K",  //0.53S
-    "zai-org/GLM-4.5-Air",             //0.41S
-    "deepseek-ai/DeepSeek-V3",         //0.68S
-    "baidu/ERNIE-4.5-300B-A47B",       // 0.16S
+const PRO_MODELS: [&str; 23] = [
+    "Pro/zai-org/GLM-5",
+    "Pro/zai-org/GLM-4.7",
+    "deepseek-ai/DeepSeek-V3.2",
+    "Pro/deepseek-ai/DeepSeek-V3.2",
+    "zai-org/GLM-4.6",
+    "Qwen/Qwen3-8B",
+    "Qwen/Qwen3-14B",
+    "Qwen/Qwen3-32B",
+    "Qwen/Qwen3-30B-A3B",
+    "tencent/Hunyuan-A13B-Instruct",
+    "zai-org/GLM-4.5V",
+    "deepseek-ai/DeepSeek-V3.1-Terminus",
+    "Pro/deepseek-ai/DeepSeek-V3.1-Terminus",
+    "Qwen/Qwen3.5-397B-A17B",
+    "Qwen/Qwen3.5-122B-A10B",
+    "Qwen/Qwen3.5-35B-A3B",
+    "Qwen/Qwen2.5-14B-Instruct",
+    "Qwen/Qwen2.5-32B-Instruct",
+    "inclusionAI/Ling-flash-2.0",
+    "Qwen/Qwen2.5-72B-Instruct-128K",
+    "zai-org/GLM-4.5-Air",
+    "deepseek-ai/DeepSeek-V3",
+    "baidu/ERNIE-4.5-300B-A47B",
 ];
 
 pub fn siliconflow_pro_models() -> &'static [&'static str] {
@@ -134,6 +149,7 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.7,
             prompt_role: "assistant",
+            enable_thinking: Some(false),
         }),
         "doubao_lite" => Ok(ResolvedLlmProvider {
             model: "doubao-1.5-lite-32k-250115".to_string(),
@@ -146,6 +162,7 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.7,
             prompt_role: "system",
+            enable_thinking: None,
         }),
         "doubao_pro" => Ok(ResolvedLlmProvider {
             model: "doubao-1.5-pro-32k-250115".to_string(),
@@ -158,6 +175,7 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.7,
             prompt_role: "assistant",
+            enable_thinking: None,
         }),
         "kimi" => Ok(ResolvedLlmProvider {
             model: "kimi-k2-0905-preview".to_string(),
@@ -170,6 +188,7 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.7,
             prompt_role: "system",
+            enable_thinking: None,
         }),
         "zhipu" => Ok(ResolvedLlmProvider {
             model: "glm-4.5".to_string(),
@@ -182,6 +201,7 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.618,
             prompt_role: "system",
+            enable_thinking: None,
         }),
         "deepseek_api" => Ok(ResolvedLlmProvider {
             model: "deepseek-chat".to_string(),
@@ -194,6 +214,7 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.7,
             prompt_role: "system",
+            enable_thinking: None,
         }),
         "ali_qwen_2_5" => Ok(ResolvedLlmProvider {
             model: "qwen2.5-14b-instruct-1m".to_string(),
@@ -206,6 +227,7 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.7,
             prompt_role: "system",
+            enable_thinking: None,
         }),
         "ali_qwen_plus_latest" => Ok(ResolvedLlmProvider {
             model: "qwen-plus".to_string(),
@@ -218,6 +240,7 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.7,
             prompt_role: "system",
+            enable_thinking: None,
         }),
         "ali_qwen_max" => Ok(ResolvedLlmProvider {
             model: "qwen-max-2025-01-25".to_string(),
@@ -230,6 +253,7 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.7,
             prompt_role: "system",
+            enable_thinking: None,
         }),
         "openai" => Ok(ResolvedLlmProvider {
             model: resolve_string_or_default(
@@ -250,6 +274,7 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.7,
             prompt_role: "system",
+            enable_thinking: None,
         }),
         "gemini" => Ok(ResolvedLlmProvider {
             model: resolve_string_or_default(
@@ -270,6 +295,7 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.7,
             prompt_role: "system",
+            enable_thinking: None,
         }),
         "custom_openai" => Ok(ResolvedLlmProvider {
             model: resolve_required_string(
@@ -290,6 +316,7 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.7,
             prompt_role: "system",
+            enable_thinking: None,
         }),
         _ => Err(format!("不支持的大模型供应商: {provider}")),
     }
@@ -315,6 +342,7 @@ pub async fn chat_with_llm_provider(
             api_key: resolved.api_key,
             max_tokens: resolved.max_tokens,
             temperature: resolved.temperature,
+            enable_thinking: resolved.enable_thinking,
         },
         flow_args.request_id,
     )
@@ -342,6 +370,7 @@ pub async fn siliconflow_pro_with_model(
             api_key,
             max_tokens: 4096,
             temperature: 0.7,
+            enable_thinking: None,
         },
         flow_args.request_id,
     )
@@ -378,6 +407,7 @@ pub async fn doubao_lite(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<S
             api_key,
             max_tokens: 4096,
             temperature: 0.7,
+            enable_thinking: None,
         },
         flow_args.request_id,
     )
@@ -402,6 +432,7 @@ pub async fn doubao_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<St
             api_key,
             max_tokens: 4096,
             temperature: 0.7,
+            enable_thinking: None,
         },
         flow_args.request_id,
     )
@@ -429,6 +460,7 @@ pub async fn doubao_seed_flash(
             api_key,
             max_tokens: 4096,
             temperature: 0.7,
+            enable_thinking: None,
         },
         flow_args.request_id,
     )
@@ -453,6 +485,7 @@ pub async fn doubao_seed(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<S
             api_key,
             max_tokens: 4096,
             temperature: 0.7,
+            enable_thinking: None,
         },
         flow_args.request_id,
     )
@@ -478,6 +511,7 @@ pub async fn kimi(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, 
             api_key,
             max_tokens: 4096,
             temperature: 0.7,
+            enable_thinking: None,
         },
         flow_args.request_id,
     )
@@ -503,6 +537,7 @@ pub async fn zhipu(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String,
             api_key,
             max_tokens: 4096,
             temperature: 0.618,
+            enable_thinking: None,
         },
         flow_args.request_id,
     )
@@ -528,6 +563,7 @@ pub async fn deepseek_api(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<
             api_key,
             max_tokens: 4096,
             temperature: 0.7,
+            enable_thinking: None,
         },
         flow_args.request_id,
     )
@@ -553,6 +589,7 @@ pub async fn ali_qwen_2_5(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<
             api_key,
             max_tokens: 4096,
             temperature: 0.7,
+            enable_thinking: None,
         },
         flow_args.request_id,
     )
@@ -580,6 +617,7 @@ pub async fn ali_qwen_plus_latest(
             api_key,
             max_tokens: 4096,
             temperature: 0.7,
+            enable_thinking: None,
         },
         flow_args.request_id,
     )
@@ -604,6 +642,7 @@ pub async fn ali_qwen_max(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<
             api_key,
             max_tokens: 4096,
             temperature: 0.7,
+            enable_thinking: None,
         },
         flow_args.request_id,
     )

@@ -34,9 +34,9 @@ export async function llmInterviewChatStreamOutput(
 	})
 		.then(() => {})
 		.catch((err) => {
-			console.error("invoke llmModel Error", err);
-			logError("invoke llmModel Error", err);
-			toast.error(`invoke llm err ${err}`);
+			console.error(`invoke llmModel Error model=${currentModel}`, err);
+			logError(`invoke llmModel Error model=${currentModel}`, err);
+			toast.error(`invoke llm err model=${currentModel} ${err}`);
 		})
 		.finally(() => {
 			unlisten();

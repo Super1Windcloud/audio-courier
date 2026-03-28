@@ -14,6 +14,7 @@ pub struct ModelRequest {
     pub api_key: String,
     pub max_tokens: u32,
     pub temperature: f32,
+    pub enable_thinking: Option<bool>,
 }
 
 #[derive(Debug)]
@@ -22,7 +23,7 @@ pub enum ModelError {
     InvalidResponse(String),
     Timeout,
     RateLimited,
-    Unauthorized,
+    Unauthorized(String),
     InternalServerError,
     StreamingError(String),
     JsonParseError(String),
@@ -35,7 +36,7 @@ impl std::fmt::Display for ModelError {
             ModelError::InvalidResponse(msg) => write!(f, "服务器响应无效: {}", msg),
             ModelError::Timeout => write!(f, "请求超时"),
             ModelError::RateLimited => write!(f, "请求频率限制，请稍后重试"),
-            ModelError::Unauthorized => write!(f, "API密钥无效或未授权"),
+            ModelError::Unauthorized(msg) => write!(f, "API密钥无效或未授权: {}", msg),
             ModelError::InternalServerError => write!(f, "服务器内部错误"),
             ModelError::StreamingError(msg) => write!(f, "流式传输错误: {}", msg),
             ModelError::JsonParseError(msg) => write!(f, "JSON解析错误: {}", msg),
@@ -48,11 +49,24 @@ pub async fn call_model_api(
     req: ModelRequest,
     request_id: Option<String>,
 ) -> Result<String, ModelError> {
+    let model_name = req.model.clone();
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(120)) // 设置总超时时间
         .connect_timeout(Duration::from_secs(30)) // 连接超时
         .build()
         .map_err(|e| ModelError::NetworkError(format!("客户端创建失败: {}", e)))?;
+
+    let mut request_body = json!({
+        "model": req.model,
+        "messages": req.messages,
+        "temperature": req.temperature,
+        "max_tokens": req.max_tokens,
+        "stream": true
+    });
+
+    if let Some(enable_thinking) = req.enable_thinking {
+        request_body["enable_thinking"] = json!(enable_thinking);
+    }
 
     // 发送请求并处理基本网络错误
     let response = client
@@ -61,13 +75,7 @@ pub async fn call_model_api(
             req.base_url.trim_end_matches('/')
         ))
         .header("Authorization", format!("Bearer {}", req.api_key))
-        .json(&json!({
-            "model": req.model,
-            "messages": req.messages,
-            "temperature": req.temperature,
-            "max_tokens": req.max_tokens,
-            "stream": true
-        }))
+        .json(&request_body)
         .send()
         .await
         .map_err(|e| {
@@ -85,11 +93,19 @@ pub async fn call_model_api(
     // 检查HTTP状态码
     let status = response.status();
     if !status.is_success() {
+        let error_body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "无法读取错误响应体".to_string());
         return Err(match status.as_u16() {
-            401 => ModelError::Unauthorized,
+            401 => ModelError::Unauthorized(format!(
+                "model={model_name}, HTTP状态码: {status}, 响应体: {error_body}"
+            )),
             429 => ModelError::RateLimited,
             500..=599 => ModelError::InternalServerError,
-            _ => ModelError::InvalidResponse(format!("HTTP状态码: {}", status)),
+            _ => ModelError::InvalidResponse(format!(
+                "model={model_name}, HTTP状态码: {status}, 响应体: {error_body}"
+            )),
         });
     }
 
@@ -101,7 +117,9 @@ pub async fn call_model_api(
                 .unwrap_or("")
                 .contains("text/event-stream")
         {
-            return Err(ModelError::InvalidResponse("响应不是流式格式".to_string()));
+            return Err(ModelError::InvalidResponse(format!(
+                "model={model_name}, 响应不是流式格式"
+            )));
         }
     }
 
@@ -148,7 +166,7 @@ pub async fn call_model_api(
                                 // 检查是否有错误信息
                                 if let Some(error) = json_chunk.get("error") {
                                     return Err(ModelError::InvalidResponse(format!(
-                                        "API错误: {}",
+                                        "model={model_name}, API错误: {}",
                                         error
                                     )));
                                 }
