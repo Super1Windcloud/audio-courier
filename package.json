@@ -9,7 +9,6 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "vite",
-    "bump:version": "tsx scripts/bump-version.ts",
     "taze": "npx taze latest -w",
     "build": "tsc && vite build",
     "preview": "vite preview",
@@ -30,7 +29,8 @@
     "generate:signkey": "tauri signer generate -w .tauri/${npm_package_name}_signer.key",
     "prepare": "husky",
     "migrate": "biome migrate eslint --write",
-    "fix": "biome check --write"
+    "fix": "biome check --write",
+    "bump": "tsx scripts/bump-version.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",

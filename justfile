@@ -19,8 +19,12 @@ clear :
 pull :
    git pull repo main
 
+
 release:
-    pnpm bump:version
+    pnpm bump
+    pnpm release
+
+publish:
     pnpm release
 
 build:
