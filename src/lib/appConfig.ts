@@ -7,7 +7,7 @@ import {
 } from "zustand/middleware";
 import { logError } from "@/lib/logger.ts";
 
-const APP_CONFIG_STORE_PATH = "app-config.json";
+const APP_CONFIG_STORE_PATH = "audio-courier.settings.json";
 const LEGACY_UI_OPACITY_STORAGE_KEY = "audio-courier-ui-opacity";
 const LEGACY_UI_TEXT_TONE_STORAGE_KEY = "audio-courier-ui-text-tone";
 
