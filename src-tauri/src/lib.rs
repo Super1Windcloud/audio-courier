@@ -26,24 +26,34 @@ pub use utils::*;
 
 #[tauri::command]
 fn show_window(window: tauri::Window) -> Result<(), String> {
-    info!("show_window requested for {}", window.label());
+    // 绕过 info! 宏，直接写文件，确认函数是否被调用
+    write_some_log(&format!(
+        "CRITICAL DEBUG: show_window called for {}",
+        window.label()
+    ));
+
     if window.is_visible().unwrap() {
         info!("window {} already visible", window.label());
         return Ok(());
     }
+
     let splash = window.get_webview_window("splashscreen");
     if let Some(splash) = splash {
-        splash.close().unwrap();
+        let _ = splash.close();
     }
+
     window
         .set_size(LogicalSize::<i32>::from((800, 900)))
-        .unwrap();
-    window
-        .set_focus()
-        .map_err(|e| format!("Failed to set focus: {}", e))?;
+        .map_err(|e| format!("Failed to set size: {}", e))?;
+
+    // 在 macOS 上，必须先 show 再 set_focus
     window
         .show()
         .map_err(|e| format!("Failed to show window: {}", e))?;
+
+    window
+        .set_focus()
+        .map_err(|e| format!("Failed to set focus: {}", e))?;
 
     Ok(())
 }

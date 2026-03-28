@@ -2,7 +2,22 @@
 	"$schema": "../gen/schemas/desktop-schema.json",
 	"identifier": "default",
 	"description": "Capability for the main window",
-	"windows": ["main"],
-	"permissions": [],
-	"capabilities": []
+	"windows": ["main", "license-signer"],
+	"permissions": [
+		"core:default",
+		"core:window:default",
+		"core:app:default",
+		"core:resources:default",
+		"core:menu:default",
+		"core:tray:default",
+		"core:event:default",
+		"core:webview:default",
+		"core:webview:allow-internal-toggle-devtools",
+		"core:path:default",
+		"global-shortcut:default",
+		"updater:default",
+		"log:default",
+		"opener:default",
+		"allow-all-commands"
+	]
 }

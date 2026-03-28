@@ -110,12 +110,18 @@ function App() {
 			"license-signer";
 
 	useEffect(() => {
-		// Use requestAnimationFrame and a small timeout to ensure the window is shown after the first paint
-		requestAnimationFrame(() => {
-			setTimeout(() => {
-				invoke("show_window").then();
-			}, 100);
-		});
+		// On macOS, requestAnimationFrame might be suspended for hidden windows.
+		// Using a simple timeout to ensure the first paint attempt is registered.
+		const timer = setTimeout(() => {
+			invoke("show_window")
+				.then(() => console.log("show_window: success"))
+				.catch((err) => {
+					console.error("show_window: failed", err);
+					logError("show_window_failed", err);
+				});
+		}, 200);
+
+		return () => clearTimeout(timer);
 	}, []);
 
 	useEffect(() => {

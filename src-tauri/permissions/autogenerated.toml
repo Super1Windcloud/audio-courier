@@ -1,0 +1,36 @@
+[[permission]]
+identifier = "allow-all-commands"
+description = "Allows all custom commands defined in the rust code."
+commands.allow = [
+    "show_window",
+    "get_license_status",
+    "get_machine_code",
+    "verify_license",
+    "save_license",
+    "get_transcript_vendors",
+    "get_active_vendor",
+    "set_active_vendor",
+    "start_record_audio_with_writer",
+    "stop_recording",
+    "get_audio_devices",
+    "get_system_info",
+    "open_log_folder",
+    "sign_license",
+    "get_signer_status",
+    "get_audio_stream_devices_names",
+    "toggle_devtools",
+    "start_recognize_audio_stream_from_speaker_loopback",
+    "stop_recognize_audio_stream_from_speaker_loopback",
+    "siliconflow_free",
+    "siliconflow_pro",
+    "doubao_lite",
+    "doubao_pro",
+    "doubao_seed_flash",
+    "doubao_seed",
+    "kimi",
+    "zhipu",
+    "deepseek_api",
+    "ali_qwen_2_5",
+    "ali_qwen_plus_latest",
+    "ali_qwen_max"
+]
