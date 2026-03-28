@@ -35,7 +35,7 @@ const Conversation = lazy(() =>
 
 function Home() {
 	return (
-		<div className="w-full h-screen bg-gradient-to-b from-[#724766] to-[#2C4F71]">
+		<div className="h-screen w-full bg-transparent">
 			<ChatContainer />
 			<Toaster
 				position="top-center"

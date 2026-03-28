@@ -124,7 +124,7 @@
 
 	body {
 		@apply text-foreground;
-		background: linear-gradient(180deg, #724766 0%, #2c4f71 100%);
+		background: transparent;
 	}
 }
 
