@@ -165,7 +165,10 @@ async function publishRelease(version: string) {
 		version,
 	});
 
-	if (artifactContext.uploads.length === 0 || Object.keys(artifactContext.platformEntries).length === 0) {
+	if (
+		artifactContext.uploads.length === 0 ||
+		Object.keys(artifactContext.platformEntries).length === 0
+	) {
 		throw new Error(
 			"no updater artifacts found. build first with a signing key so .sig files are generated",
 		);
@@ -316,7 +319,10 @@ async function collectArtifacts(input: {
 					}
 				: null;
 		})
-		.filter((item): item is PreferredArtifact & { hasSignature: boolean } => item !== null);
+		.filter(
+			(item): item is PreferredArtifact & { hasSignature: boolean } =>
+				item !== null,
+		);
 
 	if (allArtifacts.length === 0) {
 		return {
@@ -327,7 +333,8 @@ async function collectArtifacts(input: {
 
 	// Prepare all artifacts for upload
 	const uploadPromises: Promise<UploadAsset>[] = [];
-	const platformEntries: Record<string, { signature: string; url: string }> = {};
+	const platformEntries: Record<string, { signature: string; url: string }> =
+		{};
 
 	for (const item of allArtifacts) {
 		uploadPromises.push(
@@ -350,7 +357,9 @@ async function collectArtifacts(input: {
 			// Add to manifest entries (prioritize kinds by order)
 			const currentEntry = platformEntries[item.platform];
 			const priority = ["nsis", "dmg", "appimage", "app-tar", "msi"];
-			const currentKindIndex = currentEntry ? priority.indexOf((currentEntry as any).kind) : 99;
+			const currentKindIndex = currentEntry
+				? priority.indexOf((currentEntry as any).kind)
+				: 99;
 			const newKindIndex = priority.indexOf(item.kind);
 
 			if (newKindIndex < currentKindIndex) {
