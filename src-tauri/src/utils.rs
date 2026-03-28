@@ -28,17 +28,24 @@ pub fn reset_app_log_files() {
 pub fn write_some_log(msg: &str) {
     let path = primary_plain_log_path();
     if let Some(parent) = path.parent() {
-        let _ = create_dir_all(parent);
+        if !parent.exists() {
+            let _ = create_dir_all(parent);
+        }
     }
 
-    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
         let _ = writeln!(file, "{}", msg);
+    } else {
+        // 如果文件打开失败，至少尝试在标准错误中输出，以便开发者查看
+        eprintln!("Failed to write log to {:?}: {}", path, msg);
     }
 }
 
 fn truncate_log_file(path: &Path) {
     if let Some(parent) = path.parent() {
-        let _ = create_dir_all(parent);
+        if !parent.exists() {
+            let _ = create_dir_all(parent);
+        }
     }
 
     let _ = File::create(path);
