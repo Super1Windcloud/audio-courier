@@ -110,7 +110,12 @@ function App() {
 			"license-signer";
 
 	useEffect(() => {
-		invoke("show_window").then();
+		// Use requestAnimationFrame and a small timeout to ensure the window is shown after the first paint
+		requestAnimationFrame(() => {
+			setTimeout(() => {
+				invoke("show_window").then();
+			}, 100);
+		});
 	}, []);
 
 	useEffect(() => {
