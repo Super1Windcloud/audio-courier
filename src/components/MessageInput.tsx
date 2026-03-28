@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import type { Message } from "@/components/ChatContainer.tsx";
 import { MoreMenu } from "@/components/MoreMenu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import Waruls from "@/components/Waruls.tsx";
 import { startAudioRecognition, stopAudioRecognition } from "@/lib/audio.ts";
 import useAppStateStore from "@/stores";
 
@@ -27,7 +28,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	setIsTyping,
 }) => {
 	const [inputText, setInputText] = useState("");
-	const [canStopRecording, setCanStopRecording] = useState(true);
+	const [recordingTimerStamp, setRecordingTimerStamp] = useState(() =>
+		Date.now(),
+	);
 	const recordingState = useAppStateStore((state) => state.isRecording);
 	const updateRecordingState = useAppStateStore(
 		(state) => state.updateIsRecording,
@@ -52,6 +55,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const wasRecordingRef = useRef(recordingState);
 	const MIN_RECORDING_DURATION = 3000;
+	const canStopRecording =
+		!recordingState ||
+		recordingStartedAt === null ||
+		recordingTimerStamp - recordingStartedAt >= MIN_RECORDING_DURATION;
 
 	const handleSend = useCallback(() => {
 		if (!isAuthorized) {
@@ -99,20 +106,22 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	};
 
 	useEffect(() => {
-		if (!recordingState) {
-			setCanStopRecording(true);
-			return;
+		if (!recordingState || recordingStartedAt === null) {
+			return () => undefined;
 		}
 
-		setCanStopRecording(false);
+		const remainingDuration = Math.max(
+			0,
+			recordingStartedAt + MIN_RECORDING_DURATION - Date.now(),
+		);
 		const timer = setTimeout(() => {
-			setCanStopRecording(true);
-		}, MIN_RECORDING_DURATION);
+			setRecordingTimerStamp(Date.now());
+		}, remainingDuration);
 
 		return () => {
 			clearTimeout(timer);
 		};
-	}, [recordingState]);
+	}, [recordingStartedAt, recordingState]);
 
 	const toggleRecording = async () => {
 		if (!isAuthorized) {
@@ -187,20 +196,22 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 					className="flex-1 resize-none overflow-hidden text-white border-none focus-visible:ring-0 placeholder:text-gray-300 focus-visible:ring-offset-0 bg-transparent"
 				/>
 
-				<span
-					title={
-						recordingState
-							? canStopRecording
-								? "停止语音"
-								: "录音中...3秒后可停止"
-							: "开始语音"
-					}
-				>
-					<Mic
-						onClick={toggleRecording}
-						className={`cursor-pointer ${recordingState ? (canStopRecording ? "text-red-500" : "text-orange-500") : "text-gray-400"}`}
-					/>
-				</span>
+				{recordingState ? (
+					<div className="relative h-16 w-16 shrink-0 overflow-visible">
+						<Waruls
+							className="h-full w-full"
+							onToggle={toggleRecording}
+							title={canStopRecording ? "停止语音" : "录音中...3秒后可停止"}
+						/>
+					</div>
+				) : (
+					<span title="开始语音">
+						<Mic
+							onClick={toggleRecording}
+							className="cursor-pointer text-gray-400"
+						/>
+					</span>
+				)}
 
 				<span title="清空会话">
 					<Trash2

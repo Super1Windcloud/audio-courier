@@ -1,10 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, RotateCcw, Save, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button.tsx";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog.tsx";
@@ -32,6 +34,7 @@ export function MoreMenu() {
 	const [audioChannels, setAudioChannels] = useState<string[]>([]);
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
+	const [promptDraft, setPromptDraft] = useState(appState.llmPrompt);
 	const TRANSCRIBE_VENDORS: TranscribeVendor[] = [
 		"assemblyai",
 		"deepgram",
@@ -53,6 +56,10 @@ export function MoreMenu() {
 		{ value: "light", label: "浅色文字" },
 		{ value: "dark", label: "深色文字" },
 	];
+	const defaultPrompt = import.meta.env.VITE_PROMPT || "";
+	const promptCharacterCount = promptDraft.length;
+	const hasPromptChanges = promptDraft !== appState.llmPrompt;
+	const isUsingDefaultPrompt = promptDraft === defaultPrompt;
 
 	useEffect(() => {
 		invoke("get_audio_stream_devices_names").then((result) => {
@@ -71,6 +78,14 @@ export function MoreMenu() {
 		console.log(currentModel);
 	}, [currentModel, appState.updateCurrentSelectedModel]);
 
+	useEffect(() => {
+		if (!isDialogOpen) {
+			return;
+		}
+
+		setPromptDraft(appState.llmPrompt);
+	}, [appState.llmPrompt, isDialogOpen]);
+
 	const handleCheckUpdate = async () => {
 		if (isUpdating) {
 			return;
@@ -82,6 +97,16 @@ export function MoreMenu() {
 		} finally {
 			setIsUpdating(false);
 		}
+	};
+
+	const handlePromptSave = () => {
+		appState.updateLLMPrompt(promptDraft);
+		setIsDialogOpen(false);
+		toast.success("提示词已保存");
+	};
+
+	const handlePromptReset = () => {
+		setPromptDraft(defaultPrompt);
 	};
 
 	return (
@@ -319,30 +344,97 @@ export function MoreMenu() {
 				</DropdownMenuContent>
 			</DropdownMenu>
 			<Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-				<DialogContent className="sm:max-w-[400px] bg-pink-200">
-					<DialogHeader>
-						<DialogTitle>输入提示词</DialogTitle>
-					</DialogHeader>
+				<DialogContent className="prompt-editor-dialog border-none p-0 text-white sm:max-w-[680px]">
+					<div className="prompt-editor-shell">
+						<div className="prompt-editor-orb prompt-editor-orb-left" />
+						<div className="prompt-editor-orb prompt-editor-orb-right" />
+						<div className="prompt-editor-orb prompt-editor-orb-bottom" />
+						<div className="prompt-editor-content">
+							<DialogHeader className="prompt-editor-header">
+								<div className="prompt-editor-kicker">
+									<Sparkles className="h-3.5 w-3.5" />
+									System Prompt
+								</div>
+								<DialogTitle className="prompt-editor-title">
+									塑造回答语气、深度与追问节奏
+								</DialogTitle>
+								<DialogDescription className="prompt-editor-description">
+									这里定义系统提示词。保存后会用于后续消息，不会回写历史回答。
+								</DialogDescription>
+							</DialogHeader>
 
-					<Textarea
-						value={appState.llmPrompt}
-						onChange={(e) => {
-							appState.updateLLMPrompt(e.target.value);
-						}}
-						placeholder="请输入提示词..."
-						className="mt-2 w-full"
-						autoFocus={true}
-						style={{
-							scrollbarWidth: "none",
-						}}
-						rows={6} // 默认高度，可自行调整
-						onFocus={(e) =>
-							e.currentTarget.setSelectionRange(
-								e.currentTarget.value.length,
-								e.currentTarget.value.length,
-							)
-						}
-					/>
+							<div className="prompt-editor-status-row">
+								<div className="prompt-editor-chip">
+									{hasPromptChanges ? "未保存更改" : "当前已同步"}
+								</div>
+								<div className="prompt-editor-chip prompt-editor-chip-muted">
+									{promptCharacterCount} 字符
+								</div>
+							</div>
+
+							<div className="prompt-editor-field">
+								<div className="prompt-editor-field-label">
+									<span>提示词内容</span>
+									<span>支持多行编辑</span>
+								</div>
+								<Textarea
+									value={promptDraft}
+									onChange={(e) => {
+										setPromptDraft(e.target.value);
+									}}
+									placeholder="请输入提示词..."
+									className="prompt-editor-textarea"
+									autoFocus
+									style={{
+										scrollbarWidth: "none",
+									}}
+									rows={10}
+									onFocus={(e) =>
+										e.currentTarget.setSelectionRange(
+											e.currentTarget.value.length,
+											e.currentTarget.value.length,
+										)
+									}
+								/>
+							</div>
+
+							<div className="prompt-editor-note">
+								建议在这里描述角色设定、回答风格、语言偏好和追问力度，避免把临时问题写进系统提示词。
+							</div>
+
+							<div className="prompt-editor-actions">
+								<Button
+									type="button"
+									variant="ghost"
+									className="prompt-editor-secondary-button"
+									onClick={handlePromptReset}
+									disabled={isUsingDefaultPrompt}
+								>
+									<RotateCcw className="h-4 w-4" />
+									恢复默认
+								</Button>
+								<div className="prompt-editor-actions-right">
+									<Button
+										type="button"
+										variant="ghost"
+										className="prompt-editor-tertiary-button"
+										onClick={() => setIsDialogOpen(false)}
+									>
+										取消
+									</Button>
+									<Button
+										type="button"
+										className="prompt-editor-primary-button"
+										onClick={handlePromptSave}
+										disabled={!hasPromptChanges}
+									>
+										<Save className="h-4 w-4" />
+										保存提示词
+									</Button>
+								</div>
+							</div>
+						</div>
+					</div>
 				</DialogContent>
 			</Dialog>
 		</>
