@@ -91,7 +91,6 @@ class SignerErrorBoundary extends Component<
 function App() {
 	const didRun = useRef(false);
 	const didCheckForUpdates = useRef(false);
-	const didRequestWindowShow = useRef(false);
 	const [windowLabel, setWindowLabel] = useState<string | null>(null);
 	const [availableUpdate, setAvailableUpdate] = useState<Awaited<
 		ReturnType<typeof checkForUpdate>
@@ -109,6 +108,10 @@ function App() {
 		window.location.hash === "#license-signer" ||
 		new URLSearchParams(window.location.search).get("mode") ===
 			"license-signer";
+
+	useEffect(() => {
+		invoke("show_window").then();
+	}, []);
 
 	useEffect(() => {
 		try {
@@ -151,18 +154,6 @@ function App() {
 			});
 		registryGlobalShortCuts().then();
 	}, [isSignerMode, updateLicenseStatus]);
-
-	useEffect(() => {
-		if (isSignerMode || didRequestWindowShow.current) {
-			return;
-		}
-
-		didRequestWindowShow.current = true;
-
-		void invoke("show_window").catch((error) => {
-			logError("show_window failed", error);
-		});
-	}, [isSignerMode]);
 
 	const checkForUpdates = useEffectEvent(
 		async (source: "startup" | "manual") => {

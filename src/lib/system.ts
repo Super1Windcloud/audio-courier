@@ -37,7 +37,7 @@ export async function registryGlobalShortCuts() {
 			if (await window.isVisible()) {
 				await window.hide();
 			} else {
-				await window.show();
+				await invoke("show_window");
 			}
 		}
 	});
