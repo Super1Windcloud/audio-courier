@@ -342,11 +342,28 @@ async function collectArtifacts(input: {
 	// Prepare all artifacts for upload
 	const uploadPromises: Promise<UploadAsset>[] = [];
 	const platformEntries: Record<string, PlatformEntryWithKind> = {};
+	const duplicatedArtifactBaseNames = new Set(
+		Object.entries(
+			allArtifacts.reduce<Record<string, number>>((counts, item) => {
+				const baseName = path.basename(item.artifactPath);
+				counts[baseName] = (counts[baseName] ?? 0) + 1;
+				return counts;
+			}, {}),
+		)
+			.filter(([, count]) => count > 1)
+			.map(([baseName]) => baseName),
+	);
 
 	for (const item of allArtifacts) {
+		const artifactAssetName = releaseAssetName(
+			path.basename(item.artifactPath),
+			item.platform,
+			duplicatedArtifactBaseNames,
+		);
+
 		uploadPromises.push(
 			(async () => ({
-				name: path.basename(item.artifactPath),
+				name: artifactAssetName,
 				contentType: contentTypeFor(item.artifactPath),
 				buffer: await readFile(item.artifactPath),
 			}))(),
@@ -355,7 +372,7 @@ async function collectArtifacts(input: {
 		if (item.hasSignature) {
 			uploadPromises.push(
 				(async () => ({
-					name: path.basename(item.signaturePath),
+					name: `${artifactAssetName}.sig`,
 					contentType: contentTypeFor(item.signaturePath),
 					buffer: await readFile(item.signaturePath),
 				}))(),
@@ -379,7 +396,7 @@ async function collectArtifacts(input: {
 				platformEntries[item.platform] = {
 					signature: (await readFile(item.signaturePath, "utf8")).trim(),
 					url: `https://github.com/${input.repository}/releases/download/${input.tagName}/${encodeURIComponent(
-						sanitizeGitHubAssetName(path.basename(item.artifactPath)),
+						sanitizeGitHubAssetName(artifactAssetName),
 					)}`,
 					kind: item.kind,
 				};
@@ -399,6 +416,39 @@ async function collectArtifacts(input: {
 		uploads,
 		platformEntries: manifestEntries,
 	};
+}
+
+function releaseAssetName(
+	baseName: string,
+	platform: string,
+	duplicatedArtifactBaseNames: Set<string>,
+) {
+	if (!duplicatedArtifactBaseNames.has(baseName)) {
+		return baseName;
+	}
+
+	return appendPlatformSuffix(baseName, platform);
+}
+
+function appendPlatformSuffix(fileName: string, platform: string) {
+	const knownSuffixes = [
+		".app.tar.gz",
+		".AppImage.tar.gz",
+		".tar.gz",
+		".AppImage",
+		".dmg",
+		".msi",
+		".exe",
+	];
+
+	for (const suffix of knownSuffixes) {
+		if (fileName.endsWith(suffix)) {
+			return `${fileName.slice(0, -suffix.length)}-${platform}${suffix}`;
+		}
+	}
+
+	const parsed = path.parse(fileName);
+	return `${parsed.name}-${platform}${parsed.ext}`;
 }
 
 function classifyArtifact(filePath: string, targetTriple: string | null) {
