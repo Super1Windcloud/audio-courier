@@ -1,6 +1,12 @@
 import { Mic, SendHorizontal, Trash2 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useEffectEvent,
+	useRef,
+	useState,
+} from "react";
 import { toast } from "sonner";
 import type { Message } from "@/components/ChatContainer.tsx";
 import { MoreMenu } from "@/components/MoreMenu.tsx";
@@ -44,6 +50,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	);
 
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const wasRecordingRef = useRef(recordingState);
 	const MIN_RECORDING_DURATION = 3000;
 
 	const handleSend = useCallback(() => {
@@ -127,28 +134,31 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		updateRecordingState(false);
 	};
 
+	const startRecordingEffect = useEffectEvent(() => {
+		void startAudioRecognition(
+			setInputText,
+			currentAudioChannel,
+			remoteModelVendor,
+			captureInterval,
+			isUsePreRecorded,
+		);
+	});
+
+	const stopRecordingEffect = useEffectEvent(() => {
+		void stopAudioRecognition(currentAudioChannel);
+	});
+
 	useEffect(() => {
 		setIsTyping(recordingState);
+
 		if (recordingState) {
-			void startAudioRecognition(
-				setInputText,
-				currentAudioChannel,
-				remoteModelVendor,
-				captureInterval,
-				isUsePreRecorded,
-			);
-			return;
+			startRecordingEffect();
+		} else if (wasRecordingRef.current) {
+			stopRecordingEffect();
 		}
 
-		void stopAudioRecognition(currentAudioChannel);
-	}, [
-		captureInterval,
-		currentAudioChannel,
-		isUsePreRecorded,
-		recordingState,
-		remoteModelVendor,
-		setIsTyping,
-	]);
+		wasRecordingRef.current = recordingState;
+	}, [recordingState, setIsTyping]);
 
 	const handleClearConversation = () => {
 		setInputText("");

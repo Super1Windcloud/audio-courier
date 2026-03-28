@@ -1,3 +1,4 @@
+import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { toast } from "sonner";
 
@@ -70,9 +71,11 @@ export async function downloadAndInstallUpdate(
 		}
 	});
 
-	toast.success("更新已交给安装器处理", {
-		description: "如果应用退出或弹出安装窗口，属于正常行为。",
+	toast.success("更新安装完成", {
+		description: "应用即将重启。",
 	});
+
+	await relaunch();
 }
 
 export async function runUpdater() {
