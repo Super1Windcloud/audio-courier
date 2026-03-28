@@ -23,7 +23,7 @@ export async function showWindow() {
 			requestAnimationFrame(() => {
 				void invoke<void>("show_window").then(resolve).catch(reject);
 			});
-		}, 100);
+		}, 200);
 	});
 }
 
