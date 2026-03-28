@@ -81,19 +81,18 @@ pub async fn siliconflow_free(
     siliconflow_free_with_model(app, flow_args, random_model).await
 }
 
-const PRO_MODELS: [&str; 12] = [
-    "Pro/Qwen/Qwen2.5-7B-Instruct",     //0.17S
-    "Pro/THUDM/glm-4-9b-chat",          //0.27S
-    "Qwen/Qwen2.5-14B-Instruct",        // 0.21S
-    "Qwen/Qwen2.5-Coder-32B-Instruct",  //0.14S
-    "Qwen/Qwen2.5-32B-Instruct",        // 0.23S
-    "THUDM/GLM-4-32B-0414",             //0.29S
-    "Qwen/Qwen3-Next-80B-A3B-Instruct", //0.36S
-    "inclusionAI/Ling-flash-2.0",       // 0.4S
-    "Qwen/Qwen2.5-72B-Instruct-128K",   //0.53S
-    "zai-org/GLM-4.5-Air",              //0.41S
-    "deepseek-ai/DeepSeek-V3",          //0.68S
-    "baidu/ERNIE-4.5-300B-A47B",        // 0.16S
+const PRO_MODELS: [&str; 11] = [
+    "Pro/Qwen/Qwen2.5-7B-Instruct",    //0.17S
+    "Pro/THUDM/glm-4-9b-chat",         //0.27S
+    "Qwen/Qwen2.5-14B-Instruct",       // 0.21S
+    "Qwen/Qwen2.5-Coder-32B-Instruct", //0.14S
+    "Qwen/Qwen2.5-32B-Instruct",       // 0.23S
+    "THUDM/GLM-4-32B-0414",            //0.29S
+    "inclusionAI/Ling-flash-2.0",      // 0.4S
+    "Qwen/Qwen2.5-72B-Instruct-128K",  //0.53S
+    "zai-org/GLM-4.5-Air",             //0.41S
+    "deepseek-ai/DeepSeek-V3",         //0.68S
+    "baidu/ERNIE-4.5-300B-A47B",       // 0.16S
 ];
 
 pub fn siliconflow_pro_models() -> &'static [&'static str] {
