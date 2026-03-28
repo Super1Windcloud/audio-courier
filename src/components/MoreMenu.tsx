@@ -40,7 +40,6 @@ export function MoreMenu() {
 		(state) => state.updateCurrentSelectedModel,
 	);
 	const [audioChannels, setAudioChannels] = useState<string[]>([]);
-	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
 	const [promptDraft, setPromptDraft] = useState(appState.llmPrompt);
 	const [interviewPromptDraft, setInterviewPromptDraft] = useState(
@@ -69,6 +68,12 @@ export function MoreMenu() {
 	];
 	const defaultPrompt = import.meta.env.VITE_PROMPT || "";
 	const defaultInterviewPrompt = import.meta.env.VITE_INTERVIEW_PROMPT || "";
+	const shouldOpenPromptDialogOnStartup =
+		defaultPrompt.trim().length === 0 ||
+		defaultInterviewPrompt.trim().length === 0;
+	const [isDialogOpen, setIsDialogOpen] = useState(
+		shouldOpenPromptDialogOnStartup,
+	);
 	const hasPromptChanges =
 		promptDraft !== appState.llmPrompt ||
 		interviewPromptDraft !== appState.interviewPrompt;
@@ -383,6 +388,11 @@ export function MoreMenu() {
 							</DialogHeader>
 
 							<div className="prompt-editor-status-row">
+								{shouldOpenPromptDialogOnStartup ? (
+									<div className="prompt-editor-chip">
+										检测到默认提示词缺失，请先补全并保存
+									</div>
+								) : null}
 								<div className="prompt-editor-chip">
 									{hasPromptChanges ? "未保存更改" : "当前已同步"}
 								</div>
