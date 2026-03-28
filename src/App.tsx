@@ -159,15 +159,9 @@ function App() {
 
 		didRequestWindowShow.current = true;
 
-		const frameId = window.requestAnimationFrame(() => {
-			void invoke("show_window").catch((error) => {
-				logError("show_window failed", error);
-			});
+		void invoke("show_window").catch((error) => {
+			logError("show_window failed", error);
 		});
-
-		return () => {
-			window.cancelAnimationFrame(frameId);
-		};
 	}, [isSignerMode]);
 
 	const checkForUpdates = useEffectEvent(
