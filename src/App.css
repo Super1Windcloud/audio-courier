@@ -128,16 +128,16 @@
 	}
 }
 
-.low-opacity-shell {
+.ui-text-dark {
 	color: #111827;
 }
 
-.low-opacity-shell,
-.low-opacity-shell * {
+.ui-text-dark,
+.ui-text-dark * {
 	caret-color: #111827;
 }
 
-.low-opacity-shell
+.ui-text-dark
 	:is(
 		p,
 		span,
@@ -159,10 +159,19 @@
 		a,
 		svg
 	) {
-	color: #111827;
+	color: #111827 !important;
 }
 
-.low-opacity-shell input::placeholder,
-.low-opacity-shell textarea::placeholder {
+.ui-text-dark input::placeholder,
+.ui-text-dark textarea::placeholder {
 	color: rgb(31 41 55 / 0.7);
+}
+
+.ui-text-light {
+	color: #f8fafc;
+}
+
+.ui-text-light,
+.ui-text-light * {
+	caret-color: #f8fafc;
 }

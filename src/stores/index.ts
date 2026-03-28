@@ -9,6 +9,8 @@ export type TranscribeVendor =
 	| "revai"
 	| "speechmatics";
 
+export type UiTextTone = "light" | "dark";
+
 interface AppStateStore {
 	currentSelectedModel: ModelOption;
 	updateCurrentSelectedModel: (target: ModelOption) => void;
@@ -42,9 +44,13 @@ interface AppStateStore {
 
 	uiOpacity: number;
 	updateUiOpacity: (target: number) => void;
+
+	uiTextTone: UiTextTone;
+	updateUiTextTone: (target: UiTextTone) => void;
 }
 
 const UI_OPACITY_STORAGE_KEY = "audio-courier-ui-opacity";
+const UI_TEXT_TONE_STORAGE_KEY = "audio-courier-ui-text-tone";
 
 function normalizeUiOpacity(target: number) {
 	return Math.min(1, Math.max(0.3, Number(target.toFixed(2))));
@@ -68,6 +74,15 @@ function readInitialUiOpacity() {
 	return normalizeUiOpacity(parsedValue);
 }
 
+function readInitialUiTextTone(): UiTextTone {
+	if (typeof window === "undefined") {
+		return "light";
+	}
+
+	const rawValue = window.localStorage.getItem(UI_TEXT_TONE_STORAGE_KEY);
+	return rawValue === "dark" ? "dark" : "light";
+}
+
 const useAppStateStore = create<AppStateStore>((set) => ({
 	uiOpacity: readInitialUiOpacity(),
 	updateUiOpacity: (target: number) => {
@@ -76,6 +91,13 @@ const useAppStateStore = create<AppStateStore>((set) => ({
 			window.localStorage.setItem(UI_OPACITY_STORAGE_KEY, String(nextOpacity));
 		}
 		set({ uiOpacity: nextOpacity });
+	},
+	uiTextTone: readInitialUiTextTone(),
+	updateUiTextTone: (target: UiTextTone) => {
+		if (typeof window !== "undefined") {
+			window.localStorage.setItem(UI_TEXT_TONE_STORAGE_KEY, target);
+		}
+		set({ uiTextTone: target });
 	},
 	isUsePreRecorded: false,
 	updatePreRecorded: (target: boolean) => {

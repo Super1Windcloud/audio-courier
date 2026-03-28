@@ -29,10 +29,22 @@ export const ChatContainer: React.FC = () => {
 	const currentSelectedModel = useAppStateStore(
 		(state) => state.currentSelectedModel,
 	);
+	const uiOpacity = useAppStateStore((state) => state.uiOpacity);
+	const uiTextTone = useAppStateStore((state) => state.uiTextTone);
 	const licenseStatus = useAppStateStore((state) => state.licenseStatus);
 	const isAuthorized = Boolean(
 		licenseStatus?.isValid || licenseStatus?.isHostSigner,
 	);
+	const panelStyle = {
+		borderColor: `rgb(255 255 255 / ${0.08 + uiOpacity * 0.12})`,
+		background: `linear-gradient(180deg, rgb(114 71 102 / ${Math.max(0.24, uiOpacity * 0.72)}) 0%, rgb(44 79 113 / ${Math.max(0.18, uiOpacity * 0.62)}) 100%)`,
+		transition:
+			"background 180ms ease-out, border-color 180ms ease-out, box-shadow 180ms ease-out",
+	};
+	const footerStyle = {
+		backgroundColor: `rgb(0 0 0 / ${Math.max(0.04, uiOpacity * 0.1)})`,
+		transition: "background-color 180ms ease-out, border-color 180ms ease-out",
+	};
 
 	const updateSpecificBotMessage = useCallback(
 		(id: number, content: string) => {
@@ -120,7 +132,12 @@ export const ChatContainer: React.FC = () => {
 
 	return (
 		<div className="flex h-screen w-screen">
-			<div className="flex h-full w-full flex-col overflow-hidden border border-white/14 bg-[linear-gradient(180deg,rgba(114,71,102,0.72)_0%,rgba(44,79,113,0.62)_100%)] backdrop-blur-xl">
+			<div
+				className={`flex h-full w-full flex-col overflow-hidden border backdrop-blur-xl ${
+					uiTextTone === "dark" ? "ui-text-dark" : "ui-text-light"
+				}`}
+				style={panelStyle}
+			>
 				<div className="flex-shrink-0 border-b border-white/10">
 					<TitleBar />
 				</div>
@@ -141,7 +158,10 @@ export const ChatContainer: React.FC = () => {
 					<MessageList messages={messages} isTyping={isTyping} />
 				</div>
 
-				<div className="w-full flex-shrink-0 self-center border-t border-white/10 bg-black/10">
+				<div
+					className="w-full flex-shrink-0 self-center border-t border-white/10"
+					style={footerStyle}
+				>
 					<MessageInput
 						onSendMessage={handleSendMessage}
 						onClearConversation={handleClearConversation}

@@ -19,7 +19,10 @@ import {
 } from "@/components/ui/dropdown-menu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { runUpdater } from "@/lib/updater.ts";
-import useAppStateStore, { type TranscribeVendor } from "@/stores";
+import useAppStateStore, {
+	type TranscribeVendor,
+	type UiTextTone,
+} from "@/stores";
 import { HOTKEYS, MODEL_OPTIONS, type ModelOption } from "@/types/llm.ts";
 
 export function MoreMenu() {
@@ -45,6 +48,10 @@ export function MoreMenu() {
 	};
 	const UI_OPACITY_OPTIONS = [
 		100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30,
+	];
+	const UI_TEXT_TONE_OPTIONS: { value: UiTextTone; label: string }[] = [
+		{ value: "light", label: "浅色文字" },
+		{ value: "dark", label: "深色文字" },
 	];
 
 	useEffect(() => {
@@ -129,6 +136,32 @@ export function MoreMenu() {
 									</DropdownMenuItem>
 								);
 							})}
+						</DropdownMenuSubContent>
+					</DropdownMenuSub>
+					<DropdownMenuSub>
+						<DropdownMenuSubTrigger
+							className="
+             bg-gray-600 text-white
+            data-[highlighted]:bg-gray-500
+            data-[state=open]:bg-gray-500"
+						>
+							文字颜色
+						</DropdownMenuSubTrigger>
+						<DropdownMenuSubContent className="w-40 bg-gray-600 text-white border-0">
+							{UI_TEXT_TONE_OPTIONS.map((option) => (
+								<DropdownMenuItem
+									key={option.value}
+									className={`data-[highlighted]:bg-gray-500 ${
+										appState.uiTextTone === option.value ? "font-bold" : ""
+									}`}
+									onClick={() => appState.updateUiTextTone(option.value)}
+								>
+									{option.label}
+									{appState.uiTextTone === option.value && (
+										<span className="ml-2 text-green-400">✔</span>
+									)}
+								</DropdownMenuItem>
+							))}
 						</DropdownMenuSubContent>
 					</DropdownMenuSub>
 					<DropdownMenuSub>
