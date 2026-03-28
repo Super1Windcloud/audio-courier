@@ -19,7 +19,7 @@ import { LicenseSignerApp } from "@/components/LicenseSignerApp.tsx";
 import { UpdateDialog } from "@/components/UpdateDialog.tsx";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { logError, logInfo } from "@/lib/logger.ts";
-import { registryGlobalShortCuts } from "@/lib/system.ts";
+import { registryGlobalShortCuts, showWindow } from "@/lib/system.ts";
 import {
 	checkForUpdate,
 	downloadAndInstallUpdate,
@@ -128,7 +128,7 @@ function App() {
 			return;
 		}
 
-		void invoke("show_window")
+		void showWindow()
 			.then(() => console.log("show_window: success"))
 			.catch((err) => {
 				console.error("show_window: failed", err);

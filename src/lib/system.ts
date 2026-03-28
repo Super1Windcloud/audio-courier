@@ -9,6 +9,24 @@ import { toast } from "sonner";
 import { logError, logInfo } from "@/lib/logger.ts";
 import useAppStateStore from "@/stores";
 
+function isWindows() {
+	return navigator.userAgent.includes("Windows");
+}
+
+export async function showWindow() {
+	if (!isWindows()) {
+		return invoke<void>("show_window");
+	}
+
+	return new Promise<void>((resolve, reject) => {
+		window.setTimeout(() => {
+			requestAnimationFrame(() => {
+				void invoke<void>("show_window").then(resolve).catch(reject);
+			});
+		}, 100);
+	});
+}
+
 export async function toggleRecording() {
 	const appState = useAppStateStore.getState();
 
@@ -37,7 +55,7 @@ export async function registryGlobalShortCuts() {
 			if (await window.isVisible()) {
 				await window.hide();
 			} else {
-				await invoke("show_window");
+				await showWindow();
 			}
 		}
 	});
