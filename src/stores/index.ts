@@ -93,7 +93,8 @@ type PersistedAppConfigState = Pick<
 	| "envProviderPresets"
 >;
 
-const DEFAULT_LLM_PROMPT = (import.meta.env.DEV ? import.meta.env.VITE_PROMPT : "") || "";
+const DEFAULT_LLM_PROMPT =
+	(import.meta.env.DEV ? import.meta.env.VITE_PROMPT : "") || "";
 const DEFAULT_INTERVIEW_PROMPT =
 	(import.meta.env.DEV ? import.meta.env.VITE_INTERVIEW_PROMPT : "") || "";
 const LEGACY_UI_DEFAULTS = readLegacyUiConfigDefaults();
@@ -211,7 +212,7 @@ function normalizePersistedAppConfigState(
 function pickPersistedAppConfigState(
 	state: AppStateStore,
 ): PersistedAppConfigState {
-	return {
+	const result: PersistedAppConfigState = {
 		currentSelectedModel: state.currentSelectedModel,
 		currentAudioChannel: state.currentAudioChannel,
 		llmPrompt: state.llmPrompt,
@@ -226,6 +227,18 @@ function pickPersistedAppConfigState(
 		transcriptProviderSettings: state.transcriptProviderSettings,
 		envProviderPresets: state.envProviderPresets,
 	};
+
+	if (import.meta.env.DEV) {
+		// In development, do not write these to storage if they come from the env
+		if (state.llmPrompt === DEFAULT_LLM_PROMPT) {
+			result.llmPrompt = "";
+		}
+		if (state.interviewPrompt === DEFAULT_INTERVIEW_PROMPT) {
+			result.interviewPrompt = "";
+		}
+	}
+
+	return result;
 }
 
 const defaultPersistedConfigState = createDefaultPersistedConfigState();

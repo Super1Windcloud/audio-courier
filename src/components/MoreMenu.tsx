@@ -70,7 +70,8 @@ export function MoreMenu() {
 		{ value: "light", label: "浅色文字" },
 		{ value: "dark", label: "深色文字" },
 	];
-	const defaultPrompt = (import.meta.env.DEV ? import.meta.env.VITE_PROMPT : "") || "";
+	const defaultPrompt =
+		(import.meta.env.DEV ? import.meta.env.VITE_PROMPT : "") || "";
 	const defaultInterviewPrompt =
 		(import.meta.env.DEV ? import.meta.env.VITE_INTERVIEW_PROMPT : "") || "";
 	const modelLabels = {
