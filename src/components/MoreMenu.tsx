@@ -81,8 +81,8 @@ export function MoreMenu() {
 			MODEL_LABELS.custom_openai,
 	};
 	const shouldOpenPromptDialogOnStartup =
-		defaultPrompt.trim().length === 0 ||
-		defaultInterviewPrompt.trim().length === 0;
+		appState.llmPrompt.trim().length === 0 &&
+		appState.interviewPrompt.trim().length === 0;
 	const hasPromptChanges =
 		promptDraft !== appState.llmPrompt ||
 		interviewPromptDraft !== appState.interviewPrompt;
@@ -444,7 +444,7 @@ export function MoreMenu() {
 							<div className="prompt-editor-status-row">
 								{shouldOpenPromptDialogOnStartup ? (
 									<div className="prompt-editor-chip">
-										检测到默认提示词缺失，请先补全并保存
+										检测到未配置提示词，请先补全并保存
 									</div>
 								) : null}
 								<div className="prompt-editor-chip">
