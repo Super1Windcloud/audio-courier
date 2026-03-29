@@ -148,6 +148,9 @@ async function buildRelease(version: string) {
 }
 
 async function cleanupMacOsBundle() {
+	if (process.platform !== "darwin") {
+		return;
+	}
 	await rm(macosBundleDir, { recursive: true, force: true });
 	console.log(`removed ${path.relative(rootDir, macosBundleDir)}`);
 }

@@ -93,8 +93,9 @@ type PersistedAppConfigState = Pick<
 	| "envProviderPresets"
 >;
 
-const DEFAULT_LLM_PROMPT = import.meta.env.VITE_PROMPT || "";
-const DEFAULT_INTERVIEW_PROMPT = import.meta.env.VITE_INTERVIEW_PROMPT || "";
+const DEFAULT_LLM_PROMPT = (import.meta.env.DEV ? import.meta.env.VITE_PROMPT : "") || "";
+const DEFAULT_INTERVIEW_PROMPT =
+	(import.meta.env.DEV ? import.meta.env.VITE_INTERVIEW_PROMPT : "") || "";
 const LEGACY_UI_DEFAULTS = readLegacyUiConfigDefaults();
 
 function normalizeUiOpacity(target: number) {
