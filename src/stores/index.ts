@@ -90,7 +90,6 @@ type PersistedAppConfigState = Pick<
 	| "uiTextTone"
 	| "llmProviderSettings"
 	| "transcriptProviderSettings"
-	| "envProviderPresets"
 >;
 
 const DEFAULT_LLM_PROMPT =
@@ -143,7 +142,6 @@ function createDefaultPersistedConfigState(): PersistedAppConfigState {
 		uiTextTone: normalizeUiTextTone(LEGACY_UI_DEFAULTS.uiTextTone),
 		llmProviderSettings: createDefaultLlmProviderSettings(),
 		transcriptProviderSettings: createDefaultTranscriptProviderSettings(),
-		envProviderPresets: createDefaultProviderEnvPresets(),
 	};
 }
 
@@ -203,9 +201,6 @@ function normalizePersistedAppConfigState(
 		transcriptProviderSettings: normalizeTranscriptProviderSettings(
 			persistedState.transcriptProviderSettings,
 		),
-		envProviderPresets: normalizeProviderEnvPresets(
-			persistedState.envProviderPresets,
-		),
 	};
 }
 
@@ -225,7 +220,6 @@ function pickPersistedAppConfigState(
 		uiTextTone: state.uiTextTone,
 		llmProviderSettings: state.llmProviderSettings,
 		transcriptProviderSettings: state.transcriptProviderSettings,
-		envProviderPresets: state.envProviderPresets,
 	};
 
 	if (import.meta.env.DEV) {
@@ -267,7 +261,7 @@ const useAppStateStore = create<AppStateStore>()(
 						normalizeTranscriptProviderSettings(target),
 				});
 			},
-			envProviderPresets: defaultPersistedConfigState.envProviderPresets,
+			envProviderPresets: createDefaultProviderEnvPresets(),
 			updateEnvProviderPresets: (target: ProviderEnvPresets) => {
 				set({ envProviderPresets: normalizeProviderEnvPresets(target) });
 			},
@@ -315,7 +309,19 @@ const useAppStateStore = create<AppStateStore>()(
 			storage: createAppConfigStorage<PersistedAppConfigState>(),
 			partialize: pickPersistedAppConfigState,
 			skipHydration: true,
-			version: 1,
+			version: 2,
+			migrate: (persistedState) => {
+				if (!persistedState || typeof persistedState !== "object") {
+					return persistedState as PersistedAppConfigState;
+				}
+
+				const { envProviderPresets: _ignored, ...rest } =
+					persistedState as PersistedAppConfigState & {
+						envProviderPresets?: ProviderEnvPresets;
+					};
+
+				return rest;
+			},
 			merge: (persistedState, currentState) => ({
 				...currentState,
 				...normalizePersistedAppConfigState(

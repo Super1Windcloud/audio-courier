@@ -60,6 +60,18 @@ export interface ProviderEnvPresets {
 	transcript: TranscriptProviderSettings;
 }
 
+const LLM_API_KEY_FIELDS = [
+	"siliconflowApiKey",
+	"doubaoApiKey",
+	"kimiApiKey",
+	"zhipuApiKey",
+	"deepseekApiKey",
+	"aliQwenApiKey",
+	"openaiApiKey",
+	"geminiApiKey",
+	"customOpenAiApiKey",
+] as const satisfies readonly (keyof LlmProviderSettings)[];
+
 function readString(value: unknown, fallback = "") {
 	return typeof value === "string" ? value : fallback;
 }
@@ -175,6 +187,21 @@ export function createDefaultProviderEnvPresets(): ProviderEnvPresets {
 		llm: createDefaultLlmProviderSettings(),
 		transcript: createDefaultTranscriptProviderSettings(),
 	};
+}
+
+export function mergeLlmApiKeyPresetsIntoSettings(
+	currentSettings: LlmProviderSettings,
+	presetSettings: LlmProviderSettings,
+) {
+	const nextSettings = { ...currentSettings };
+
+	for (const field of LLM_API_KEY_FIELDS) {
+		if (hasConfiguredValue(presetSettings[field])) {
+			nextSettings[field] = presetSettings[field];
+		}
+	}
+
+	return nextSettings;
 }
 
 export function normalizeProviderEnvPresets(

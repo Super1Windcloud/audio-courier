@@ -3,7 +3,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { initializeAppLogger, logError } from "@/lib/logger.ts";
 import useAppStateStore from "@/stores";
-import type { ProviderEnvPresets } from "@/types/provider.ts";
+import {
+	mergeLlmApiKeyPresetsIntoSettings,
+	type ProviderEnvPresets,
+} from "@/types/provider.ts";
 import App from "./App.tsx";
 
 const root = ReactDOM.createRoot(
@@ -30,7 +33,21 @@ async function bootstrap() {
 			const presets = await invoke<ProviderEnvPresets>(
 				"get_provider_env_presets",
 			);
-			useAppStateStore.getState().updateEnvProviderPresets(presets);
+			const appState = useAppStateStore.getState();
+			appState.updateEnvProviderPresets(presets);
+
+			if (!import.meta.env.DEV) {
+				const mergedSettings = mergeLlmApiKeyPresetsIntoSettings(
+					appState.llmProviderSettings,
+					presets.llm,
+				);
+				if (
+					JSON.stringify(mergedSettings) !==
+					JSON.stringify(appState.llmProviderSettings)
+				) {
+					appState.updateLlmProviderSettings(mergedSettings);
+				}
+			}
 		} catch (error) {
 			console.error("sync-provider-env-presets-failed", error);
 			logError("sync-provider-env-presets-failed", error);
