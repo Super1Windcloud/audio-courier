@@ -1,5 +1,12 @@
 import { spawn } from "node:child_process";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+	mkdir,
+	readdir,
+	readFile,
+	rm,
+	stat,
+	writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { config as loadDotenv } from "dotenv";
@@ -129,6 +136,8 @@ function assertVersions(versions: {
 async function buildRelease(version: string) {
 	await ensureSigningEnv();
 	const extraArgs = splitArgs(process.env.RELEASE_TAURI_ARGS);
+	await rm(bundleDir, { recursive: true, force: true });
+	console.log(`removed ${path.relative(rootDir, bundleDir)} before build`);
 	console.log(`building audio-courier ${version}`);
 	await runCommand("pnpm", ["tauri", "build", "--ci", ...extraArgs], {
 		env: {
@@ -189,9 +198,13 @@ async function publishRelease(version: string) {
 		releaseName,
 		releaseBody,
 	});
-
-	const currentLatest = await loadExistingLatestJson({
-		path: updaterMetadataPath,
+	await deleteManagedReleaseAssets({
+		token,
+		release,
+		keepNames: new Set([
+			...artifactContext.uploads.map((item) => item.name),
+			"latest.json",
+		]),
 	});
 
 	for (const upload of artifactContext.uploads) {
@@ -212,10 +225,7 @@ async function publishRelease(version: string) {
 		version,
 		notes: releaseBody,
 		pub_date: new Date().toISOString(),
-		platforms: {
-			...(currentLatest?.platforms ?? {}),
-			...artifactContext.platformEntries,
-		},
+		platforms: artifactContext.platformEntries,
 	};
 
 	await writeLatestJson(nextLatest);
@@ -313,24 +323,27 @@ async function collectArtifacts(input: {
 	version: string;
 }) {
 	const files = await listFiles(input.bundleDir);
-	const allArtifacts = files
-		.filter((filePath) => !filePath.endsWith(".sig"))
-		.map((filePath) => {
-			const metadata = classifyArtifact(filePath, input.targetTriple);
-			const signaturePath = `${filePath}.sig`;
-			return metadata
-				? {
-						...metadata,
-						artifactPath: filePath,
-						signaturePath,
-						hasSignature: files.includes(signaturePath),
-					}
-				: null;
-		})
-		.filter(
-			(item): item is PreferredArtifact & { hasSignature: boolean } =>
-				item !== null,
-		);
+	const filePaths = new Set(files.map((file) => file.path));
+	const allArtifacts = selectArtifactsForUpload(
+		files
+			.filter((file) => !file.path.endsWith(".sig"))
+			.map((file) => {
+				const metadata = classifyArtifact(file.path, input.targetTriple);
+				const signaturePath = `${file.path}.sig`;
+				return metadata
+					? {
+							...metadata,
+							artifactPath: file.path,
+							signaturePath,
+							hasSignature: filePaths.has(signaturePath),
+							matchesVersion: matchesArtifactVersion(file.path, input.version),
+							mtimeMs: file.mtimeMs,
+							relatedFiles: [],
+						}
+					: null;
+			})
+			.filter((item): item is CollectedArtifact => item !== null),
+	);
 
 	if (allArtifacts.length === 0) {
 		return {
@@ -416,6 +429,36 @@ async function collectArtifacts(input: {
 		uploads,
 		platformEntries: manifestEntries,
 	};
+}
+
+function selectArtifactsForUpload(artifacts: CollectedArtifact[]) {
+	const groupedArtifacts = new Map<string, CollectedArtifact[]>();
+
+	for (const artifact of artifacts) {
+		const key = `${artifact.platform}:${artifact.kind}`;
+		const group = groupedArtifacts.get(key) ?? [];
+		group.push(artifact);
+		groupedArtifacts.set(key, group);
+	}
+
+	return [...groupedArtifacts.values()].map(
+		(group) =>
+			group
+				.filter((item) =>
+					group.some((candidate) => candidate.matchesVersion)
+						? item.matchesVersion
+						: true,
+				)
+				.sort((left, right) => right.mtimeMs - left.mtimeMs)[0],
+	);
+}
+
+function matchesArtifactVersion(filePath: string, version: string) {
+	const fileName = path.basename(filePath);
+	const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	return new RegExp(`(^|[^0-9A-Za-z])${escapedVersion}([^0-9A-Za-z]|$)`).test(
+		fileName,
+	);
 }
 
 function releaseAssetName(
@@ -525,9 +568,9 @@ function archFromNode(arch: string) {
 	}
 }
 
-async function listFiles(directory: string): Promise<string[]> {
+async function listFiles(directory: string): Promise<BundleFile[]> {
 	const entries = await readdir(directory, { withFileTypes: true });
-	const files: string[] = [];
+	const files: BundleFile[] = [];
 
 	for (const entry of entries) {
 		const fullPath = path.join(directory, entry.name);
@@ -536,7 +579,11 @@ async function listFiles(directory: string): Promise<string[]> {
 			continue;
 		}
 
-		files.push(fullPath);
+		const fileStat = await stat(fullPath);
+		files.push({
+			path: fullPath,
+			mtimeMs: fileStat.mtimeMs,
+		});
 	}
 
 	return files;
@@ -599,24 +646,6 @@ async function ensureRelease(input: {
 	return created.json;
 }
 
-async function loadExistingLatestJson(input: { path: string }) {
-	try {
-		const content = await readFile(input.path, "utf8");
-		return JSON.parse(content) as LatestJson;
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		if (
-			message.includes("ENOENT") ||
-			message.includes("no such file") ||
-			message.includes("系统找不到指定的文件")
-		) {
-			return null;
-		}
-
-		throw error;
-	}
-}
-
 async function writeLatestJson(content: LatestJson) {
 	await mkdir(updaterMetadataDir, { recursive: true });
 	await writeFile(
@@ -636,6 +665,36 @@ async function listReleaseAssets(input: {
 	});
 
 	return response.json ?? [];
+}
+
+async function deleteManagedReleaseAssets(input: {
+	token: string;
+	release: GitHubRelease;
+	keepNames: Set<string>;
+}) {
+	input.release.assets = await listReleaseAssets({
+		token: input.token,
+		release: input.release,
+	});
+
+	const keepNames = new Set(
+		[...input.keepNames].flatMap((name) => [
+			name,
+			sanitizeGitHubAssetName(name),
+		]),
+	);
+
+	for (const asset of input.release.assets) {
+		if (keepNames.has(asset.name) || !isManagedReleaseAssetName(asset.name)) {
+			continue;
+		}
+
+		await githubRequest({
+			token: input.token,
+			method: "DELETE",
+			url: releaseAssetDeleteUrl(input.release, asset.id),
+		});
+	}
 }
 
 async function deleteReleaseAssetByName(input: {
@@ -789,6 +848,15 @@ function sanitizeGitHubAssetName(name: string) {
 	return name.replace(/[^A-Za-z0-9._-]+/g, ".");
 }
 
+function isManagedReleaseAssetName(name: string) {
+	if (name === "latest.json") {
+		return true;
+	}
+
+	const normalizedName = name.endsWith(".sig") ? name.slice(0, -4) : name;
+	return classifyArtifact(normalizedName, null) !== null;
+}
+
 function releaseAssetDeleteUrl(release: GitHubRelease, assetId: number) {
 	return release.url.replace(/\/releases\/\d+$/, `/releases/assets/${assetId}`);
 }
@@ -828,6 +896,11 @@ type UploadAsset = {
 	buffer: Buffer;
 };
 
+type BundleFile = {
+	path: string;
+	mtimeMs: number;
+};
+
 type PlatformEntry = {
 	signature: string;
 	url: string;
@@ -840,6 +913,11 @@ type PreferredArtifact = {
 	kind: "nsis" | "dmg" | "appimage" | "app-tar" | "msi";
 	platform: string;
 	relatedFiles: string[];
+};
+
+type CollectedArtifact = PreferredArtifact & {
+	matchesVersion: boolean;
+	mtimeMs: number;
 };
 
 type PlatformEntryWithKind = PlatformEntry & {
