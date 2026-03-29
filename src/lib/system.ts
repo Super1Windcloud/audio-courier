@@ -7,6 +7,7 @@ import {
 } from "@tauri-apps/plugin-global-shortcut";
 import { toast } from "sonner";
 import { logError, logInfo } from "@/lib/logger.ts";
+import { setRecordingStateImmediately } from "@/lib/recordingState.ts";
 import useAppStateStore from "@/stores";
 
 function isWindows() {
@@ -31,13 +32,13 @@ export async function toggleRecording() {
 	const appState = useAppStateStore.getState();
 
 	if (!appState.isRecording) {
-		appState.updateIsRecording(true);
+		setRecordingStateImmediately(true);
 	} else {
 		const startedAt = appState.recordingStartedAt ?? 0;
 		if (startedAt && Date.now() - startedAt < 3000) {
 			toast.warning("录音开始后需要等待 3 秒才能停止");
 		} else {
-			appState.updateIsRecording(false);
+			setRecordingStateImmediately(false);
 		}
 	}
 }

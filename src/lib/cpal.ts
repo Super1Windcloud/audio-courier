@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 import { logError, logInfo } from "@/lib/logger.ts";
+import { setRecordingStateImmediately } from "@/lib/recordingState.ts";
 import useAppStateStore from "@/stores";
 
 let traditionalChineseConverter: ((content: string) => string) | null = null;
@@ -62,7 +63,7 @@ export async function startAudioLoopbackRecognition(
 		toast.error(`transcription error${event.payload}`);
 		const appState = useAppStateStore.getState();
 		if (appState.isRecording) {
-			appState.updateIsRecording(false);
+			setRecordingStateImmediately(false);
 		}
 		toast.error(`当前${selectedAsrVendor}Websocket流连接已关闭`);
 	});
@@ -78,7 +79,7 @@ export async function startAudioLoopbackRecognition(
 		toast.error(`invoke start audio capture err${err}`);
 		const appState = useAppStateStore.getState();
 		if (appState.isRecording) {
-			appState.updateIsRecording(false);
+			setRecordingStateImmediately(false);
 		}
 	});
 }

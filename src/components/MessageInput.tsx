@@ -1,8 +1,6 @@
 import { Mic, SendHorizontal, Trash2 } from "lucide-react";
 import type React from "react";
 import {
-	lazy,
-	Suspense,
 	useCallback,
 	useEffect,
 	useEffectEvent,
@@ -13,10 +11,10 @@ import { toast } from "sonner";
 import type { Message } from "@/components/ChatContainer.tsx";
 import { MoreMenu } from "@/components/MoreMenu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import Waruls from "@/components/Waruls.tsx";
 import { startAudioRecognition, stopAudioRecognition } from "@/lib/audio.ts";
+import { setRecordingStateImmediately } from "@/lib/recordingState.ts";
 import useAppStateStore from "@/stores";
-
-const Waruls = lazy(() => import("@/components/Waruls.tsx"));
 
 interface MessageInputProps {
 	onSendMessage: (text: string) => void;
@@ -35,9 +33,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		Date.now(),
 	);
 	const recordingState = useAppStateStore((state) => state.isRecording);
-	const updateRecordingState = useAppStateStore(
-		(state) => state.updateIsRecording,
-	);
 	const captureInterval = useAppStateStore((state) => state.captureInterval);
 	const updateQuestionState = useAppStateStore((state) => state.updateQuestion);
 	const remoteModelVendor = useAppStateStore(
@@ -64,6 +59,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		!recordingState ||
 		recordingStartedAt === null ||
 		recordingTimerStamp - recordingStartedAt >= MIN_RECORDING_DURATION;
+	const recordingTitle = canStopRecording ? "停止语音" : "录音中...3秒后可停止";
 
 	const handleSend = useCallback(() => {
 		if (!isAuthorized) {
@@ -128,14 +124,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		};
 	}, [recordingStartedAt, recordingState]);
 
-	const toggleRecording = async () => {
+	const toggleRecording = () => {
 		if (!isAuthorized) {
 			toast.warning("未激活许可证，无法开始录音");
 			return;
 		}
 
 		if (!recordingState) {
-			updateRecordingState(true);
+			setRecordingStateImmediately(true);
 			return;
 		}
 
@@ -145,7 +141,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 			toast.warning("录音开始后需要等待3秒才能停止");
 			return;
 		}
-		updateRecordingState(false);
+		setRecordingStateImmediately(false);
 	};
 
 	const startRecordingEffect = useEffectEvent(() => {
@@ -203,32 +199,19 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
 				{recordingState ? (
 					shouldUseWaruls ? (
-						<div className="relative h-16 w-16 shrink-0 overflow-visible">
-							<Suspense
-								fallback={
-									<span
-										title={
-											canStopRecording ? "停止语音" : "录音中...3秒后可停止"
-										}
-									>
-										<Mic
-											onClick={toggleRecording}
-											className="cursor-pointer text-red-500"
-										/>
-									</span>
-								}
-							>
-								<Waruls
-									className="h-full w-full"
-									onToggle={toggleRecording}
-									title={canStopRecording ? "停止语音" : "录音中...3秒后可停止"}
-								/>
-							</Suspense>
+						<div
+							key="recording-waruls"
+							className="relative h-8 w-8 shrink-0 overflow-visible"
+						>
+							<Waruls
+								className="h-full w-full"
+								onToggle={toggleRecording}
+								scale={0.32}
+								title={recordingTitle}
+							/>
 						</div>
 					) : (
-						<span
-							title={canStopRecording ? "停止语音" : "录音中...3秒后可停止"}
-						>
+						<span key="recording-mic" title={recordingTitle}>
 							<Mic
 								onClick={toggleRecording}
 								className="cursor-pointer text-red-500"
@@ -236,7 +219,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 						</span>
 					)
 				) : (
-					<span title="开始语音">
+					<span key="idle-mic" title="开始语音">
 						<Mic
 							onClick={toggleRecording}
 							className="cursor-pointer text-gray-400"
