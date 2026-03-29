@@ -76,6 +76,10 @@ export async function startAudioLoopbackRecognition(
 		console.error("invoke start output audio recognition failed", err);
 		logError("invoke start output audio recognition failed", err);
 		toast.error(`invoke start audio capture err${err}`);
+		const appState = useAppStateStore.getState();
+		if (appState.isRecording) {
+			appState.updateIsRecording(false);
+		}
 	});
 }
 

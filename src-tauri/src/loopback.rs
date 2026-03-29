@@ -44,6 +44,34 @@ thread_local! {
     static PCM_BUFFER: Mutex<Vec<f32>> = const { Mutex::new(Vec::new()) };
 }
 
+pub fn request_stop_recording() {
+    RECORDING.store(false, Ordering::SeqCst);
+}
+
+fn create_recording_status_callback(
+    status_callback: Option<StatusCallback>,
+) -> Option<StatusCallback> {
+    let callback = status_callback?;
+    let has_reported = Arc::new(AtomicBool::new(false));
+
+    Some(Arc::new(move |message: String| {
+        if has_reported.swap(true, Ordering::SeqCst) {
+            return;
+        }
+
+        request_stop_recording();
+        callback(message);
+    }))
+}
+
+fn report_recording_error(status_callback: Option<&StatusCallback>, message: impl Into<String>) {
+    request_stop_recording();
+
+    if let Some(callback) = status_callback {
+        callback(message.into());
+    }
+}
+
 #[derive(Default)]
 pub struct RecordParams {
     pub device: String,
@@ -67,7 +95,7 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
         "default_input" => host.default_input_device(),
         name => host
             .output_devices()
-            .unwrap()
+            .map_err(|e| format!("Failed to enumerate output devices: {e}"))?
             .find(|x| device_display_name(x).as_deref() == Some(name)),
     }
     .ok_or_else(|| "failed to find input device".to_string())?;
@@ -84,7 +112,9 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
     }
 
     let config = if device.supports_input() && params.device.contains("input") {
-        device.default_input_config().unwrap()
+        device
+            .default_input_config()
+            .map_err(|e| format!("Failed to read default input config: {e}"))?
     } else {
         select_output_config(params.use_resampled)?
     };
@@ -202,12 +232,13 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
                         asr_transcriber.clone(),
                         params.use_resampled,
                         sample_rate,
+                        status_callback.clone(),
                     )
                 },
                 err_fn,
                 None,
             )
-            .unwrap(),
+            .map_err(|e| format!("Failed to build i16 input stream: {e}"))?,
         cpal::SampleFormat::F32 => device
             .build_input_stream(
                 &config.into(),
@@ -222,12 +253,13 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
                         asr_transcriber.clone(),
                         params.use_resampled,
                         sample_rate,
+                        status_callback.clone(),
                     )
                 },
                 err_fn,
                 None,
             )
-            .unwrap(),
+            .map_err(|e| format!("Failed to build f32 input stream: {e}"))?,
         sample_format => {
             write_some_log(format!("Unsupported sample format '{sample_format}'").as_str());
             return Err(format!("Unsupported sample format '{sample_format}'"));
@@ -270,6 +302,7 @@ fn handle_input_data<T, U>(
     transcriber: Option<Arc<dyn StreamingTranscriber>>,
     use_resampled: bool,
     input_sample_rate: usize,
+    status_callback: Option<StatusCallback>,
 ) where
     T: Sample + ToSample<i16> + ToSample<f32> + FromSample<i16> + FromSample<f32>,
     U: Sample + hound::Sample + FromSample<T> + FromSample<i16> + FromSample<f32>,
@@ -301,7 +334,9 @@ fn handle_input_data<T, U>(
             let chunk_i16 =
                 prepare_chunk_for_transcriber(&input_mono, use_resampled, input_sample_rate);
             if let Err(err) = transcriber.queue_chunk(chunk_i16) {
-                write_some_log(format!("Streaming chunk send failed: {err}").as_str());
+                let message = format!("Streaming chunk send failed: {err}");
+                write_some_log(message.as_str());
+                report_recording_error(status_callback.as_ref(), message);
             }
         }
     } else {
@@ -314,6 +349,7 @@ fn handle_input_data<T, U>(
                 transcriber.clone(),
                 use_resampled,
                 input_sample_rate,
+                status_callback.clone(),
             )
         });
     }
@@ -325,6 +361,7 @@ fn drain_chunk_buffer_to_writer(
     transcriber: Option<Arc<dyn StreamingTranscriber>>,
     use_resampled: bool,
     input_sample_rate: usize,
+    status_callback: Option<StatusCallback>,
 ) {
     while buf.len() >= chunk_size {
         let chunk = buf.drain(..chunk_size).collect::<Vec<f32>>();
@@ -348,7 +385,10 @@ fn drain_chunk_buffer_to_writer(
             let vendor = transcriber.get_vendor_name();
             let chunk_i16 = prepare_chunk_for_transcriber(&chunk, use_resampled, input_sample_rate);
             if let Err(err) = transcriber.queue_chunk(chunk_i16) {
-                write_some_log(format!("{vendor:?} Streaming chunk send failed: {err}").as_str());
+                let message = format!("{vendor} streaming chunk send failed: {err}");
+                write_some_log(message.as_str());
+                report_recording_error(status_callback.as_ref(), message);
+                break;
             }
         }
     }
@@ -387,16 +427,20 @@ type WavWriterHandle = Arc<Mutex<Option<hound::WavWriter<BufWriter<File>>>>>;
 ///! 停止录音线程可能死锁卡住,暂时还没解决
 
 pub fn stop_recording(handle: JoinHandle<()>) {
-    RECORDING.store(false, Ordering::SeqCst);
+    request_stop_recording();
     println!("停止信号已发送，等待录音线程退出...");
     handle.join().expect("无法 join 录音线程");
     println!("录音线程已退出 ✅");
 }
 
-pub fn start_record_audio_with_writer(params: RecordParams) -> Result<JoinHandle<()>, String> {
+pub fn start_record_audio_with_writer(mut params: RecordParams) -> Result<JoinHandle<()>, String> {
+    let status_callback = create_recording_status_callback(params.status_callback.clone());
+    params.status_callback = status_callback.clone();
+
     let handle = thread::spawn(move || {
         if let Err(e) = record_audio_worker(params) {
             eprintln!("录音线程出错: {e}");
+            report_recording_error(status_callback.as_ref(), e);
         }
     });
     Ok(handle)
