@@ -207,7 +207,7 @@ function normalizePersistedAppConfigState(
 function pickPersistedAppConfigState(
 	state: AppStateStore,
 ): PersistedAppConfigState {
-	const result: PersistedAppConfigState = {
+	return {
 		currentSelectedModel: state.currentSelectedModel,
 		currentAudioChannel: state.currentAudioChannel,
 		llmPrompt: state.llmPrompt,
@@ -221,18 +221,6 @@ function pickPersistedAppConfigState(
 		llmProviderSettings: state.llmProviderSettings,
 		transcriptProviderSettings: state.transcriptProviderSettings,
 	};
-
-	if (import.meta.env.DEV) {
-		// In development, do not write these to storage if they come from the env
-		if (state.llmPrompt === DEFAULT_LLM_PROMPT) {
-			result.llmPrompt = "";
-		}
-		if (state.interviewPrompt === DEFAULT_INTERVIEW_PROMPT) {
-			result.interviewPrompt = "";
-		}
-	}
-
-	return result;
 }
 
 const defaultPersistedConfigState = createDefaultPersistedConfigState();

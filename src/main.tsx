@@ -1,7 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { initializeAppLogger, logError } from "@/lib/logger.ts";
+import { initializeAppLogger, logError, logInfo } from "@/lib/logger.ts";
 import useAppStateStore from "@/stores";
 import {
 	mergeLlmApiKeyPresetsIntoSettings,
@@ -13,6 +13,20 @@ const root = ReactDOM.createRoot(
 	document.getElementById("root") as HTMLElement,
 );
 
+function logDevPromptEnv() {
+	if (!import.meta.env.DEV) {
+		return;
+	}
+
+	const vitePrompt = import.meta.env.VITE_PROMPT ?? "";
+	const viteInterviewPrompt = import.meta.env.VITE_INTERVIEW_PROMPT ?? "";
+
+	console.info("VITE_PROMPT:", vitePrompt);
+	console.info("VITE_INTERVIEW_PROMPT:", viteInterviewPrompt);
+	logInfo(`VITE_PROMPT: ${JSON.stringify(vitePrompt)}`);
+	logInfo(`VITE_INTERVIEW_PROMPT: ${JSON.stringify(viteInterviewPrompt)}`);
+}
+
 async function bootstrap() {
 	try {
 		await initializeAppLogger();
@@ -20,6 +34,8 @@ async function bootstrap() {
 		console.error("initialize-app-logger-failed", error);
 		logError("initialize-app-logger-failed", error);
 	}
+
+	logDevPromptEnv();
 
 	try {
 		await useAppStateStore.persist.rehydrate();
