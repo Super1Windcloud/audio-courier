@@ -1,6 +1,7 @@
 import { RotateCcw, Save } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
+import { ProviderConfigField } from "@/components/ProviderConfigField.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
 	Dialog,
@@ -9,51 +10,13 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog.tsx";
-import { Input } from "@/components/ui/input.tsx";
+import { transcriptProviderOfficialLinks } from "@/lib/providerOfficialLinks.ts";
 import useAppStateStore from "@/stores";
 import {
 	createDefaultTranscriptProviderSettings,
 	getTranscriptProviderStatus,
 	type TranscriptProviderSettings,
 } from "@/types/provider.ts";
-
-function LabeledField({
-	label,
-	value,
-	onChange,
-	placeholder,
-	description,
-	status,
-}: {
-	label: string;
-	value: string;
-	onChange: (value: string) => void;
-	placeholder?: string;
-	description?: string;
-	status?: string;
-}) {
-	return (
-		<div className="grid gap-2">
-			<div className="flex items-center justify-between gap-3">
-				<span className="text-sm font-medium text-white">{label}</span>
-				{status ? (
-					<span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] text-slate-200">
-						{status}
-					</span>
-				) : null}
-			</div>
-			<Input
-				value={value}
-				onChange={(event) => onChange(event.target.value)}
-				placeholder={placeholder}
-				className="border-white/10 bg-white/5 text-white placeholder:text-slate-500"
-			/>
-			{description ? (
-				<span className="text-xs leading-5 text-slate-400">{description}</span>
-			) : null}
-		</div>
-	);
-}
 
 function Section({
 	title,
@@ -108,14 +71,15 @@ export function TranscriptProviderDialog({
 					<DialogDescription className="text-slate-300">
 						这里的配置只影响语音转录供应商，不影响大模型对话。API Key
 						留空时会回退到 dev 模式下的 `.env` 或 production 模式下内置的
-						`.env.local` 预设；语言、模型和实时地址会使用这里的值覆盖默认行为。
+						`.env.local`
+						预设；语言、模型和实时地址会使用这里的值覆盖默认行为。每个字段右侧都可以直接打开对应供应商官网。
 					</DialogDescription>
 				</DialogHeader>
 
 				<div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
 					<Section title="Deepgram" description="可配置 API Key 和语言代码。">
 						<div className="grid gap-4 md:grid-cols-2">
-							<LabeledField
+							<ProviderConfigField
 								label="Deepgram API Key"
 								value={draft.deepgramApiKey}
 								onChange={(value) =>
@@ -123,8 +87,9 @@ export function TranscriptProviderDialog({
 								}
 								placeholder={getTranscriptProviderStatus(draft.deepgramApiKey)}
 								status={getTranscriptProviderStatus(draft.deepgramApiKey)}
+								officialLink={transcriptProviderOfficialLinks.deepgramApiKey}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="Deepgram Language"
 								value={draft.deepgramLanguage}
 								onChange={(value) =>
@@ -134,6 +99,7 @@ export function TranscriptProviderDialog({
 									}))
 								}
 								placeholder="zh"
+								officialLink={transcriptProviderOfficialLinks.deepgramLanguage}
 							/>
 						</div>
 					</Section>
@@ -142,7 +108,7 @@ export function TranscriptProviderDialog({
 						title="AssemblyAI"
 						description="目前只需要 AssemblyAI 的流式 API Key。"
 					>
-						<LabeledField
+						<ProviderConfigField
 							label="AssemblyAI API Key"
 							value={draft.assemblyApiKey}
 							onChange={(value) =>
@@ -150,6 +116,7 @@ export function TranscriptProviderDialog({
 							}
 							placeholder={getTranscriptProviderStatus(draft.assemblyApiKey)}
 							status={getTranscriptProviderStatus(draft.assemblyApiKey)}
+							officialLink={transcriptProviderOfficialLinks.assemblyApiKey}
 						/>
 					</Section>
 
@@ -158,7 +125,7 @@ export function TranscriptProviderDialog({
 						description="支持自定义 API Key、语言和模型名。"
 					>
 						<div className="grid gap-4 md:grid-cols-3">
-							<LabeledField
+							<ProviderConfigField
 								label="Gladia API Key"
 								value={draft.gladiaApiKey}
 								onChange={(value) =>
@@ -166,8 +133,9 @@ export function TranscriptProviderDialog({
 								}
 								placeholder={getTranscriptProviderStatus(draft.gladiaApiKey)}
 								status={getTranscriptProviderStatus(draft.gladiaApiKey)}
+								officialLink={transcriptProviderOfficialLinks.gladiaApiKey}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="Gladia Language"
 								value={draft.gladiaLanguage}
 								onChange={(value) =>
@@ -177,14 +145,16 @@ export function TranscriptProviderDialog({
 									}))
 								}
 								placeholder="zh"
+								officialLink={transcriptProviderOfficialLinks.gladiaLanguage}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="Gladia Model"
 								value={draft.gladiaModel}
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, gladiaModel: value }))
 								}
 								placeholder="solaria-1"
+								officialLink={transcriptProviderOfficialLinks.gladiaModel}
 							/>
 						</div>
 					</Section>
@@ -194,7 +164,7 @@ export function TranscriptProviderDialog({
 						description="支持 API Key、语言和实时接入 URL。"
 					>
 						<div className="grid gap-4 md:grid-cols-2">
-							<LabeledField
+							<ProviderConfigField
 								label="Speechmatics API Key"
 								value={draft.speechmaticsApiKey}
 								onChange={(value) =>
@@ -207,8 +177,11 @@ export function TranscriptProviderDialog({
 									draft.speechmaticsApiKey,
 								)}
 								status={getTranscriptProviderStatus(draft.speechmaticsApiKey)}
+								officialLink={
+									transcriptProviderOfficialLinks.speechmaticsApiKey
+								}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="Speechmatics Language"
 								value={draft.speechmaticsLanguage}
 								onChange={(value) =>
@@ -218,9 +191,12 @@ export function TranscriptProviderDialog({
 									}))
 								}
 								placeholder="cmn"
+								officialLink={
+									transcriptProviderOfficialLinks.speechmaticsLanguage
+								}
 							/>
 							<div className="md:col-span-2">
-								<LabeledField
+								<ProviderConfigField
 									label="Speechmatics RT URL"
 									value={draft.speechmaticsRtUrl}
 									onChange={(value) =>
@@ -230,6 +206,9 @@ export function TranscriptProviderDialog({
 										}))
 									}
 									placeholder="wss://eu2.rt.speechmatics.com/v2/"
+									officialLink={
+										transcriptProviderOfficialLinks.speechmaticsRtUrl
+									}
 								/>
 							</div>
 						</div>
@@ -237,7 +216,7 @@ export function TranscriptProviderDialog({
 
 					<Section title="RevAI" description="支持 API Key、语言和 metadata。">
 						<div className="grid gap-4 md:grid-cols-2">
-							<LabeledField
+							<ProviderConfigField
 								label="RevAI API Key"
 								value={draft.revaiApiKey}
 								onChange={(value) =>
@@ -245,17 +224,19 @@ export function TranscriptProviderDialog({
 								}
 								placeholder={getTranscriptProviderStatus(draft.revaiApiKey)}
 								status={getTranscriptProviderStatus(draft.revaiApiKey)}
+								officialLink={transcriptProviderOfficialLinks.revaiApiKey}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="RevAI Language"
 								value={draft.revaiLanguage}
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, revaiLanguage: value }))
 								}
 								placeholder="cmn"
+								officialLink={transcriptProviderOfficialLinks.revaiLanguage}
 							/>
 							<div className="md:col-span-2">
-								<LabeledField
+								<ProviderConfigField
 									label="RevAI Metadata"
 									value={draft.revaiMetadata}
 									onChange={(value) =>
@@ -265,6 +246,7 @@ export function TranscriptProviderDialog({
 										}))
 									}
 									placeholder="optional metadata"
+									officialLink={transcriptProviderOfficialLinks.revaiMetadata}
 								/>
 							</div>
 						</div>

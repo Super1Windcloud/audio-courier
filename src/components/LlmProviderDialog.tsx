@@ -1,6 +1,7 @@
 import { RotateCcw, Save } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
+import { ProviderConfigField } from "@/components/ProviderConfigField.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
 	Dialog,
@@ -9,51 +10,13 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog.tsx";
-import { Input } from "@/components/ui/input.tsx";
+import { llmProviderOfficialLinks } from "@/lib/providerOfficialLinks.ts";
 import useAppStateStore from "@/stores";
 import {
 	createDefaultLlmProviderSettings,
 	getLlmProviderStatus,
 	type LlmProviderSettings,
 } from "@/types/provider.ts";
-
-function LabeledField({
-	label,
-	value,
-	onChange,
-	placeholder,
-	description,
-	status,
-}: {
-	label: string;
-	value: string;
-	onChange: (value: string) => void;
-	placeholder?: string;
-	description?: string;
-	status?: string;
-}) {
-	return (
-		<div className="grid gap-2">
-			<div className="flex items-center justify-between gap-3">
-				<span className="text-sm font-medium text-white">{label}</span>
-				{status ? (
-					<span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] text-slate-200">
-						{status}
-					</span>
-				) : null}
-			</div>
-			<Input
-				value={value}
-				onChange={(event) => onChange(event.target.value)}
-				placeholder={placeholder}
-				className="border-white/10 bg-white/5 text-white placeholder:text-slate-500"
-			/>
-			{description ? (
-				<span className="text-xs leading-5 text-slate-400">{description}</span>
-			) : null}
-		</div>
-	);
-}
 
 function Section({
 	title,
@@ -108,7 +71,7 @@ export function LlmProviderDialog({
 						这里的配置只影响大模型请求，不影响转录供应商。API Key 留空时会回退到
 						dev 模式下的 `.env` 或 production 模式下内置的 `.env.local`
 						预设；OpenAI、Gemini 和自定义兼容供应商还支持自定义 Base URL
-						与模型名。
+						与模型名。每个字段右侧都可以直接打开对应供应商官网。
 					</DialogDescription>
 				</DialogHeader>
 
@@ -118,7 +81,7 @@ export function LlmProviderDialog({
 						description="这些字段对应当前仓库已有的大模型供应商。只需要填 API Key。"
 					>
 						<div className="grid gap-4 md:grid-cols-2">
-							<LabeledField
+							<ProviderConfigField
 								label="SiliconFlow API Key"
 								value={draft.siliconflowApiKey}
 								onChange={(value) =>
@@ -135,8 +98,9 @@ export function LlmProviderDialog({
 									draft.siliconflowApiKey,
 									presets.siliconflowApiKey,
 								)}
+								officialLink={llmProviderOfficialLinks.siliconflowApiKey}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="Doubao API Key"
 								value={draft.doubaoApiKey}
 								onChange={(value) =>
@@ -150,8 +114,9 @@ export function LlmProviderDialog({
 									draft.doubaoApiKey,
 									presets.doubaoApiKey,
 								)}
+								officialLink={llmProviderOfficialLinks.doubaoApiKey}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="Kimi API Key"
 								value={draft.kimiApiKey}
 								onChange={(value) =>
@@ -165,8 +130,9 @@ export function LlmProviderDialog({
 									draft.kimiApiKey,
 									presets.kimiApiKey,
 								)}
+								officialLink={llmProviderOfficialLinks.kimiApiKey}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="Zhipu API Key"
 								value={draft.zhipuApiKey}
 								onChange={(value) =>
@@ -180,8 +146,9 @@ export function LlmProviderDialog({
 									draft.zhipuApiKey,
 									presets.zhipuApiKey,
 								)}
+								officialLink={llmProviderOfficialLinks.zhipuApiKey}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="DeepSeek API Key"
 								value={draft.deepseekApiKey}
 								onChange={(value) =>
@@ -195,8 +162,9 @@ export function LlmProviderDialog({
 									draft.deepseekApiKey,
 									presets.deepseekApiKey,
 								)}
+								officialLink={llmProviderOfficialLinks.deepseekApiKey}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="Ali Qwen API Key"
 								value={draft.aliQwenApiKey}
 								onChange={(value) =>
@@ -210,6 +178,7 @@ export function LlmProviderDialog({
 									draft.aliQwenApiKey,
 									presets.aliQwenApiKey,
 								)}
+								officialLink={llmProviderOfficialLinks.aliQwenApiKey}
 							/>
 						</div>
 					</Section>
@@ -219,7 +188,7 @@ export function LlmProviderDialog({
 						description="使用官方 OpenAI Chat Completions 接口。"
 					>
 						<div className="grid gap-4 md:grid-cols-2">
-							<LabeledField
+							<ProviderConfigField
 								label="OpenAI API Key"
 								value={draft.openaiApiKey}
 								onChange={(value) =>
@@ -233,17 +202,19 @@ export function LlmProviderDialog({
 									draft.openaiApiKey,
 									presets.openaiApiKey,
 								)}
+								officialLink={llmProviderOfficialLinks.openaiApiKey}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="OpenAI Model"
 								value={draft.openaiModel}
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, openaiModel: value }))
 								}
 								placeholder="gpt-4.1-mini"
+								officialLink={llmProviderOfficialLinks.openaiModel}
 							/>
 							<div className="md:col-span-2">
-								<LabeledField
+								<ProviderConfigField
 									label="OpenAI Base URL"
 									value={draft.openaiBaseUrl}
 									onChange={(value) =>
@@ -253,6 +224,7 @@ export function LlmProviderDialog({
 										}))
 									}
 									placeholder="https://api.openai.com/v1"
+									officialLink={llmProviderOfficialLinks.openaiBaseUrl}
 								/>
 							</div>
 						</div>
@@ -263,7 +235,7 @@ export function LlmProviderDialog({
 						description="使用 Gemini 的 OpenAI-compatible 接口。"
 					>
 						<div className="grid gap-4 md:grid-cols-2">
-							<LabeledField
+							<ProviderConfigField
 								label="Gemini API Key"
 								value={draft.geminiApiKey}
 								onChange={(value) =>
@@ -278,17 +250,19 @@ export function LlmProviderDialog({
 									presets.geminiApiKey,
 								)}
 								description="如果这里留空，后端会回退到 GEMINI_API_KEY 或 GOOGLE_GENAI_API_KEY。"
+								officialLink={llmProviderOfficialLinks.geminiApiKey}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="Gemini Model"
 								value={draft.geminiModel}
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, geminiModel: value }))
 								}
 								placeholder="gemini-3-flash-preview"
+								officialLink={llmProviderOfficialLinks.geminiModel}
 							/>
 							<div className="md:col-span-2">
-								<LabeledField
+								<ProviderConfigField
 									label="Gemini Base URL"
 									value={draft.geminiBaseUrl}
 									onChange={(value) =>
@@ -298,6 +272,7 @@ export function LlmProviderDialog({
 										}))
 									}
 									placeholder="https://generativelanguage.googleapis.com/v1beta/openai"
+									officialLink={llmProviderOfficialLinks.geminiBaseUrl}
 								/>
 							</div>
 						</div>
@@ -308,7 +283,7 @@ export function LlmProviderDialog({
 						description="适用于任何遵循 OpenAI Chat Completions 规范的自建或第三方接口。"
 					>
 						<div className="grid gap-4 md:grid-cols-2">
-							<LabeledField
+							<ProviderConfigField
 								label="显示名称"
 								value={draft.customOpenAiName}
 								onChange={(value) =>
@@ -318,8 +293,9 @@ export function LlmProviderDialog({
 									}))
 								}
 								placeholder="自定义 OpenAI 兼容供应商"
+								officialLink={llmProviderOfficialLinks.customOpenAiName}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="模型名"
 								value={draft.customOpenAiModel}
 								onChange={(value) =>
@@ -329,8 +305,9 @@ export function LlmProviderDialog({
 									}))
 								}
 								placeholder="your-model-name"
+								officialLink={llmProviderOfficialLinks.customOpenAiModel}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="API Key"
 								value={draft.customOpenAiApiKey}
 								onChange={(value) =>
@@ -347,8 +324,9 @@ export function LlmProviderDialog({
 									draft.customOpenAiApiKey,
 									presets.customOpenAiApiKey,
 								)}
+								officialLink={llmProviderOfficialLinks.customOpenAiApiKey}
 							/>
-							<LabeledField
+							<ProviderConfigField
 								label="Base URL"
 								value={draft.customOpenAiBaseUrl}
 								onChange={(value) =>
@@ -358,6 +336,7 @@ export function LlmProviderDialog({
 									}))
 								}
 								placeholder="https://your-endpoint.example/v1"
+								officialLink={llmProviderOfficialLinks.customOpenAiBaseUrl}
 							/>
 						</div>
 					</Section>
