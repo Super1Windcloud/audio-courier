@@ -354,7 +354,7 @@ export function MoreMenu() {
 						>
 							选择音频通道
 						</DropdownMenuSubTrigger>
-						<DropdownMenuSubContent className="w-48 bg-gray-600 text-white border-0">
+						<DropdownMenuSubContent className="w-[min(26rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] bg-gray-600 text-white border-0">
 							{audioChannels.map((channel) => (
 								<DropdownMenuItem
 									key={channel.value}
@@ -367,8 +367,13 @@ export function MoreMenu() {
 										appState.updateCurrentAudioChannel(channel.value)
 									}
 								>
-									<div className="flex w-full items-center justify-between gap-2">
-										<span className="truncate">{channel.name}</span>
+									<div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+										<span
+											className="whitespace-normal break-all leading-5"
+											title={channel.name}
+										>
+											{channel.name}
+										</span>
 										<span className="ml-2 shrink-0 text-xs text-gray-300">
 											{channel.isDefault
 												? "默认输出"
