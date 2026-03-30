@@ -1,5 +1,6 @@
 export const MODEL_OPTIONS = [
 	"siliconflow_pro",
+	"siliconflow_minimax_m2_5",
 	"doubao_lite",
 	"doubao_pro",
 	"kimi",
@@ -17,6 +18,7 @@ export type ModelOption = (typeof MODEL_OPTIONS)[number];
 
 export const MODEL_LABELS: Record<ModelOption, string> = {
 	siliconflow_pro: "SiliconFlow Pro",
+	siliconflow_minimax_m2_5: "MiniMax M2.5",
 	doubao_lite: "Doubao Lite",
 	doubao_pro: "Doubao Pro",
 	kimi: "Kimi",

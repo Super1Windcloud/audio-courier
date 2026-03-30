@@ -113,9 +113,29 @@ const PRO_MODELS: [&str; 23] = [
     "deepseek-ai/DeepSeek-V3",
     "baidu/ERNIE-4.5-300B-A47B",
 ];
+const SILICONFLOW_MINIMAX_M2_5_MODEL: &str = "Pro/MiniMaxAI/MiniMax-M2.5";
 
 pub fn siliconflow_pro_models() -> &'static [&'static str] {
     &PRO_MODELS
+}
+
+fn resolve_siliconflow_provider(
+    runtime_config: &LlmRuntimeConfig,
+    model: impl Into<String>,
+) -> Result<ResolvedLlmProvider, String> {
+    Ok(ResolvedLlmProvider {
+        model: model.into(),
+        base_url: "https://api.siliconflow.cn/v1".to_string(),
+        api_key: resolve_required_string(
+            runtime_config.siliconflow_api_key.as_deref(),
+            SILICONFLOW_ENV_KEYS,
+            "SILICONFLOW_API_KEY",
+        )?,
+        max_tokens: 4096,
+        temperature: 0.7,
+        prompt_role: "assistant",
+        enable_thinking: Some(false),
+    })
 }
 
 fn build_messages(flow_args: &FlowArgs, prompt_role: &str) -> Vec<serde_json::Value> {
@@ -132,25 +152,16 @@ fn resolve_provider(
     let provider = provider.trim();
 
     match provider {
-        "siliconflow_pro" => Ok(ResolvedLlmProvider {
-            model: {
-                let idx = {
-                    let mut rng = thread_rng();
-                    rng.random_range(0..PRO_MODELS.len())
-                };
-                PRO_MODELS[idx].to_string()
-            },
-            base_url: "https://api.siliconflow.cn/v1".to_string(),
-            api_key: resolve_required_string(
-                runtime_config.siliconflow_api_key.as_deref(),
-                SILICONFLOW_ENV_KEYS,
-                "SILICONFLOW_API_KEY",
-            )?,
-            max_tokens: 4096,
-            temperature: 0.7,
-            prompt_role: "assistant",
-            enable_thinking: Some(false),
+        "siliconflow_pro" => resolve_siliconflow_provider(runtime_config, {
+            let idx = {
+                let mut rng = thread_rng();
+                rng.random_range(0..PRO_MODELS.len())
+            };
+            PRO_MODELS[idx].to_string()
         }),
+        "siliconflow_minimax_m2_5" => {
+            resolve_siliconflow_provider(runtime_config, SILICONFLOW_MINIMAX_M2_5_MODEL)
+        }
         "doubao_lite" => Ok(ResolvedLlmProvider {
             model: "doubao-1.5-lite-32k-250115".to_string(),
             base_url: "https://ark.cn-beijing.volces.com/api/v3".to_string(),
@@ -388,6 +399,14 @@ pub async fn siliconflow_pro(app: tauri::AppHandle, flow_args: FlowArgs) -> Resu
     let random_model = PRO_MODELS[idx];
     println!("随机选择的模型: {}", random_model);
     siliconflow_pro_with_model(app, flow_args, random_model).await
+}
+
+#[tauri::command]
+pub async fn siliconflow_minimax_m2_5(
+    app: tauri::AppHandle,
+    flow_args: FlowArgs,
+) -> Result<String, String> {
+    siliconflow_pro_with_model(app, flow_args, SILICONFLOW_MINIMAX_M2_5_MODEL).await
 }
 
 #[tauri::command]

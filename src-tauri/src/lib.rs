@@ -239,6 +239,7 @@ pub fn run() {
             chat_with_llm_provider,
             siliconflow_free,
             siliconflow_pro,
+            siliconflow_minimax_m2_5,
             doubao_lite,
             doubao_pro,
             doubao_seed_flash,
