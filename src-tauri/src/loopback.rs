@@ -76,6 +76,7 @@ fn report_recording_error(status_callback: Option<&StatusCallback>, message: imp
 pub struct RecordParams {
     pub device: String,
     pub is_input_device: bool,
+    pub device_occurrence: Option<usize>,
     pub file_name: String,
     pub only_pcm: bool,
     pub capture_interval: u32,
@@ -91,6 +92,7 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
     let host = cpal::default_host();
     RECORDING.store(true, Ordering::SeqCst);
     let is_input_device = params.is_input_device || params.device == "default_input";
+    let device_occurrence = params.device_occurrence.unwrap_or(0);
 
     let device = match params.device.as_str() {
         "default" => host.default_output_device(),
@@ -98,11 +100,13 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
         name if is_input_device => host
             .input_devices()
             .map_err(|e| format!("Failed to enumerate input devices: {e}"))?
-            .find(|x| device_display_name(x).as_deref() == Some(name)),
+            .filter(|x| device_display_name(x).as_deref() == Some(name))
+            .nth(device_occurrence),
         name => host
             .output_devices()
             .map_err(|e| format!("Failed to enumerate output devices: {e}"))?
-            .find(|x| device_display_name(x).as_deref() == Some(name)),
+            .filter(|x| device_display_name(x).as_deref() == Some(name))
+            .nth(device_occurrence),
     }
     .ok_or_else(|| {
         if is_input_device {

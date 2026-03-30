@@ -66,6 +66,15 @@ export const ChatContainer: React.FC = () => {
 		[],
 	);
 
+	const removeMessageById = useCallback((id: number) => {
+		const nextMessages = messagesRef.current.filter((msg) => msg.id !== id);
+
+		if (nextMessages.length === messagesRef.current.length) return;
+
+		messagesRef.current = nextMessages;
+		setMessages(nextMessages);
+	}, []);
+
 	const handleSendMessage = useCallback(
 		async (text: string, useInterviewPrompt?: boolean) => {
 			if (!isAuthorized) {
@@ -93,23 +102,34 @@ export const ChatContainer: React.FC = () => {
 			const thisBotId = botMsg.id; // ← 记录本轮机器人消息 ID
 
 			setIsTyping(true);
+			let didReceiveResponse = false;
 
-			const { llmInterviewChatStreamOutput } = await import("@/lib/llm.ts");
-			await llmInterviewChatStreamOutput(
-				text,
-				useInterviewPrompt ? interviewPromptStore : llmPromptStore,
-				currentSelectedModel,
-				(content) => {
-					setIsTyping(false);
-					updateSpecificBotMessage(thisBotId, content); // ← 更新特定机器人消息
-				},
-			);
+			try {
+				const { llmInterviewChatStreamOutput } = await import("@/lib/llm.ts");
+				await llmInterviewChatStreamOutput(
+					text,
+					useInterviewPrompt ? interviewPromptStore : llmPromptStore,
+					currentSelectedModel,
+					(content) => {
+						didReceiveResponse = true;
+						setIsTyping(false);
+						updateSpecificBotMessage(thisBotId, content); // ← 更新特定机器人消息
+					},
+				);
+			} catch {
+				if (!didReceiveResponse) {
+					removeMessageById(thisBotId);
+				}
+			} finally {
+				setIsTyping(false);
+			}
 		},
 		[
 			currentSelectedModel,
 			interviewPromptStore,
 			isAuthorized,
 			llmPromptStore,
+			removeMessageById,
 			updateSpecificBotMessage,
 		],
 	);

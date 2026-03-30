@@ -3,6 +3,8 @@
 use crate::loopback::{RecordParams, start_record_audio_with_writer, stop_recording};
 use crate::provider_config::TranscriptRuntimeConfig;
 use cpal::traits::{DeviceTrait, HostTrait};
+use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
 
@@ -16,8 +18,24 @@ pub fn get_record_handle() -> &'static Mutex<Option<std::thread::JoinHandle<()>>
 enum SelectedAudioDevice {
     DefaultOutput,
     DefaultInput,
-    NamedOutput(String),
-    NamedInput(String),
+    NamedOutput { name: String, occurrence: usize },
+    NamedInput { name: String, occurrence: usize },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioChannelKind {
+    Output,
+    Input,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioChannelOption {
+    pub value: String,
+    pub name: String,
+    pub kind: AudioChannelKind,
+    pub is_default: bool,
 }
 
 fn device_display_name(device: &cpal::Device) -> Option<String> {
@@ -27,10 +45,51 @@ fn device_display_name(device: &cpal::Device) -> Option<String> {
         .map(|description| description.name().to_string())
 }
 
+fn build_audio_channel_value(
+    kind: AudioChannelKind,
+    occurrence: Option<usize>,
+    name: &str,
+) -> String {
+    let prefix = match kind {
+        AudioChannelKind::Output => "output",
+        AudioChannelKind::Input => "input",
+    };
+
+    match occurrence {
+        Some(index) => format!("{prefix}:{index}:{name}"),
+        None => format!("{prefix}:default:{name}"),
+    }
+}
+
+fn parse_audio_channel_value(value: &str) -> Option<SelectedAudioDevice> {
+    let mut parts = value.splitn(3, ':');
+    let kind = parts.next()?;
+    let occurrence = parts.next()?;
+    let name = parts.next().unwrap_or_default().trim().to_string();
+
+    match (kind, occurrence) {
+        ("output", "default") => Some(SelectedAudioDevice::DefaultOutput),
+        ("input", "default") => Some(SelectedAudioDevice::DefaultInput),
+        ("output", occurrence) => occurrence
+            .parse()
+            .ok()
+            .map(|occurrence| SelectedAudioDevice::NamedOutput { name, occurrence }),
+        ("input", occurrence) => occurrence
+            .parse()
+            .ok()
+            .map(|occurrence| SelectedAudioDevice::NamedInput { name, occurrence }),
+        _ => None,
+    }
+}
+
 fn parse_selected_audio_device(device_name: Option<&str>) -> SelectedAudioDevice {
     let Some(device_name) = device_name.map(str::trim).filter(|value| !value.is_empty()) else {
         return SelectedAudioDevice::DefaultOutput;
     };
+
+    if let Some(device) = parse_audio_channel_value(device_name) {
+        return device;
+    }
 
     if device_name == "default" {
         return SelectedAudioDevice::DefaultOutput;
@@ -45,20 +104,31 @@ fn parse_selected_audio_device(device_name: Option<&str>) -> SelectedAudioDevice
     }
 
     if let Some(name) = device_name.strip_suffix(" [输出]") {
-        return SelectedAudioDevice::NamedOutput(name.trim().to_string());
+        return SelectedAudioDevice::NamedOutput {
+            name: name.trim().to_string(),
+            occurrence: 0,
+        };
     }
 
     if let Some(name) = device_name.strip_suffix(" [输入]") {
-        return SelectedAudioDevice::NamedInput(name.trim().to_string());
+        return SelectedAudioDevice::NamedInput {
+            name: name.trim().to_string(),
+            occurrence: 0,
+        };
     }
 
-    SelectedAudioDevice::NamedOutput(device_name.to_string())
+    SelectedAudioDevice::NamedOutput {
+        name: device_name.to_string(),
+        occurrence: 0,
+    }
 }
 
 #[tauri::command]
-pub fn get_audio_stream_devices_names() -> Result<Vec<String>, String> {
+pub fn get_audio_stream_devices_names() -> Result<Vec<AudioChannelOption>, String> {
     let host = cpal::default_host();
-    let mut device_names = Vec::new();
+    let mut channels = Vec::new();
+    let mut output_occurrences = HashMap::new();
+    let mut input_occurrences = HashMap::new();
 
     let default_output_name = host
         .default_output_device()
@@ -67,8 +137,21 @@ pub fn get_audio_stream_devices_names() -> Result<Vec<String>, String> {
     if let Ok(output_devices) = host.output_devices() {
         for device in output_devices {
             if let Some(name) = device_display_name(&device) {
+                let occurrence = output_occurrences.entry(name.clone()).or_insert(0usize);
+                let current_occurrence = *occurrence;
+                *occurrence += 1;
+
                 if Some(&name) != default_output_name.as_ref() {
-                    device_names.push(format!("{} [输出]", name));
+                    channels.push(AudioChannelOption {
+                        value: build_audio_channel_value(
+                            AudioChannelKind::Output,
+                            Some(current_occurrence),
+                            &name,
+                        ),
+                        name,
+                        kind: AudioChannelKind::Output,
+                        is_default: false,
+                    });
                 }
             }
         }
@@ -77,16 +160,37 @@ pub fn get_audio_stream_devices_names() -> Result<Vec<String>, String> {
     if let Ok(input_devices) = host.input_devices() {
         for device in input_devices {
             if let Some(name) = device_display_name(&device) {
-                device_names.push(format!("{} [输入]", name));
+                let occurrence = input_occurrences.entry(name.clone()).or_insert(0usize);
+                let current_occurrence = *occurrence;
+                *occurrence += 1;
+
+                channels.push(AudioChannelOption {
+                    value: build_audio_channel_value(
+                        AudioChannelKind::Input,
+                        Some(current_occurrence),
+                        &name,
+                    ),
+                    name,
+                    kind: AudioChannelKind::Input,
+                    is_default: false,
+                });
             }
         }
     }
 
     if let Some(name) = default_output_name {
-        device_names.insert(0, format!("{} [输出] (默认)", name));
+        channels.insert(
+            0,
+            AudioChannelOption {
+                value: build_audio_channel_value(AudioChannelKind::Output, None, &name),
+                name,
+                kind: AudioChannelKind::Output,
+                is_default: true,
+            },
+        );
     }
 
-    Ok(device_names)
+    Ok(channels)
 }
 
 #[tauri::command]
@@ -107,11 +211,11 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     transcript_config: Option<TranscriptRuntimeConfig>,
 ) {
     let selected_device = parse_selected_audio_device(device_name.as_deref());
-    let (device, is_input_device) = match selected_device {
-        SelectedAudioDevice::DefaultOutput => ("default".to_string(), false),
-        SelectedAudioDevice::DefaultInput => ("default_input".to_string(), true),
-        SelectedAudioDevice::NamedOutput(name) => (name, false),
-        SelectedAudioDevice::NamedInput(name) => (name, true),
+    let (device, is_input_device, device_occurrence) = match selected_device {
+        SelectedAudioDevice::DefaultOutput => ("default".to_string(), false, None),
+        SelectedAudioDevice::DefaultInput => ("default_input".to_string(), true, None),
+        SelectedAudioDevice::NamedOutput { name, occurrence } => (name, false, Some(occurrence)),
+        SelectedAudioDevice::NamedInput { name, occurrence } => (name, true, Some(occurrence)),
     };
 
     let last_result = Arc::new(Mutex::new(String::new()));
@@ -125,6 +229,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     let params = RecordParams {
         device,
         is_input_device,
+        device_occurrence,
         file_name: String::new(),
         capture_interval,
         only_pcm: true,
@@ -153,7 +258,10 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
 
 #[cfg(test)]
 mod tests {
-    use super::{SelectedAudioDevice, parse_selected_audio_device};
+    use super::{
+        AudioChannelKind, SelectedAudioDevice, build_audio_channel_value,
+        parse_selected_audio_device,
+    };
 
     #[test]
     fn parse_selected_audio_device_defaults_to_output_when_missing() {
@@ -171,7 +279,10 @@ mod tests {
     fn parse_selected_audio_device_recognizes_frontend_output_labels() {
         assert_eq!(
             parse_selected_audio_device(Some("扬声器 Realtek [输出]")),
-            SelectedAudioDevice::NamedOutput("扬声器 Realtek".to_string())
+            SelectedAudioDevice::NamedOutput {
+                name: "扬声器 Realtek".to_string(),
+                occurrence: 0
+            }
         );
         assert_eq!(
             parse_selected_audio_device(Some("扬声器 Realtek [输出] (默认)")),
@@ -183,11 +294,52 @@ mod tests {
     fn parse_selected_audio_device_recognizes_frontend_input_labels() {
         assert_eq!(
             parse_selected_audio_device(Some("麦克风 USB [输入]")),
-            SelectedAudioDevice::NamedInput("麦克风 USB".to_string())
+            SelectedAudioDevice::NamedInput {
+                name: "麦克风 USB".to_string(),
+                occurrence: 0
+            }
         );
         assert_eq!(
             parse_selected_audio_device(Some("default_input")),
             SelectedAudioDevice::DefaultInput
+        );
+    }
+
+    #[test]
+    fn parse_selected_audio_device_recognizes_structured_output_value() {
+        assert_eq!(
+            parse_selected_audio_device(Some(&build_audio_channel_value(
+                AudioChannelKind::Output,
+                Some(2),
+                "扬声器 Realtek",
+            ))),
+            SelectedAudioDevice::NamedOutput {
+                name: "扬声器 Realtek".to_string(),
+                occurrence: 2
+            }
+        );
+        assert_eq!(
+            parse_selected_audio_device(Some(&build_audio_channel_value(
+                AudioChannelKind::Output,
+                None,
+                "扬声器 Realtek",
+            ))),
+            SelectedAudioDevice::DefaultOutput
+        );
+    }
+
+    #[test]
+    fn parse_selected_audio_device_recognizes_structured_input_value() {
+        assert_eq!(
+            parse_selected_audio_device(Some(&build_audio_channel_value(
+                AudioChannelKind::Input,
+                Some(1),
+                "麦克风 USB",
+            ))),
+            SelectedAudioDevice::NamedInput {
+                name: "麦克风 USB".to_string(),
+                occurrence: 1
+            }
         );
     }
 }

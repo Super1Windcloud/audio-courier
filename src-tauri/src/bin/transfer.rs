@@ -27,6 +27,7 @@ fn main() {
     let params = RecordParams {
         device: device.to_string(),
         is_input_device: false,
+        device_occurrence: None,
         file_name: String::new(),
         only_pcm: true,
         capture_interval,
@@ -72,7 +73,7 @@ fn output_device_config() {
     fn select_input_config() -> Result<cpal::StreamConfig, String> {
         let names = get_audio_stream_devices_names()?;
         for (i, name) in names.iter().enumerate() {
-            println!("{}: {}", i, name);
+            println!("{}: {} ({})", i, name.name, name.value);
         }
         let device = cpal::default_host()
             .default_output_device()

@@ -27,6 +27,10 @@ import useAppStateStore, {
 	type TranscribeVendor,
 	type UiTextTone,
 } from "@/stores";
+import {
+	type AudioChannelOption,
+	findAudioChannelValue,
+} from "@/types/audio.ts";
 import { HOTKEYS, MODEL_LABELS, MODEL_OPTIONS } from "@/types/llm.ts";
 import {
 	hasAnyTranscriptApiKeyConfigured,
@@ -45,7 +49,7 @@ export function MoreMenu() {
 	const updateCurrentSelectedModel = useAppStateStore(
 		(state) => state.updateCurrentSelectedModel,
 	);
-	const [audioChannels, setAudioChannels] = useState<string[]>([]);
+	const [audioChannels, setAudioChannels] = useState<AudioChannelOption[]>([]);
 	const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
 	const [isLlmConfigDialogOpen, setIsLlmConfigDialogOpen] = useState(false);
 	const [isTranscriptConfigDialogOpen, setIsTranscriptConfigDialogOpen] =
@@ -89,9 +93,8 @@ export function MoreMenu() {
 	const isUsingDefaultPrompt =
 		promptDraft === defaultPrompt &&
 		interviewPromptDraft === defaultInterviewPrompt;
-
 	useEffect(() => {
-		void invoke<string[]>("get_audio_stream_devices_names")
+		void invoke<AudioChannelOption[]>("get_audio_stream_devices_names")
 			.then((result) => {
 				setAudioChannels(result);
 				if (result.length === 0) {
@@ -99,8 +102,17 @@ export function MoreMenu() {
 					return;
 				}
 
-				if (!currentAudioChannel || !result.includes(currentAudioChannel)) {
-					updateCurrentAudioChannel(result[0]);
+				const matchedValue = currentAudioChannel
+					? findAudioChannelValue(result, currentAudioChannel)
+					: null;
+
+				if (matchedValue && matchedValue !== currentAudioChannel) {
+					updateCurrentAudioChannel(matchedValue);
+					return;
+				}
+
+				if (!matchedValue) {
+					updateCurrentAudioChannel(result[0].value);
 				}
 			})
 			.catch((error) => {
@@ -343,18 +355,31 @@ export function MoreMenu() {
 							选择音频通道
 						</DropdownMenuSubTrigger>
 						<DropdownMenuSubContent className="w-48 bg-gray-600 text-white border-0">
-							{audioChannels.map((devices) => (
+							{audioChannels.map((channel) => (
 								<DropdownMenuItem
-									key={devices}
+									key={channel.value}
 									className={`data-[highlighted]:bg-gray-500 ${
-										appState.currentAudioChannel === devices ? "font-bold" : ""
+										appState.currentAudioChannel === channel.value
+											? "font-bold"
+											: ""
 									}`}
-									onClick={() => appState.updateCurrentAudioChannel(devices)}
+									onClick={() =>
+										appState.updateCurrentAudioChannel(channel.value)
+									}
 								>
-									{devices}
-									{appState.currentAudioChannel === devices && (
-										<span className="ml-2 text-green-400">✔</span>
-									)}
+									<div className="flex w-full items-center justify-between gap-2">
+										<span className="truncate">{channel.name}</span>
+										<span className="ml-2 shrink-0 text-xs text-gray-300">
+											{channel.isDefault
+												? "默认输出"
+												: channel.kind === "output"
+													? "输出"
+													: "输入"}
+											{appState.currentAudioChannel === channel.value && (
+												<span className="ml-2 text-green-400">✔</span>
+											)}
+										</span>
+									</div>
 								</DropdownMenuItem>
 							))}
 						</DropdownMenuSubContent>

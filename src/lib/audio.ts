@@ -4,6 +4,7 @@ import {
 } from "@/lib/cpal.ts";
 import { logError } from "@/lib/logger.ts";
 import type { TranscribeVendor } from "@/stores";
+import { isOutputAudioChannel } from "@/types/audio.ts";
 
 interface BrowserSpeechRecognition extends EventTarget {
 	lang: string;
@@ -86,7 +87,7 @@ export async function startAudioRecognition(
 	captureInterval: number,
 	isUsePreRecorded: boolean,
 ) {
-	if (audioDevice.includes("输出")) {
+	if (isOutputAudioChannel(audioDevice)) {
 		return await startAudioLoopbackRecognition(
 			onMessageCapture,
 			audioDevice,
@@ -104,7 +105,7 @@ export async function startAudioRecognition(
 }
 
 export async function stopAudioRecognition(device: string) {
-	if (device.includes("输出")) {
+	if (isOutputAudioChannel(device)) {
 		return await stopAudioLoopbackRecognition();
 	}
 	activeCallback = null;
