@@ -236,12 +236,7 @@ fn extract_plain_transcripts(value: &Value, treat_type_as_final: bool) -> Vec<(S
     } else {
         bool_flag(
             value,
-            &[
-                "is_final",
-                "final",
-                "end_of_turn",
-                "turn_is_final",
-            ],
+            &["is_final", "final", "end_of_turn", "turn_is_final"],
             false,
         )
     };
@@ -260,15 +255,7 @@ fn extract_nested_turns(value: &Value) -> Vec<(String, bool)> {
     let mut transcripts = Vec::new();
     if let Some(turns) = turns {
         for turn in turns {
-            if bool_flag(
-                turn,
-                &[
-                    "turn_is_final",
-                    "is_final",
-                    "end_of_turn",
-                ],
-                true,
-            ) {
+            if bool_flag(turn, &["turn_is_final", "is_final", "end_of_turn"], true) {
                 if let Some(text) = first_non_empty_text(
                     turn,
                     &[

@@ -63,11 +63,14 @@ export async function startAudioLoopbackRecognition(
 		return content + payload;
 	};
 
-	previewUnlistener = await listen<string>("transcription_preview", async (event) => {
-		logInfo(`transcription_preview received length=${event.payload.length}`);
-		content = await normalizeTranscript(event.payload);
-		onMessageCapture(content);
-	});
+	previewUnlistener = await listen<string>(
+		"transcription_preview",
+		async (event) => {
+			logInfo(`transcription_preview received length=${event.payload.length}`);
+			content = await normalizeTranscript(event.payload);
+			onMessageCapture(content);
+		},
+	);
 	unlistener = await listen<string>("transcription_result", async (event) => {
 		logInfo(`transcription_result received length=${event.payload.length}`);
 		content = await normalizeTranscript(event.payload);

@@ -62,20 +62,23 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		recordingTimerStamp - recordingStartedAt >= MIN_RECORDING_DURATION;
 	const recordingTitle = canStopRecording ? "停止语音" : "录音中...3秒后可停止";
 
-	const handleSend = useCallback((overrideText?: string) => {
-		if (!isAuthorized) {
-			toast.warning("未激活许可证，无法使用发送和录音功能");
-			return;
-		}
+	const handleSend = useCallback(
+		(overrideText?: string) => {
+			if (!isAuthorized) {
+				toast.warning("未激活许可证，无法使用发送和录音功能");
+				return;
+			}
 
-		const text = (overrideText ?? inputText).trim();
-		if (text) {
-			updateQuestionState(text);
-			onSendMessage(text);
-			setInputText("");
-			setFinalTranscript("");
-		}
-	}, [inputText, isAuthorized, onSendMessage, updateQuestionState]);
+			const text = (overrideText ?? inputText).trim();
+			if (text) {
+				updateQuestionState(text);
+				onSendMessage(text);
+				setInputText("");
+				setFinalTranscript("");
+			}
+		},
+		[inputText, isAuthorized, onSendMessage, updateQuestionState],
+	);
 
 	useEffect(() => {
 		if (!recordingState) return () => undefined;
