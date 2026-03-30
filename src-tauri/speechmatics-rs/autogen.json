@@ -1,9 +1,0 @@
-{
-	"withInterfaces": true,
-	"withSeparateModelsAndApi": true,
-	"apiPackage": "client",
-	"modelPackage": "models",
-	"useSingleRequestParameter": true,
-	"apiTests": true,
-	"modelTests": true
-}

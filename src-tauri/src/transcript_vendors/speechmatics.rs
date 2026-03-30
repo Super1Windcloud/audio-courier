@@ -1,22 +1,39 @@
+#![allow(clippy::collapsible_if)]
+
+/// https://docs.speechmatics.com/api-ref/realtime-transcription-websocket#addtranslation
 use crate::provider_config::{
     TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
 };
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
-use speechmatics::realtime::models::ConversationConfig;
-use speechmatics::realtime::{ReadMessage, RealtimeSession, SessionConfig, models};
-use std::io;
-use std::pin::Pin;
+use futures_util::{SinkExt, StreamExt, future::try_join};
+use serde_json::{Value, json};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::task::{Context, Poll};
 use std::thread::{self, JoinHandle};
-use tokio::io::{AsyncRead, ReadBuf};
+use tauri::http::Uri;
 use tokio::runtime::Runtime;
-use tokio::sync::{mpsc, mpsc::error::TrySendError, oneshot};
+use tokio::sync::{Mutex as AsyncMutex, mpsc, mpsc::error::TrySendError, oneshot, watch};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{
+        client::{ClientRequestBuilder, IntoClientRequest},
+        protocol::Message,
+    },
+};
+
+const DEFAULT_RT_URL: &str = "wss://eu2.rt.speechmatics.com/v2/";
+const DEFAULT_LANGUAGE: &str = "en";
+const END_OF_UTTERANCE_SILENCE_TRIGGER: f32 = 0.5;
+const MAX_DELAY_SECONDS: f32 = 1.5;
+
+enum StreamCommand {
+    Audio(Vec<u8>),
+    ForceEndpoint,
+}
 
 pub struct SpeechmaticsTranscriber {
-    sender: Mutex<Option<mpsc::Sender<Vec<u8>>>>,
+    sender: Mutex<Option<mpsc::Sender<StreamCommand>>>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
     handle: Mutex<Option<JoinHandle<()>>>,
     stop_requested: Arc<AtomicBool>,
@@ -43,7 +60,7 @@ impl SpeechmaticsTranscriber {
             &["SPEECHMATICS_RT_URL"],
         );
 
-        let (sender, receiver) = mpsc::channel::<Vec<u8>>(64);
+        let (sender, receiver) = mpsc::channel::<StreamCommand>(64);
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         let callback_clone = callback.clone();
         let status_callback_clone = status_callback.clone();
@@ -91,7 +108,7 @@ impl SpeechmaticsTranscriber {
             bytes.extend_from_slice(&sample.to_le_bytes());
         }
 
-        match sender.try_send(bytes) {
+        match sender.try_send(StreamCommand::Audio(bytes)) {
             Ok(()) => Ok(()),
             Err(TrySendError::Full(_chunk)) => Err(
                 "Failed to queue PCM chunk for Speechmatics: channel is full (consumer stalled)"
@@ -101,6 +118,20 @@ impl SpeechmaticsTranscriber {
                 Err("Failed to queue PCM chunk for Speechmatics: channel closed".into())
             }
         }
+    }
+
+    pub fn request_force_endpoint(&self) -> Result<(), String> {
+        let sender = self
+            .sender
+            .lock()
+            .unwrap()
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| "Speechmatics transcriber is not running".to_string())?;
+
+        sender
+            .blocking_send(StreamCommand::ForceEndpoint)
+            .map_err(|e| format!("Failed to queue Speechmatics force endpoint: {e}"))
     }
 
     pub fn stop(&self) {
@@ -131,6 +162,10 @@ impl StreamingTranscriber for SpeechmaticsTranscriber {
         "SpeechMatics".to_string()
     }
 
+    fn force_endpoint(&self) -> Result<(), String> {
+        self.request_force_endpoint()
+    }
+
     fn shutdown(&self) {
         self.stop();
         println!("Speechmatics websocket shutdown invoked");
@@ -143,139 +178,324 @@ async fn run_session(
     language: Option<String>,
     sample_rate: u32,
     callback: PcmCallback,
-    audio_rx: mpsc::Receiver<Vec<u8>>,
+    mut audio_rx: mpsc::Receiver<StreamCommand>,
     mut shutdown_rx: oneshot::Receiver<()>,
     stop_requested: Arc<AtomicBool>,
 ) -> Result<(), String> {
-    let (mut session, mut message_rx) = RealtimeSession::new(api_key, rt_url)
-        .map_err(|e| format!("Failed to init Speechmatics session: {e}"))?;
+    let url = rt_url.unwrap_or_else(|| DEFAULT_RT_URL.to_string());
+    let language = language.unwrap_or_else(|| DEFAULT_LANGUAGE.to_string());
+    let uri: Uri = url
+        .parse()
+        .map_err(|e| format!("Failed to parse Speechmatics streaming URI: {e}"))?;
+    let builder =
+        ClientRequestBuilder::new(uri).with_header("Authorization", format!("Bearer {api_key}"));
+    let client_request = builder
+        .into_client_request()
+        .map_err(|e| format!("Failed to build Speechmatics websocket request: {e}"))?;
 
-    let mut config = SessionConfig::default();
-    if let Some(lang) = language {
-        config.transcription_config.language = lang;
-    }
-    config.translation_config = None;
-    let mut audio_format = models::AudioFormat::new(models::audio_format::Type::Raw);
-    audio_format.encoding = Some(models::audio_format::Encoding::PcmS16le);
-    audio_format.sample_rate = Some(sample_rate as i32);
-    config.audio_format = Some(audio_format);
-    config.transcription_config.conversation_config = Some(Box::new(ConversationConfig {
-        end_of_utterance_silence_trigger: Some(0.5),
-    }));
-    config.transcription_config.max_delay = Some(1.5);
-    config.transcription_config.enable_partials = Some(false);
+    let (ws_stream, _) = connect_async(client_request)
+        .await
+        .map_err(|e| format!("Failed to connect to Speechmatics: {e}"))?;
 
-    let reader = ChannelAudioReader::new(audio_rx);
+    let (mut sink, mut stream) = ws_stream.split();
+    let start_payload = build_start_recognition_payload(&language, sample_rate);
 
-    let message_task = tokio::spawn(async move {
-        while let Some(message) = message_rx.recv().await {
-            match message {
-                ReadMessage::AddTranscript(transcript) => {
-                    let text = transcript.metadata.transcript.trim().to_string();
-                    if !text.is_empty() {
-                        callback(&text, true);
+    sink.send(Message::Text(start_payload.to_string().into()))
+        .await
+        .map_err(|e| format!("Failed to send Speechmatics StartRecognition: {e}"))?;
+
+    let (termination_tx, mut termination_rx) = watch::channel(false);
+    let (started_tx, mut started_rx) = watch::channel(false);
+    let last_partial = Arc::new(AsyncMutex::new(None::<String>));
+    let eos_sent = Arc::new(AtomicBool::new(false));
+
+    let send_audio = {
+        let eos_sent = eos_sent.clone();
+        async move {
+            let mut chunk_seq_no = 0_i32;
+            let mut total_samples_sent = 0_u64;
+
+            loop {
+                if *started_rx.borrow() {
+                    break;
+                }
+
+                tokio::select! {
+                    _ = &mut shutdown_rx => return Ok::<(), String>(()),
+                    result = termination_rx.changed() => {
+                        if result.is_err() || *termination_rx.borrow() {
+                            return Ok::<(), String>(());
+                        }
+                    }
+                    result = started_rx.changed() => {
+                        if result.is_err() {
+                            return Err("Speechmatics readiness watcher closed unexpectedly".into());
+                        }
                     }
                 }
-                ReadMessage::Error(err) => {
-                    return Err(format!("Speechmatics returned error: {}", err.reason));
-                }
-                ReadMessage::EndOfTranscript(_) => {
-                    if stop_requested.load(Ordering::SeqCst) {
-                        break;
+            }
+
+            let mut should_send_end_of_stream = true;
+
+            loop {
+                tokio::select! {
+                    _ = &mut shutdown_rx => break,
+                    result = termination_rx.changed() => {
+                        if result.is_err() || *termination_rx.borrow() {
+                            should_send_end_of_stream = false;
+                            break;
+                        }
                     }
-                    return Err("Speechmatics websocket closed unexpectedly".into());
+                    command = audio_rx.recv() => match command {
+                        Some(StreamCommand::Audio(bytes)) => {
+                            total_samples_sent = total_samples_sent.saturating_add((bytes.len() / 2) as u64);
+                            sink.send(Message::Binary(bytes.into()))
+                                .await
+                                .map_err(|e| format!("Failed to send audio chunk to Speechmatics: {e}"))?;
+                            chunk_seq_no += 1;
+                        }
+                        Some(StreamCommand::ForceEndpoint) => {
+                            let timestamp = total_samples_sent as f64 / sample_rate as f64;
+                            let payload = json!({
+                                "message": "ForceEndOfUtterance",
+                                "timestamp": timestamp
+                            });
+                            sink.send(Message::Text(payload.to_string().into()))
+                                .await
+                                .map_err(|e| format!("Failed to send Speechmatics ForceEndOfUtterance: {e}"))?;
+                        }
+                        None => break,
+                    }
                 }
-                _ => {}
+            }
+
+            if should_send_end_of_stream {
+                let payload = json!({
+                    "message": "EndOfStream",
+                    "last_seq_no": chunk_seq_no
+                });
+                sink.send(Message::Text(payload.to_string().into()))
+                    .await
+                    .map_err(|e| format!("Failed to send Speechmatics EndOfStream: {e}"))?;
+                eos_sent.store(true, Ordering::SeqCst);
+            }
+
+            sink.close()
+                .await
+                .map_err(|e| format!("Failed to close Speechmatics socket: {e}"))?;
+            Ok::<(), String>(())
+        }
+    };
+
+    let receive_events = {
+        let callback = callback.clone();
+        let termination_tx = termination_tx.clone();
+        let started_tx = started_tx.clone();
+        let last_partial = last_partial.clone();
+        let eos_sent = eos_sent.clone();
+        let stop_requested = stop_requested.clone();
+
+        async move {
+            while let Some(message) = stream.next().await {
+                let message = match message {
+                    Ok(message) => message,
+                    Err(err) => {
+                        let _ = termination_tx.send(true);
+                        return Err(format!("Speechmatics receive error: {err}"));
+                    }
+                };
+
+                match message {
+                    Message::Text(payload) => {
+                        let value: Value = serde_json::from_str(&payload)
+                            .map_err(|e| format!("Failed to parse Speechmatics payload: {e}"))?;
+                        let message_type = value
+                            .get("message")
+                            .and_then(|entry| entry.as_str())
+                            .unwrap_or_default();
+
+                        match message_type {
+                            "RecognitionStarted" => {
+                                let _ = started_tx.send(true);
+                            }
+                            "AddPartialTranscript" | "AddPartialTranslation" => {
+                                if let Some(text) = extract_payload_text(&value) {
+                                    *last_partial.lock().await = Some(text.clone());
+                                    callback(&text, false);
+                                }
+                            }
+                            "AddTranscript" | "AddTranslation" => {
+                                if let Some(text) = extract_payload_text(&value) {
+                                    *last_partial.lock().await = None;
+                                    callback(&text, true);
+                                }
+                            }
+                            "EndOfUtterance" => {
+                                flush_last_partial_as_final(&callback, &last_partial).await;
+                            }
+                            "EndOfTranscript" => {
+                                flush_last_partial_as_final(&callback, &last_partial).await;
+                                let _ = termination_tx.send(true);
+                                if eos_sent.load(Ordering::SeqCst)
+                                    || stop_requested.load(Ordering::SeqCst)
+                                {
+                                    return Ok::<(), String>(());
+                                }
+                                return Err("Speechmatics websocket closed unexpectedly".into());
+                            }
+                            "Error" => {
+                                let _ = termination_tx.send(true);
+                                let reason = value
+                                    .get("reason")
+                                    .and_then(|entry| entry.as_str())
+                                    .unwrap_or("unknown Speechmatics error");
+                                return Err(format!("Speechmatics returned error: {reason}"));
+                            }
+                            _ => {}
+                        }
+                    }
+                    Message::Close(_) => {
+                        let _ = termination_tx.send(true);
+                        flush_last_partial_as_final(&callback, &last_partial).await;
+                        if eos_sent.load(Ordering::SeqCst) || stop_requested.load(Ordering::SeqCst)
+                        {
+                            return Ok::<(), String>(());
+                        }
+                        return Err("Speechmatics websocket closed unexpectedly".into());
+                    }
+                    _ => {}
+                }
+            }
+
+            let _ = termination_tx.send(true);
+            flush_last_partial_as_final(&callback, &last_partial).await;
+            if eos_sent.load(Ordering::SeqCst) || stop_requested.load(Ordering::SeqCst) {
+                Ok::<(), String>(())
+            } else {
+                Err("Speechmatics websocket closed unexpectedly".into())
             }
         }
+    };
 
-        if stop_requested.load(Ordering::SeqCst) {
-            Ok(())
-        } else {
-            Err("Speechmatics websocket closed unexpectedly".into())
-        }
-    });
-
-    let mut session_future = Box::pin(session.run(config, reader));
-
-    tokio::select! {
-        result = &mut session_future => {
-            if let Err(err) = result {
-                let _ = message_task.await;
-                return Err(format!("Speechmatics session run failed: {err}"));
-            }
-        }
-        _ = &mut shutdown_rx => {
-            message_task.abort();
-            let _ = message_task.await;
-            println!("Speechmatics session shutdown requested");
-            return Ok(());
-        }
-    }
-
-    match message_task.await {
-        Ok(result) => result?,
-        Err(err) => return Err(format!("Speechmatics message task failed: {err}")),
-    }
-
-    println!("Speechmatics websocket closed");
+    try_join(send_audio, receive_events).await?;
     Ok(())
 }
 
-struct ChannelAudioReader {
-    receiver: mpsc::Receiver<Vec<u8>>,
-    buffer: Vec<u8>,
-    position: usize,
-    finished: bool,
+fn build_start_recognition_payload(language: &str, sample_rate: u32) -> Value {
+    json!({
+        "message": "StartRecognition",
+        "audio_format": {
+            "type": "raw",
+            "encoding": "pcm_s16le",
+            "sample_rate": sample_rate
+        },
+        "transcription_config": {
+            "language": language,
+            "max_delay": MAX_DELAY_SECONDS,
+            "enable_partials": true,
+            "conversation_config": {
+                "end_of_utterance_silence_trigger": END_OF_UTTERANCE_SILENCE_TRIGGER
+            }
+        }
+    })
 }
 
-impl ChannelAudioReader {
-    fn new(receiver: mpsc::Receiver<Vec<u8>>) -> Self {
-        Self {
-            receiver,
-            buffer: Vec::new(),
-            position: 0,
-            finished: false,
+fn extract_payload_text(value: &Value) -> Option<String> {
+    if let Some(text) = value
+        .get("metadata")
+        .and_then(|metadata| metadata.get("transcript"))
+        .and_then(|entry| entry.as_str())
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+    {
+        return Some(text.to_string());
+    }
+
+    let Some(results) = value.get("results").and_then(|entry| entry.as_array()) else {
+        return None;
+    };
+
+    let mut segments = Vec::new();
+    for result in results {
+        if let Some(text) = result
+            .get("content")
+            .and_then(|entry| entry.as_str())
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+        {
+            segments.push(text.to_string());
+        }
+    }
+
+    if segments.is_empty() {
+        None
+    } else {
+        Some(segments.join(" "))
+    }
+}
+
+async fn flush_last_partial_as_final(
+    callback: &PcmCallback,
+    last_partial: &Arc<AsyncMutex<Option<String>>>,
+) {
+    if let Some(text) = last_partial.lock().await.take() {
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            callback(trimmed, true);
         }
     }
 }
 
-impl AsyncRead for ChannelAudioReader {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        if self.finished {
-            return Poll::Ready(Ok(()));
-        }
+#[cfg(test)]
+mod tests {
+    use super::{build_start_recognition_payload, extract_payload_text};
+    use serde_json::json;
 
-        if self.position >= self.buffer.len() {
-            match Pin::new(&mut self.receiver).poll_recv(cx) {
-                Poll::Ready(Some(chunk)) => {
-                    self.buffer = chunk;
-                    self.position = 0;
-                }
-                Poll::Ready(None) => {
-                    self.finished = true;
-                    return Poll::Ready(Ok(()));
-                }
-                Poll::Pending => return Poll::Pending,
-            }
-        }
+    #[test]
+    fn start_payload_includes_conversation_config_and_partials() {
+        let payload = build_start_recognition_payload("cmn", 16_000);
 
-        if self.position >= self.buffer.len() {
-            return Poll::Ready(Ok(()));
-        }
+        assert_eq!(payload["message"], "StartRecognition");
+        assert_eq!(payload["audio_format"]["sample_rate"], 16_000);
+        assert_eq!(payload["transcription_config"]["language"], "cmn");
+        assert_eq!(payload["transcription_config"]["enable_partials"], true);
+        assert_eq!(
+            payload["transcription_config"]["conversation_config"]["end_of_utterance_silence_trigger"],
+            0.5
+        );
+    }
 
-        let available = self.buffer.len() - self.position;
-        let to_copy = available.min(buf.remaining());
-        if to_copy == 0 {
-            return Poll::Ready(Ok(()));
-        }
+    #[test]
+    fn extract_payload_text_prefers_transcript_metadata() {
+        let value = json!({
+            "message": "AddTranscript",
+            "metadata": {
+                "transcript": "hello world"
+            },
+            "results": [
+                {"content": "ignored"}
+            ]
+        });
 
-        buf.put_slice(&self.buffer[self.position..self.position + to_copy]);
-        self.position += to_copy;
-        Poll::Ready(Ok(()))
+        assert_eq!(
+            extract_payload_text(&value),
+            Some("hello world".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_payload_text_supports_translation_results() {
+        let value = json!({
+            "message": "AddTranslation",
+            "results": [
+                {"content": "ni hao"},
+                {"content": "world"}
+            ]
+        });
+
+        assert_eq!(
+            extract_payload_text(&value),
+            Some("ni hao world".to_string())
+        );
     }
 }

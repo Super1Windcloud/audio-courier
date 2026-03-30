@@ -113,7 +113,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	);
 
 	useEffect(() => {
-		if (!recordingState) return () => undefined;
 		if (!finalTranscript.trim()) return;
 
 		if (remoteModelVendor === "assemblyai") {
@@ -128,7 +127,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		let timeout: number;
 		if (remoteModelVendor === "gladia") {
 			timeout = 100;
-		} else if (remoteModelVendor === "deepgram") {
+		} else if (
+			remoteModelVendor === "deepgram" ||
+			remoteModelVendor === "revai"
+		) {
 			timeout = 200;
 		} else {
 			timeout = 1000;
@@ -140,7 +142,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		return () => {
 			if (timeoutRef.current) clearTimeout(timeoutRef.current);
 		};
-	}, [finalTranscript, handleSend, recordingState, remoteModelVendor]);
+	}, [finalTranscript, handleSend, remoteModelVendor]);
 
 	const handleKeyPress = (e: React.KeyboardEvent) => {
 		if (e.key === "Enter" && !e.shiftKey) {

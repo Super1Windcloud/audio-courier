@@ -1,5 +1,7 @@
 #![allow(clippy::collapsible_if)]
 
+///https://docs.rev.ai/api/streaming/requests
+///https://docs.rev.ai/api/streaming/responses
 use crate::provider_config::{
     TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
 };
@@ -15,7 +17,7 @@ use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{Mutex as AsyncMutex, mpsc, oneshot, watch};
 #[cfg(target_os = "windows")]
 use tokio_tungstenite::{Connector, connect_async_tls_with_config};
 use tokio_tungstenite::{
@@ -138,15 +140,18 @@ async fn run_stream(
     stop_requested: Arc<AtomicBool>,
 ) -> Result<(), String> {
     const BASE_URL: &str = "wss://api.rev.ai/speechtotext/v1/stream";
+    const MAX_CONNECTION_WAIT_SECONDS: u32 = 540;
 
-    let content_type = format!(
-        "audio/x-raw;layout=interleaved;rate={sample_rate};format=S16LE;channels=1;max_connection_wait_seconds=540"
-    );
+    let content_type =
+        format!("audio/x-raw;layout=interleaved;rate={sample_rate};format=S16LE;channels=1");
 
     let mut params = vec![
         ("access_token".to_string(), api_key),
         ("content_type".to_string(), content_type),
-        ("sample_rate".to_string(), sample_rate.to_string()),
+        (
+            "max_connection_wait_seconds".to_string(),
+            MAX_CONNECTION_WAIT_SECONDS.to_string(),
+        ),
     ];
 
     if let Some(language) = language.as_ref() {
@@ -171,7 +176,6 @@ async fn run_stream(
     let uri: Uri = url
         .parse()
         .map_err(|e| format!("Failed to parse RevAI streaming URI: {e}"))?;
-    dbg!(&uri);
     let builder = ClientRequestBuilder::new(uri);
     let client_request = builder
         .into_client_request()
@@ -188,9 +192,34 @@ async fn run_stream(
 
     let (mut sink, mut stream) = ws_stream.split();
     let (termination_tx, mut termination_rx) = watch::channel(false);
+    let (connected_tx, mut connected_rx) = watch::channel(false);
+    let eos_sent = Arc::new(AtomicBool::new(false));
+    let last_partial = Arc::new(AsyncMutex::new(None::<String>));
+    let saw_final = Arc::new(AtomicBool::new(false));
 
     let send_audio = async {
         let mut should_send_stop = true;
+        let eos_sent = eos_sent.clone();
+
+        loop {
+            if *connected_rx.borrow() {
+                break;
+            }
+
+            tokio::select! {
+                _ = &mut shutdown_rx => return Ok::<(), String>(()),
+                result = termination_rx.changed() => {
+                    if result.is_err() || *termination_rx.borrow() {
+                        return Ok::<(), String>(());
+                    }
+                },
+                result = connected_rx.changed() => {
+                    if result.is_err() {
+                        return Err("RevAI connection readiness watcher closed unexpectedly".into());
+                    }
+                },
+            }
+        }
 
         loop {
             tokio::select! {
@@ -222,13 +251,20 @@ async fn run_stream(
             sink.send(Message::Text("EOS".into()))
                 .await
                 .map_err(|e| format!("Failed to send RevAI stop message: {e}"))?;
+            eos_sent.store(true, Ordering::SeqCst);
         }
 
-        sink.close()
-            .await
-            .map_err(|e| format!("Failed to close RevAI socket: {e}"))?;
+        loop {
+            if *termination_rx.borrow() {
+                break;
+            }
 
-        println!("Revai websocket streaming stop completely!");
+            if termination_rx.changed().await.is_err() {
+                break;
+            }
+        }
+
+        println!("RevAI websocket streaming stop completed");
 
         Ok::<(), String>(())
     };
@@ -236,6 +272,10 @@ async fn run_stream(
     let receive_events = {
         let callback = callback.clone();
         let termination_tx = termination_tx.clone();
+        let connected_tx = connected_tx.clone();
+        let eos_sent = eos_sent.clone();
+        let last_partial = last_partial.clone();
+        let saw_final = saw_final.clone();
 
         async move {
             while let Some(message) = stream.next().await {
@@ -249,8 +289,19 @@ async fn run_stream(
 
                 match message {
                     Message::Text(payload) => {
-                        if let Some((kind, result)) = parse_transcript(&payload) {
+                        if is_connected_payload(&payload) {
+                            let _ = connected_tx.send(true);
+                        } else if let Some((kind, result)) = parse_transcript(&payload) {
                             if !result.is_empty() {
+                                match kind {
+                                    TranscriptKind::Partial => {
+                                        *last_partial.lock().await = Some(result.clone());
+                                    }
+                                    TranscriptKind::Final => {
+                                        saw_final.store(true, Ordering::SeqCst);
+                                        *last_partial.lock().await = None;
+                                    }
+                                }
                                 callback(result.as_str(), kind == TranscriptKind::Final);
                             }
                         } else if is_revai_error(&payload) {
@@ -260,7 +311,15 @@ async fn run_stream(
                         }
                     }
                     Message::Close(frame) => {
-                        if let Some(frame) = frame {
+                        let closed_normally = frame
+                            .as_ref()
+                            .map(|close| {
+                                close.code
+                                    == tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode::Normal
+                            })
+                            .unwrap_or(false);
+
+                        if let Some(frame) = frame.as_ref() {
                             eprintln!(
                                 "RevAI closed websocket: code={:?}, reason={}",
                                 frame.code, frame.reason
@@ -269,13 +328,23 @@ async fn run_stream(
                             eprintln!("RevAI closed websocket without close frame data");
                         }
                         let _ = termination_tx.send(true);
-                        if stop_requested.load(Ordering::SeqCst) {
+
+                        if (closed_normally && eos_sent.load(Ordering::SeqCst))
+                            || stop_requested.load(Ordering::SeqCst)
+                        {
+                            flush_last_partial_as_final(&callback, &last_partial, &saw_final).await;
                             break;
                         }
                         return Err("RevAI websocket closed unexpectedly".into());
                     }
                     _ => {}
                 }
+            }
+
+            if eos_sent.load(Ordering::SeqCst) || stop_requested.load(Ordering::SeqCst) {
+                flush_last_partial_as_final(&callback, &last_partial, &saw_final).await;
+                let _ = termination_tx.send(true);
+                return Ok::<(), String>(());
             }
 
             if !stop_requested.load(Ordering::SeqCst) {
@@ -290,6 +359,23 @@ async fn run_stream(
 
     try_join(send_audio, receive_events).await?;
     Ok(())
+}
+
+async fn flush_last_partial_as_final(
+    callback: &PcmCallback,
+    last_partial: &Arc<AsyncMutex<Option<String>>>,
+    saw_final: &Arc<AtomicBool>,
+) {
+    if saw_final.load(Ordering::SeqCst) {
+        return;
+    }
+
+    if let Some(text) = last_partial.lock().await.take() {
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            callback(trimmed, true);
+        }
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -400,6 +486,15 @@ fn is_revai_error(payload: &str) -> bool {
     false
 }
 
+fn is_connected_payload(payload: &str) -> bool {
+    if let Ok(value) = serde_json::from_str::<Value>(payload) {
+        if let Some(kind) = value.get("type").and_then(|v| v.as_str()) {
+            return kind.eq_ignore_ascii_case("connected");
+        }
+    }
+    false
+}
+
 fn encode_component(value: &str) -> String {
     let mut encoded = String::new();
     for byte in value.bytes() {
@@ -411,4 +506,105 @@ fn encode_component(value: &str) -> String {
         }
     }
     encoded
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        TranscriptKind, collect_elements_text, extract_final_text, extract_partial_text,
+        is_connected_payload, parse_transcript,
+    };
+    use serde_json::json;
+
+    #[test]
+    fn parse_final_transcript_joins_text_and_punctuation() {
+        let payload = r#"{
+            "type":"final",
+            "ts":1.01,
+            "end_ts":3.2,
+            "elements":[
+                {"type":"text","value":"One","ts":1.04,"end_ts":1.55,"confidence":1.0},
+                {"type":"punct","value":" "},
+                {"type":"text","value":"two","ts":1.84,"end_ts":2.15,"confidence":1.0},
+                {"type":"punct","value":"."}
+            ]
+        }"#;
+
+        let parsed = parse_transcript(payload);
+        assert_eq!(
+            parsed,
+            Some((TranscriptKind::Final, "One two.".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_partial_transcript_joins_elements() {
+        let payload = r#"{
+            "type":"partial",
+            "ts":1.01,
+            "end_ts":2.2,
+            "elements":[
+                {"type":"text","value":"one"},
+                {"type":"text","value":" tooth"}
+            ]
+        }"#;
+
+        let parsed = parse_transcript(payload);
+        assert_eq!(
+            parsed,
+            Some((TranscriptKind::Partial, "one tooth".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_connected_payload_is_not_treated_as_transcript() {
+        assert!(is_connected_payload(
+            r#"{"type":"connected","id":"s1d24ax2fd21"}"#
+        ));
+        assert_eq!(
+            parse_transcript(r#"{"type":"connected","id":"s1d24ax2fd21"}"#),
+            None
+        );
+    }
+
+    #[test]
+    fn final_text_extractor_ignores_empty_elements() {
+        let value = json!({
+            "elements": [
+                {"type": "punct", "value": " "},
+                {"type": "text", "value": "Hello"},
+                {"type": "punct", "value": "!"}
+            ]
+        });
+
+        assert_eq!(extract_final_text(&value), Some("Hello!".to_string()));
+    }
+
+    #[test]
+    fn partial_text_extractor_falls_back_to_top_level_fields() {
+        let value = json!({
+            "type": "partial",
+            "transcript": "fallback text"
+        });
+
+        assert_eq!(
+            extract_partial_text(&value),
+            Some("fallback text".to_string())
+        );
+    }
+
+    #[test]
+    fn collect_elements_text_trims_outer_whitespace_only() {
+        let elements = vec![
+            json!({"type": "punct", "value": " "}),
+            json!({"type": "text", "value": "Hello"}),
+            json!({"type": "punct", "value": ", world"}),
+            json!({"type": "punct", "value": " "}),
+        ];
+
+        assert_eq!(
+            collect_elements_text(&elements),
+            Some("Hello, world".to_string())
+        );
+    }
 }

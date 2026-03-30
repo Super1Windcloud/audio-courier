@@ -1,5 +1,7 @@
 #![allow(clippy::collapsible_if)]
 
+///https://www.assemblyai.com/docs/api-reference/streaming-api/universal-streaming/universal-streaming
+///
 use crate::provider_config::{TranscriptRuntimeConfig, resolve_required_string};
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use futures_util::{SinkExt, StreamExt, future::try_join};

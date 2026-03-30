@@ -1,5 +1,7 @@
 #![allow(clippy::collapsible_if)]
 
+///https://docs.gladia.io/api-reference/v2/live/init
+///https://docs.gladia.io/api-reference/v2/live/websocket
 use crate::provider_config::{
     TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
     resolve_string_or_default,
