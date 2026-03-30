@@ -75,6 +75,7 @@ fn report_recording_error(status_callback: Option<&StatusCallback>, message: imp
 #[derive(Default)]
 pub struct RecordParams {
     pub device: String,
+    pub is_input_device: bool,
     pub file_name: String,
     pub only_pcm: bool,
     pub capture_interval: u32,
@@ -89,16 +90,27 @@ pub struct RecordParams {
 pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
     let host = cpal::default_host();
     RECORDING.store(true, Ordering::SeqCst);
+    let is_input_device = params.is_input_device || params.device == "default_input";
 
     let device = match params.device.as_str() {
         "default" => host.default_output_device(),
         "default_input" => host.default_input_device(),
+        name if is_input_device => host
+            .input_devices()
+            .map_err(|e| format!("Failed to enumerate input devices: {e}"))?
+            .find(|x| device_display_name(x).as_deref() == Some(name)),
         name => host
             .output_devices()
             .map_err(|e| format!("Failed to enumerate output devices: {e}"))?
             .find(|x| device_display_name(x).as_deref() == Some(name)),
     }
-    .ok_or_else(|| "failed to find input device".to_string())?;
+    .ok_or_else(|| {
+        if is_input_device {
+            format!("failed to find input device: {}", params.device)
+        } else {
+            format!("failed to find output device: {}", params.device)
+        }
+    })?;
 
     if is_dev() {
         if let Some(name) = device_display_name(&device) {
@@ -111,12 +123,12 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
         params.auto_chunk_buffer = true;
     }
 
-    let config = if device.supports_input() && params.device.contains("input") {
+    let config = if is_input_device {
         device
             .default_input_config()
             .map_err(|e| format!("Failed to read default input config: {e}"))?
     } else {
-        select_output_config(params.use_resampled)?
+        select_output_config(&device, params.use_resampled)?
     };
 
     write_some_log(format!("Output selected config: {:#?}", config).as_str());

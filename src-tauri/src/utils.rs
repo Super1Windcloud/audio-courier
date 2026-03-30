@@ -1,6 +1,6 @@
 use crate::RESAMPLE_RATE;
 use cpal::Sample;
-use cpal::traits::{DeviceTrait, HostTrait};
+use cpal::traits::DeviceTrait;
 use rubato::ResampleError;
 use std::collections::HashMap;
 use std::env;
@@ -151,10 +151,10 @@ fn parse_line(line: &str) -> Option<(String, String)> {
     }
 }
 
-pub fn select_output_config(use_resample: bool) -> Result<cpal::SupportedStreamConfig, String> {
-    let device = cpal::default_host()
-        .default_output_device()
-        .ok_or("没有可用的输出设备")?;
+pub fn select_output_config(
+    device: &cpal::Device,
+    use_resample: bool,
+) -> Result<cpal::SupportedStreamConfig, String> {
 
     let supported_configs = device
         .supported_output_configs()

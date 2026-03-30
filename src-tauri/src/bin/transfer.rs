@@ -26,6 +26,7 @@ fn main() {
     let capture_interval = 2;
     let params = RecordParams {
         device: device.to_string(),
+        is_input_device: false,
         file_name: String::new(),
         only_pcm: true,
         capture_interval,

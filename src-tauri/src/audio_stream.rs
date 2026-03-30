@@ -12,11 +12,47 @@ pub fn get_record_handle() -> &'static Mutex<Option<std::thread::JoinHandle<()>>
     RECORD_HANDLE.get_or_init(|| Mutex::new(None))
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum SelectedAudioDevice {
+    DefaultOutput,
+    DefaultInput,
+    NamedOutput(String),
+    NamedInput(String),
+}
+
 fn device_display_name(device: &cpal::Device) -> Option<String> {
     device
         .description()
         .ok()
         .map(|description| description.name().to_string())
+}
+
+fn parse_selected_audio_device(device_name: Option<&str>) -> SelectedAudioDevice {
+    let Some(device_name) = device_name.map(str::trim).filter(|value| !value.is_empty()) else {
+        return SelectedAudioDevice::DefaultOutput;
+    };
+
+    if device_name == "default" {
+        return SelectedAudioDevice::DefaultOutput;
+    }
+
+    if device_name == "default_input" {
+        return SelectedAudioDevice::DefaultInput;
+    }
+
+    if device_name.strip_suffix(" [输出] (默认)").is_some() {
+        return SelectedAudioDevice::DefaultOutput;
+    }
+
+    if let Some(name) = device_name.strip_suffix(" [输出]") {
+        return SelectedAudioDevice::NamedOutput(name.trim().to_string());
+    }
+
+    if let Some(name) = device_name.strip_suffix(" [输入]") {
+        return SelectedAudioDevice::NamedInput(name.trim().to_string());
+    }
+
+    SelectedAudioDevice::NamedOutput(device_name.to_string())
 }
 
 #[tauri::command]
@@ -70,14 +106,12 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     capture_interval: u32,
     transcript_config: Option<TranscriptRuntimeConfig>,
 ) {
-    let device = if let Some(name) = device_name {
-        if name.contains("输入") {
-            "default_input"
-        } else {
-            "default"
-        }
-    } else {
-        "default"
+    let selected_device = parse_selected_audio_device(device_name.as_deref());
+    let (device, is_input_device) = match selected_device {
+        SelectedAudioDevice::DefaultOutput => ("default".to_string(), false),
+        SelectedAudioDevice::DefaultInput => ("default_input".to_string(), true),
+        SelectedAudioDevice::NamedOutput(name) => (name, false),
+        SelectedAudioDevice::NamedInput(name) => (name, true),
     };
 
     let last_result = Arc::new(Mutex::new(String::new()));
@@ -89,7 +123,8 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
         }
     });
     let params = RecordParams {
-        device: device.to_string(),
+        device,
+        is_input_device,
         file_name: String::new(),
         capture_interval,
         only_pcm: true,
@@ -113,5 +148,43 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
         println!("录音识别已开始 ✅");
     } else {
         eprintln!("录音线程启动失败 ❌");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SelectedAudioDevice, parse_selected_audio_device};
+
+    #[test]
+    fn parse_selected_audio_device_defaults_to_output_when_missing() {
+        assert_eq!(parse_selected_audio_device(None), SelectedAudioDevice::DefaultOutput);
+        assert_eq!(
+            parse_selected_audio_device(Some("")),
+            SelectedAudioDevice::DefaultOutput
+        );
+    }
+
+    #[test]
+    fn parse_selected_audio_device_recognizes_frontend_output_labels() {
+        assert_eq!(
+            parse_selected_audio_device(Some("扬声器 Realtek [输出]")),
+            SelectedAudioDevice::NamedOutput("扬声器 Realtek".to_string())
+        );
+        assert_eq!(
+            parse_selected_audio_device(Some("扬声器 Realtek [输出] (默认)")),
+            SelectedAudioDevice::DefaultOutput
+        );
+    }
+
+    #[test]
+    fn parse_selected_audio_device_recognizes_frontend_input_labels() {
+        assert_eq!(
+            parse_selected_audio_device(Some("麦克风 USB [输入]")),
+            SelectedAudioDevice::NamedInput("麦克风 USB".to_string())
+        );
+        assert_eq!(
+            parse_selected_audio_device(Some("default_input")),
+            SelectedAudioDevice::DefaultInput
+        );
     }
 }
