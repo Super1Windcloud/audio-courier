@@ -1,3 +1,4 @@
+use cpal::traits::{DeviceTrait, HostTrait};
 use deepgram::{
     Deepgram, DeepgramError,
     common::{
@@ -37,4 +38,15 @@ async fn main() -> Result<(), DeepgramError> {
     println!("{transcript}");
     println!("Cost Time :{:?}", start.elapsed());
     Ok(())
+}
+
+#[test]
+fn output_all_device() {
+    let hosts = cpal::available_hosts();
+    println!("{:?}", hosts);
+    let default_host = cpal::default_host();
+    let devices = default_host.devices().unwrap();
+    for (index, device) in devices.enumerate() {
+        println!("{}: {:?}", index, device.description().unwrap().extended());
+    }
 }

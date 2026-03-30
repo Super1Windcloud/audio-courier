@@ -42,7 +42,7 @@ fn device_display_name(device: &cpal::Device) -> Option<String> {
     device
         .description()
         .ok()
-        .map(|description| description.name().to_string())
+        .map(|description| description.extended().to_string())
 }
 
 fn build_audio_channel_value(
