@@ -53,7 +53,7 @@ pub async fn siliconflow_free_with_model(
 ) -> Result<String, String> {
     let api_key = get_env_key("Siliconflow");
     let messages = vec![
-        json!({"role":"assistant","content":flow_args.llm_prompt}),
+        json!({"role":"system","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
     ];
 
@@ -132,7 +132,7 @@ fn resolve_siliconflow_provider(
         )?,
         max_tokens: 4096,
         temperature: 0.7,
-        prompt_role: "assistant",
+        prompt_role: "system",
         enable_thinking: Some(false),
     })
 }
@@ -367,7 +367,7 @@ pub async fn siliconflow_pro_with_model(
 ) -> Result<String, String> {
     let api_key = get_env_key("SILICONFLOW_API_KEY");
     let messages = vec![
-        json!({"role":"assistant","content":flow_args.llm_prompt}),
+        json!({"role":"system","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),
     ];
 

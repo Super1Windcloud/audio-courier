@@ -55,7 +55,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const wasRecordingRef = useRef(recordingState);
+	const lastSubmittedRef = useRef<{ text: string; at: number } | null>(null);
 	const MIN_RECORDING_DURATION = 3000;
+	const DUPLICATE_SEND_GUARD_MS = 2000;
 	const canStopRecording =
 		!recordingState ||
 		recordingStartedAt === null ||
@@ -71,6 +73,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
 			const text = (overrideText ?? inputText).trim();
 			if (text) {
+				const now = Date.now();
+				const lastSubmitted = lastSubmittedRef.current;
+				if (
+					lastSubmitted &&
+					lastSubmitted.text === text &&
+					now - lastSubmitted.at < DUPLICATE_SEND_GUARD_MS
+				) {
+					return;
+				}
+
+				lastSubmittedRef.current = { text, at: now };
 				updateQuestionState(text);
 				onSendMessage(text);
 				setInputText("");
@@ -248,7 +261,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
 				<span title="发送消息">
 					<SendHorizontal
-						onClick={handleSend}
+						onClick={() => handleSend()}
 						className="text-gray-400 cursor-pointer"
 					/>
 				</span>
