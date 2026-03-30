@@ -164,7 +164,7 @@ async fn run_session(
                 ReadMessage::AddTranscript(transcript) => {
                     let text = transcript.metadata.transcript.trim().to_string();
                     if !text.is_empty() {
-                        callback(&text);
+                        callback(&text, true);
                     }
                 }
                 ReadMessage::Error(err) => {

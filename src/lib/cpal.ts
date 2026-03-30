@@ -19,10 +19,12 @@ async function convertTraditionalChinese(content: string) {
 }
 
 let unlistener: UnlistenFn | null = null;
+let previewUnlistener: UnlistenFn | null = null;
 let errorUnlistener: UnlistenFn | null = null;
 
 export async function startAudioLoopbackRecognition(
 	onMessageCapture: (message: string) => void,
+	onFinalMessageCapture: (message: string) => void,
 	audioDevice: string,
 	selectedAsrVendor: string,
 	captureInterval: number,
@@ -33,6 +35,10 @@ export async function startAudioLoopbackRecognition(
 		unlistener();
 		unlistener = null;
 	}
+	if (previewUnlistener) {
+		previewUnlistener();
+		previewUnlistener = null;
+	}
 	if (errorUnlistener) {
 		errorUnlistener();
 		errorUnlistener = null;
@@ -42,20 +48,31 @@ export async function startAudioLoopbackRecognition(
 	const transcriptProviderSettings =
 		useAppStateStore.getState().transcriptProviderSettings;
 
-	unlistener = await listen<string>("transcription_result", async (event) => {
-		logInfo(`transcription_result received length=${event.payload.length}`);
+	const normalizeTranscript = async (payload: string) => {
 		if (
 			selectedAsrVendor.toLowerCase() === "assemblyai" ||
 			selectedAsrVendor.toLowerCase() === "revai" ||
 			selectedAsrVendor.toLowerCase() === "deepgram"
 		) {
-			content = event.payload;
-		} else if (selectedAsrVendor.toLowerCase() === "gladia") {
-			content = await convertTraditionalChinese(event.payload);
-		} else {
-			content += event.payload;
+			return payload;
 		}
+		if (selectedAsrVendor.toLowerCase() === "gladia") {
+			return await convertTraditionalChinese(payload);
+		}
+
+		return content + payload;
+	};
+
+	previewUnlistener = await listen<string>("transcription_preview", async (event) => {
+		logInfo(`transcription_preview received length=${event.payload.length}`);
+		content = await normalizeTranscript(event.payload);
 		onMessageCapture(content);
+	});
+	unlistener = await listen<string>("transcription_result", async (event) => {
+		logInfo(`transcription_result received length=${event.payload.length}`);
+		content = await normalizeTranscript(event.payload);
+		onMessageCapture(content);
+		onFinalMessageCapture(content);
 	});
 	errorUnlistener = await listen<string>("transcription_error", (event) => {
 		console.error("transcription error:", event.payload);
@@ -96,6 +113,10 @@ export async function stopAudioLoopbackRecognition() {
 	if (unlistener) {
 		unlistener();
 		unlistener = null;
+	}
+	if (previewUnlistener) {
+		previewUnlistener();
+		previewUnlistener = null;
 	}
 	if (errorUnlistener) {
 		errorUnlistener();

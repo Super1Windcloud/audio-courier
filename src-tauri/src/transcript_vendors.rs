@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-pub type PcmCallback = Arc<dyn Fn(&str) + Send + Sync + 'static>;
+pub type PcmCallback = Arc<dyn Fn(&str, bool) + Send + Sync + 'static>;
 pub type StatusCallback = Arc<dyn Fn(String) + Send + Sync + 'static>;
 
 pub trait StreamingTranscriber: Send + Sync {

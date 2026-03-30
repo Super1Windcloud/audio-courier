@@ -208,7 +208,7 @@ async fn run_stream(
                             };
 
                             if should_emit && !text.is_empty() {
-                                callback(text.as_str());
+                                callback(text.as_str(), true);
                             }
                         } else if is_error_payload(&payload) {
                             let _ = termination_tx.send(true);

@@ -36,6 +36,7 @@ declare global {
 }
 
 let activeCallback: ((msg: string) => void) | null = null;
+let activeFinalCallback: ((msg: string) => void) | null = null;
 let recognitionInstance: BrowserSpeechRecognition | null = null;
 
 function getRecognition(): BrowserSpeechRecognition {
@@ -69,6 +70,9 @@ function getRecognition(): BrowserSpeechRecognition {
 		}
 
 		if (activeCallback) activeCallback(finalTranscript + interimTranscript);
+		if (finalTranscript.trim() && activeFinalCallback) {
+			activeFinalCallback(finalTranscript.trim());
+		}
 	};
 
 	recognition.onerror = (event: BrowserSpeechRecognitionErrorEvent) => {
@@ -82,6 +86,7 @@ function getRecognition(): BrowserSpeechRecognition {
 
 export async function startAudioRecognition(
 	onMessageCapture: (message: string) => void,
+	onFinalMessageCapture: (message: string) => void,
 	audioDevice: string,
 	selectedAsrVendor: TranscribeVendor,
 	captureInterval: number,
@@ -90,6 +95,7 @@ export async function startAudioRecognition(
 	if (isOutputAudioChannel(audioDevice)) {
 		return await startAudioLoopbackRecognition(
 			onMessageCapture,
+			onFinalMessageCapture,
 			audioDevice,
 			selectedAsrVendor,
 			captureInterval,
@@ -99,6 +105,7 @@ export async function startAudioRecognition(
 
 	const recognition = getRecognition();
 	activeCallback = onMessageCapture;
+	activeFinalCallback = onFinalMessageCapture;
 	recognition.start();
 
 	return () => recognition.stop();
@@ -109,6 +116,7 @@ export async function stopAudioRecognition(device: string) {
 		return await stopAudioLoopbackRecognition();
 	}
 	activeCallback = null;
+	activeFinalCallback = null;
 	recognitionInstance?.stop();
 	recognitionInstance = null;
 }

@@ -90,7 +90,7 @@ async fn run_stream(
     const BASE_URL: &str = "wss://streaming.assemblyai.com/v3/ws";
     const SPEECH_MODEL: &str = "whisper-rt";
     const AUDIO_ENCODING: &str = "pcm_s16le";
-    const MIN_TURN_SILENCE_MS: u32 = 900;
+    const MIN_TURN_SILENCE_MS: u32 = 400;
 
     let query = format!(
         "sample_rate={sample_rate}&speech_model={SPEECH_MODEL}&encoding={AUDIO_ENCODING}&format_turns=true&min_turn_silence={MIN_TURN_SILENCE_MS}"
@@ -172,9 +172,9 @@ async fn run_stream(
                                 break;
                             }
                             _ => {
-                                let transcripts = extract_final_transcripts(&value);
-                                for transcript in transcripts {
-                                    callback(&transcript);
+                                let transcripts = extract_transcripts(&value);
+                                for (transcript, is_final) in transcripts {
+                                    callback(&transcript, is_final);
                                 }
                             }
                         }
@@ -191,7 +191,7 @@ async fn run_stream(
     Ok(())
 }
 
-fn extract_final_transcripts(value: &Value) -> Vec<String> {
+fn extract_transcripts(value: &Value) -> Vec<(String, bool)> {
     let mut transcripts = Vec::new();
     let event_type = resolve_event_type(value);
 
@@ -217,21 +217,20 @@ fn resolve_event_type(value: &Value) -> Option<&str> {
         .and_then(|entry| entry.as_str())
 }
 
-fn extract_turn_transcripts(value: &Value) -> Vec<String> {
-    if !bool_flag(
-        value,
-        &["end_of_turn", "turn_is_final", "turn_is_formatted"],
-        false,
-    ) {
+fn extract_turn_transcripts(value: &Value) -> Vec<(String, bool)> {
+    let text = first_non_empty_text(value, &["utterance", "transcript"]);
+    let Some(text) = text else {
         return Vec::new();
+    };
+
+    if !bool_flag(value, &["end_of_turn", "turn_is_final"], false) {
+        return vec![(text.to_string(), false)];
     }
 
-    first_non_empty_text(value, &["utterance", "transcript"])
-        .map(|text| vec![text.to_string()])
-        .unwrap_or_default()
+    vec![(text.to_string(), true)]
 }
 
-fn extract_plain_transcripts(value: &Value, treat_type_as_final: bool) -> Vec<String> {
+fn extract_plain_transcripts(value: &Value, treat_type_as_final: bool) -> Vec<(String, bool)> {
     let is_final = if treat_type_as_final {
         true
     } else {
@@ -242,22 +241,17 @@ fn extract_plain_transcripts(value: &Value, treat_type_as_final: bool) -> Vec<St
                 "final",
                 "end_of_turn",
                 "turn_is_final",
-                "turn_is_formatted",
             ],
             false,
         )
     };
 
-    if !is_final {
-        return Vec::new();
-    }
-
     first_non_empty_text(value, &["text", "transcript", "utterance"])
-        .map(|text| vec![text.to_string()])
+        .map(|text| vec![(text.to_string(), is_final)])
         .unwrap_or_default()
 }
 
-fn extract_nested_turns(value: &Value) -> Vec<String> {
+fn extract_nested_turns(value: &Value) -> Vec<(String, bool)> {
     let turns = value
         .get("conversation")
         .or_else(|| value.get("turns"))
@@ -270,7 +264,6 @@ fn extract_nested_turns(value: &Value) -> Vec<String> {
                 turn,
                 &[
                     "turn_is_final",
-                    "turn_is_formatted",
                     "is_final",
                     "end_of_turn",
                 ],
@@ -286,7 +279,7 @@ fn extract_nested_turns(value: &Value) -> Vec<String> {
                         "text",
                     ],
                 ) {
-                    transcripts.push(text.to_string());
+                    transcripts.push((text.to_string(), true));
                 }
             }
         }

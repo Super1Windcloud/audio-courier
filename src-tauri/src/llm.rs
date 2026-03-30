@@ -88,7 +88,7 @@ pub async fn siliconflow_free(
     siliconflow_free_with_model(app, flow_args, random_model).await
 }
 
-const PRO_MODELS: [&str; 23] = [
+const PRO_MODELS: [&str; 22] = [
     "Pro/zai-org/GLM-5",
     "Pro/zai-org/GLM-4.7",
     "deepseek-ai/DeepSeek-V3.2",
@@ -97,7 +97,6 @@ const PRO_MODELS: [&str; 23] = [
     "Qwen/Qwen3-8B",
     "Qwen/Qwen3-14B",
     "Qwen/Qwen3-32B",
-    "Qwen/Qwen3-30B-A3B",
     "tencent/Hunyuan-A13B-Instruct",
     "zai-org/GLM-4.5V",
     "deepseek-ai/DeepSeek-V3.1-Terminus",

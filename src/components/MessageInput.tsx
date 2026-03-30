@@ -29,6 +29,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	setIsTyping,
 }) => {
 	const [inputText, setInputText] = useState("");
+	const [finalTranscript, setFinalTranscript] = useState("");
 	const [recordingTimerStamp, setRecordingTimerStamp] = useState(() =>
 		Date.now(),
 	);
@@ -61,22 +62,24 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		recordingTimerStamp - recordingStartedAt >= MIN_RECORDING_DURATION;
 	const recordingTitle = canStopRecording ? "停止语音" : "录音中...3秒后可停止";
 
-	const handleSend = useCallback(() => {
+	const handleSend = useCallback((overrideText?: string) => {
 		if (!isAuthorized) {
 			toast.warning("未激活许可证，无法使用发送和录音功能");
 			return;
 		}
 
-		if (inputText.trim()) {
-			updateQuestionState(inputText.trim());
-			onSendMessage(inputText.trim());
+		const text = (overrideText ?? inputText).trim();
+		if (text) {
+			updateQuestionState(text);
+			onSendMessage(text);
 			setInputText("");
+			setFinalTranscript("");
 		}
 	}, [inputText, isAuthorized, onSendMessage, updateQuestionState]);
 
 	useEffect(() => {
 		if (!recordingState) return () => undefined;
-		if (!inputText.trim()) return;
+		if (!finalTranscript.trim()) return;
 
 		if (timeoutRef.current) {
 			clearTimeout(timeoutRef.current);
@@ -91,13 +94,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 			timeout = 1000;
 		}
 		timeoutRef.current = setTimeout(() => {
-			handleSend();
+			handleSend(finalTranscript);
 		}, timeout);
 
 		return () => {
 			if (timeoutRef.current) clearTimeout(timeoutRef.current);
 		};
-	}, [handleSend, inputText, recordingState, remoteModelVendor]);
+	}, [finalTranscript, handleSend, recordingState, remoteModelVendor]);
 
 	const handleKeyPress = (e: React.KeyboardEvent) => {
 		if (e.key === "Enter" && !e.shiftKey) {
@@ -147,6 +150,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	const startRecordingEffect = useEffectEvent(() => {
 		void startAudioRecognition(
 			setInputText,
+			(message) => {
+				setInputText(message);
+				setFinalTranscript(message);
+			},
 			currentAudioChannel,
 			remoteModelVendor,
 			captureInterval,
@@ -172,6 +179,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
 	const handleClearConversation = () => {
 		setInputText("");
+		setFinalTranscript("");
 
 		onClearConversation();
 	};
@@ -187,6 +195,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 					value={inputText}
 					onChange={(e) => {
 						setInputText(e.target.value);
+						setFinalTranscript("");
 						e.currentTarget.style.height = "auto"; // 先重置
 						e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // 根据内容调整
 					}}

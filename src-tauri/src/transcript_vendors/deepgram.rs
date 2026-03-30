@@ -252,7 +252,7 @@ fn flush_utterance(buffer: &mut String, callback: &PcmCallback) {
     }
 
     let owned = trimmed.to_string();
-    callback(&owned);
+    callback(&owned, true);
     buffer.clear();
 }
 

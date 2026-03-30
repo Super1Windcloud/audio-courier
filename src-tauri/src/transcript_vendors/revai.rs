@@ -241,8 +241,8 @@ async fn run_stream(
                 match message {
                     Message::Text(payload) => {
                         if let Some((kind, result)) = parse_transcript(&payload) {
-                            if kind == TranscriptKind::Partial && !result.is_empty() {
-                                callback(result.as_str());
+                            if !result.is_empty() {
+                                callback(result.as_str(), kind == TranscriptKind::Final);
                             }
                         } else if is_revai_error(&payload) {
                             eprintln!("RevAI error payload: {payload}");

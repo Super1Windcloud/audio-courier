@@ -32,7 +32,7 @@ fn main() {
         only_pcm: true,
         capture_interval,
         use_resampled: true,
-        pcm_callback: Some(Arc::new(move |chunk: &str| {
+        pcm_callback: Some(Arc::new(move |chunk: &str, _is_final: bool| {
             if !chunk.is_empty() && *last_result.lock().unwrap() != chunk {
                 *last_result.lock().unwrap() += chunk;
                 println!("partial result :{:?}", *last_result.lock().unwrap());
