@@ -73,6 +73,11 @@ name = "transfer"
 path = "src/bin/transfer.rs"
 
 
+[features]
+default= ["api"]
+api= []
+sdk= []
+
 [dev-dependencies]
 
 

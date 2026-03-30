@@ -1,5 +1,14 @@
 use std::str::FromStr;
 use std::sync::Arc;
+pub mod assemblyai;
+pub mod gladia;
+pub mod revai;
+pub mod speechmatics;
+#[cfg(feature = "api")]
+pub mod deepgram_api;
+#[cfg(feature = "sdk")]
+pub mod deepgram_sdk;
+
 
 pub type PcmCallback = Arc<dyn Fn(&str, bool) + Send + Sync + 'static>;
 pub type StatusCallback = Arc<dyn Fn(String) + Send + Sync + 'static>;
@@ -38,8 +47,3 @@ impl FromStr for TranscriptVendors {
     }
 }
 
-pub mod assemblyai;
-pub mod deepgram;
-pub mod gladia;
-pub mod revai;
-pub mod speechmatics;

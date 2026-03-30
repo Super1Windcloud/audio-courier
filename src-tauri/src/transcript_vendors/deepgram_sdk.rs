@@ -3,7 +3,6 @@ use crate::provider_config::{
 };
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use bytes::{BufMut, Bytes, BytesMut};
-#[allow(unused_imports)]
 use deepgram::{
     Deepgram,
     common::{
