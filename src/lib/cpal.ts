@@ -66,6 +66,10 @@ export async function startAudioLoopbackRecognition(
 	previewUnlistener = await listen<string>(
 		"transcription_preview",
 		async (event) => {
+			if (selectedAsrVendor.toLowerCase() === "assemblyai") {
+				return;
+			}
+
 			logInfo(`transcription_preview received length=${event.payload.length}`);
 			content = await normalizeTranscript(event.payload);
 			onMessageCapture(content);

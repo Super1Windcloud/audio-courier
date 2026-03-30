@@ -52,6 +52,18 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	);
 	const shouldUseWaruls =
 		typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
+	const normalizeTranscriptForDuplicateGuard = useCallback(
+		(text: string) => {
+			if (remoteModelVendor !== "assemblyai") {
+				return text;
+			}
+
+			return text
+				.replace(/\s+/g, "")
+				.replace(/[。．\.，,、！!？?；;：:“”"'‘’（）()\[\]【】]+$/g, "");
+		},
+		[remoteModelVendor],
+	);
 
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const wasRecordingRef = useRef(recordingState);
@@ -75,22 +87,29 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 			if (text) {
 				const now = Date.now();
 				const lastSubmitted = lastSubmittedRef.current;
+				const normalizedText = normalizeTranscriptForDuplicateGuard(text);
 				if (
 					lastSubmitted &&
-					lastSubmitted.text === text &&
+					lastSubmitted.text === normalizedText &&
 					now - lastSubmitted.at < DUPLICATE_SEND_GUARD_MS
 				) {
 					return;
 				}
 
-				lastSubmittedRef.current = { text, at: now };
+				lastSubmittedRef.current = { text: normalizedText, at: now };
 				updateQuestionState(text);
 				onSendMessage(text);
 				setInputText("");
 				setFinalTranscript("");
 			}
 		},
-		[inputText, isAuthorized, onSendMessage, updateQuestionState],
+		[
+			inputText,
+			isAuthorized,
+			normalizeTranscriptForDuplicateGuard,
+			onSendMessage,
+			updateQuestionState,
+		],
 	);
 
 	useEffect(() => {
