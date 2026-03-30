@@ -60,7 +60,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
 			return text
 				.replace(/\s+/g, "")
-				.replace(/[。．\.，,、！!？?；;：:“”"'‘’（）()\[\]【】]+$/g, "");
+				.replace(/[。．.，,、！!？?；;：:“”"'‘’（）()[\]【】]+$/g, "");
 		},
 		[remoteModelVendor],
 	);
