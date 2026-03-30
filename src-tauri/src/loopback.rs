@@ -487,8 +487,9 @@ fn maybe_force_endpoint_after_silence(
             return Ok(());
         }
 
-        state.accumulated_silence_ms =
-            state.accumulated_silence_ms.saturating_add(chunk_duration_ms);
+        state.accumulated_silence_ms = state
+            .accumulated_silence_ms
+            .saturating_add(chunk_duration_ms);
         if state.accumulated_silence_ms < ASSEMBLY_FORCE_ENDPOINT_SILENCE_MS {
             return Ok(());
         }

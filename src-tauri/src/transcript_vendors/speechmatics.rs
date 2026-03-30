@@ -7,8 +7,8 @@ use speechmatics::realtime::{ReadMessage, RealtimeSession, SessionConfig, models
 use std::io;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Context, Poll};
 use std::thread::{self, JoinHandle};
 use tokio::io::{AsyncRead, ReadBuf};

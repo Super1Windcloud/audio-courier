@@ -5,8 +5,8 @@ use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscribe
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use serde_json::{Value, json};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
 use tokio::runtime::Runtime;
