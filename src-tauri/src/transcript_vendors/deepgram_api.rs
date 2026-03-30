@@ -230,9 +230,11 @@ async fn run_session(
             }
 
             close_sent.store(true, Ordering::SeqCst);
-            sink.send(Message::Text(json!({"type": "CloseStream"}).to_string().into()))
-                .await
-                .map_err(|e| format!("Failed to send Deepgram CloseStream: {e}"))?;
+            sink.send(Message::Text(
+                json!({"type": "CloseStream"}).to_string().into(),
+            ))
+            .await
+            .map_err(|e| format!("Failed to send Deepgram CloseStream: {e}"))?;
             sink.close()
                 .await
                 .map_err(|e| format!("Failed to close Deepgram socket: {e}"))?;
