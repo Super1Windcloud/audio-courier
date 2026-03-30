@@ -157,7 +157,10 @@ mod tests {
 
     #[test]
     fn parse_selected_audio_device_defaults_to_output_when_missing() {
-        assert_eq!(parse_selected_audio_device(None), SelectedAudioDevice::DefaultOutput);
+        assert_eq!(
+            parse_selected_audio_device(None),
+            SelectedAudioDevice::DefaultOutput
+        );
         assert_eq!(
             parse_selected_audio_device(Some("")),
             SelectedAudioDevice::DefaultOutput

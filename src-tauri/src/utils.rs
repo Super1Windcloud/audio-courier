@@ -155,7 +155,6 @@ pub fn select_output_config(
     device: &cpal::Device,
     use_resample: bool,
 ) -> Result<cpal::SupportedStreamConfig, String> {
-
     let supported_configs = device
         .supported_output_configs()
         .map_err(|_| "无法获取输出设备配置".to_string())?;
