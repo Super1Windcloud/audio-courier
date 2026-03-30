@@ -88,9 +88,12 @@ async fn run_stream(
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), String> {
     const BASE_URL: &str = "wss://streaming.assemblyai.com/v3/ws";
+    const SPEECH_MODEL: &str = "whisper-rt";
+    const AUDIO_ENCODING: &str = "pcm_s16le";
+    const MIN_TURN_SILENCE_MS: u32 = 900;
 
     let query = format!(
-        "sample_rate={sample_rate}&format_turns=true&min_end_of_turn_silence_when_confident=900"
+        "sample_rate={sample_rate}&speech_model={SPEECH_MODEL}&encoding={AUDIO_ENCODING}&format_turns=true&min_turn_silence={MIN_TURN_SILENCE_MS}"
     );
     let url = format!("{BASE_URL}?{query}");
 
