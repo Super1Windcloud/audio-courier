@@ -14,6 +14,8 @@ use deepgram::{
 use futures::channel::mpsc as futures_mpsc;
 use futures_util::{SinkExt, StreamExt};
 use std::fmt;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use tokio::runtime::Runtime;
@@ -23,6 +25,7 @@ pub struct DeepgramTranscriber {
     sender: mpsc::Sender<Vec<i16>>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
     handle: Mutex<Option<JoinHandle<()>>>,
+    stop_requested: Arc<AtomicBool>,
 }
 
 impl DeepgramTranscriber {
@@ -44,6 +47,8 @@ impl DeepgramTranscriber {
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
+        let stop_requested = Arc::new(AtomicBool::new(false));
+        let stop_requested_for_thread = stop_requested.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
@@ -54,6 +59,7 @@ impl DeepgramTranscriber {
                 callback,
                 receiver,
                 shutdown_rx,
+                stop_requested_for_thread,
             )) {
                 if let Some(cb) = status_callback.as_ref() {
                     cb(format!("deepgram: {err}"));
@@ -66,6 +72,7 @@ impl DeepgramTranscriber {
             sender,
             shutdown: Mutex::new(Some(shutdown)),
             handle: Mutex::new(Some(handle)),
+            stop_requested,
         })
     }
 
@@ -76,6 +83,7 @@ impl DeepgramTranscriber {
     }
 
     pub fn stop(&self) {
+        self.stop_requested.store(true, Ordering::SeqCst);
         if let Some(shutdown) = self.shutdown.lock().unwrap().take() {
             let _ = shutdown.send(());
         }
@@ -114,6 +122,7 @@ async fn run_stream(
     callback: PcmCallback,
     mut audio_rx: mpsc::Receiver<Vec<i16>>,
     mut shutdown_rx: oneshot::Receiver<()>,
+    stop_requested: Arc<AtomicBool>,
 ) -> Result<(), String> {
     let deepgram =
         Deepgram::new(&api_key).map_err(|e| format!("Failed to construct Deepgram client: {e}"))?;
@@ -184,8 +193,12 @@ async fn run_stream(
 
     let _ = bridge.await;
     flush_utterance(&mut utterance_buffer, &callback);
-    println!("Deepgram websocket closed");
-    Ok(())
+    if stop_requested.load(Ordering::SeqCst) {
+        println!("Deepgram websocket closed");
+        Ok(())
+    } else {
+        Err("Deepgram websocket closed unexpectedly".into())
+    }
 }
 
 fn pcm_chunk_to_bytes(chunk: &[i16]) -> Bytes {

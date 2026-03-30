@@ -9,6 +9,8 @@ use futures_util::{SinkExt, StreamExt, future::try_join};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
@@ -26,6 +28,7 @@ pub struct GladiaTranscriber {
     sender: mpsc::Sender<Vec<i16>>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
     handle: Mutex<Option<JoinHandle<()>>>,
+    stop_requested: Arc<AtomicBool>,
 }
 
 const RECEIVE_PARTIAL_TRANSCRIPTS: bool = false;
@@ -55,6 +58,8 @@ impl GladiaTranscriber {
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
+        let stop_requested = Arc::new(AtomicBool::new(false));
+        let stop_requested_for_thread = stop_requested.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
@@ -66,6 +71,7 @@ impl GladiaTranscriber {
                 callback,
                 receiver,
                 shutdown_rx,
+                stop_requested_for_thread,
             )) {
                 if let Some(cb) = status_callback.as_ref() {
                     cb(format!("gladia: {err}"));
@@ -78,6 +84,7 @@ impl GladiaTranscriber {
             sender,
             shutdown: Mutex::new(Some(shutdown)),
             handle: Mutex::new(Some(handle)),
+            stop_requested,
         })
     }
 
@@ -94,6 +101,7 @@ impl GladiaTranscriber {
     }
 
     pub fn stop(&self) {
+        self.stop_requested.store(true, Ordering::SeqCst);
         if let Some(shutdown) = self.shutdown.lock().unwrap().take() {
             let _ = shutdown.send(());
         }
@@ -133,6 +141,7 @@ async fn run_stream(
     callback: PcmCallback,
     mut audio_rx: mpsc::Receiver<Vec<i16>>,
     mut shutdown_rx: oneshot::Receiver<()>,
+    stop_requested: Arc<AtomicBool>,
 ) -> Result<(), String> {
     let ws_url = create_live_session(&api_key, &model, sample_rate, language.as_deref()).await?;
     let uri: Uri = ws_url
@@ -217,10 +226,18 @@ async fn run_stream(
                     }
                     Message::Close(_) => {
                         let _ = termination_tx.send(true);
-                        break;
+                        if stop_requested.load(Ordering::SeqCst) {
+                            break;
+                        }
+                        return Err("Gladia websocket closed unexpectedly".into());
                     }
                     _ => {}
                 }
+            }
+
+            if !stop_requested.load(Ordering::SeqCst) {
+                let _ = termination_tx.send(true);
+                return Err("Gladia websocket closed unexpectedly".into());
             }
 
             let _ = termination_tx.send(true);

@@ -7,6 +7,9 @@ pub type StatusCallback = Arc<dyn Fn(String) + Send + Sync + 'static>;
 pub trait StreamingTranscriber: Send + Sync {
     fn queue_chunk(&self, chunk: Vec<i16>) -> Result<(), String>;
     fn get_vendor_name(&self) -> String;
+    fn force_endpoint(&self) -> Result<(), String> {
+        Ok(())
+    }
     #[allow(unused)]
     fn shutdown(&self);
 }

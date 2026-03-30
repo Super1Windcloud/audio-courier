@@ -116,12 +116,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		if (!recordingState) return () => undefined;
 		if (!finalTranscript.trim()) return;
 
+		if (remoteModelVendor === "assemblyai") {
+			handleSend(finalTranscript);
+			return () => undefined;
+		}
+
 		if (timeoutRef.current) {
 			clearTimeout(timeoutRef.current);
 		}
 
 		let timeout: number;
-		if (remoteModelVendor === "assemblyai" || remoteModelVendor === "gladia") {
+		if (remoteModelVendor === "gladia") {
 			timeout = 100;
 		} else if (remoteModelVendor === "deepgram") {
 			timeout = 200;

@@ -84,12 +84,11 @@ export async function startAudioLoopbackRecognition(
 	errorUnlistener = await listen<string>("transcription_error", (event) => {
 		console.error("transcription error:", event.payload);
 		logError("transcription_error received", event.payload);
-		toast.error(`transcription error${event.payload}`);
 		const appState = useAppStateStore.getState();
 		if (appState.isRecording) {
 			setRecordingStateImmediately(false);
 		}
-		toast.error(`当前${selectedAsrVendor}Websocket流连接已关闭`);
+		toast.error(`当前 ${selectedAsrVendor} 转录连接异常关闭: ${event.payload}`);
 	});
 
 	await invoke("start_recognize_audio_stream_from_speaker_loopback", {

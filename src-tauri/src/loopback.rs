@@ -40,12 +40,34 @@ SeqCst	顺序一致	强制全局顺序	所有线程都按统一顺序观察所�
  */
 pub static RECORDING: AtomicBool = AtomicBool::new(true);
 
+#[derive(Default)]
+struct EndpointDetectorState {
+    has_active_speech: bool,
+    accumulated_silence_ms: u32,
+}
+
 thread_local! {
     static PCM_BUFFER: Mutex<Vec<f32>> = const { Mutex::new(Vec::new()) };
+    static ENDPOINT_DETECTOR_STATE: Mutex<EndpointDetectorState> = Mutex::new(EndpointDetectorState {
+        has_active_speech: false,
+        accumulated_silence_ms: 0,
+    });
 }
+
+const ASSEMBLY_FORCE_ENDPOINT_SILENCE_MS: u32 = 500;
+const ASSEMBLY_SPEECH_PEAK_THRESHOLD: i16 = 900;
+const ASSEMBLY_SPEECH_MEAN_ABS_THRESHOLD: f32 = 120.0;
 
 pub fn request_stop_recording() {
     RECORDING.store(false, Ordering::SeqCst);
+}
+
+fn reset_endpoint_detector_state() {
+    ENDPOINT_DETECTOR_STATE.with(|state_cell| {
+        let mut state = state_cell.lock().unwrap();
+        state.has_active_speech = false;
+        state.accumulated_silence_ms = 0;
+    });
 }
 
 fn create_recording_status_callback(
@@ -91,6 +113,7 @@ pub struct RecordParams {
 pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
     let host = cpal::default_host();
     RECORDING.store(true, Ordering::SeqCst);
+    reset_endpoint_detector_state();
     let is_input_device = params.is_input_device || params.device == "default_input";
     let device_occurrence = params.device_occurrence.unwrap_or(0);
 
@@ -400,6 +423,24 @@ fn drain_chunk_buffer_to_writer(
         if let Some(transcriber) = transcriber.as_ref() {
             let vendor = transcriber.get_vendor_name();
             let chunk_i16 = prepare_chunk_for_transcriber(&chunk, use_resampled, input_sample_rate);
+
+            if vendor == "AssemblyAI" {
+                let sample_rate = if use_resampled {
+                    RESAMPLE_RATE as usize
+                } else {
+                    input_sample_rate
+                };
+
+                if let Err(err) =
+                    maybe_force_endpoint_after_silence(transcriber, &chunk_i16, sample_rate)
+                {
+                    let message = format!("AssemblyAI force endpoint failed: {err}");
+                    write_some_log(message.as_str());
+                    report_recording_error(status_callback.as_ref(), message);
+                    break;
+                }
+            }
+
             if let Err(err) = transcriber.queue_chunk(chunk_i16) {
                 let message = format!("{vendor} streaming chunk send failed: {err}");
                 write_some_log(message.as_str());
@@ -408,6 +449,54 @@ fn drain_chunk_buffer_to_writer(
             }
         }
     }
+}
+
+fn maybe_force_endpoint_after_silence(
+    transcriber: &Arc<dyn StreamingTranscriber>,
+    chunk: &[i16],
+    sample_rate: usize,
+) -> Result<(), String> {
+    if chunk.is_empty() || sample_rate == 0 {
+        return Ok(());
+    }
+
+    let peak = chunk
+        .iter()
+        .map(|sample| sample.unsigned_abs())
+        .max()
+        .unwrap_or(0);
+    let mean_abs = chunk
+        .iter()
+        .map(|sample| sample.unsigned_abs() as f32)
+        .sum::<f32>()
+        / chunk.len() as f32;
+    let has_speech = peak >= ASSEMBLY_SPEECH_PEAK_THRESHOLD as u16
+        || mean_abs >= ASSEMBLY_SPEECH_MEAN_ABS_THRESHOLD;
+    let chunk_duration_ms = ((chunk.len() as u64) * 1000 / sample_rate as u64) as u32;
+
+    ENDPOINT_DETECTOR_STATE.with(|state_cell| {
+        let mut state = state_cell.lock().unwrap();
+
+        if has_speech {
+            state.has_active_speech = true;
+            state.accumulated_silence_ms = 0;
+            return Ok(());
+        }
+
+        if !state.has_active_speech {
+            return Ok(());
+        }
+
+        state.accumulated_silence_ms =
+            state.accumulated_silence_ms.saturating_add(chunk_duration_ms);
+        if state.accumulated_silence_ms < ASSEMBLY_FORCE_ENDPOINT_SILENCE_MS {
+            return Ok(());
+        }
+
+        state.has_active_speech = false;
+        state.accumulated_silence_ms = 0;
+        transcriber.force_endpoint()
+    })
 }
 
 fn prepare_chunk_for_transcriber(

@@ -4,6 +4,8 @@ use crate::provider_config::{TranscriptRuntimeConfig, resolve_required_string};
 use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use serde_json::{Value, json};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
@@ -12,10 +14,16 @@ use tokio::sync::{mpsc, oneshot, watch};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tungstenite::client::{ClientRequestBuilder, IntoClientRequest};
 
+enum StreamCommand {
+    Audio(Vec<i16>),
+    ForceEndpoint,
+}
+
 pub struct AssemblyAiTranscriber {
-    sender: mpsc::Sender<Vec<i16>>,
+    sender: mpsc::Sender<StreamCommand>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
     handle: Mutex<Option<JoinHandle<()>>>,
+    stop_requested: Arc<AtomicBool>,
 }
 
 impl AssemblyAiTranscriber {
@@ -31,8 +39,10 @@ impl AssemblyAiTranscriber {
             "ASSEMBLY_API_KEY",
         )?;
 
-        let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
+        let (sender, receiver) = mpsc::channel::<StreamCommand>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
+        let stop_requested = Arc::new(AtomicBool::new(false));
+        let stop_requested_for_thread = stop_requested.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
@@ -42,6 +52,7 @@ impl AssemblyAiTranscriber {
                 callback,
                 receiver,
                 shutdown_rx,
+                stop_requested_for_thread,
             )) {
                 if let Some(cb) = status_callback.as_ref() {
                     cb(format!("assemblyai: {err}"));
@@ -54,16 +65,24 @@ impl AssemblyAiTranscriber {
             sender,
             shutdown: Mutex::new(Some(shutdown)),
             handle: Mutex::new(Some(handle)),
+            stop_requested,
         })
     }
 
     pub fn enqueue_chunk(&self, chunk: Vec<i16>) -> Result<(), String> {
         self.sender
-            .blocking_send(chunk)
+            .blocking_send(StreamCommand::Audio(chunk))
             .map_err(|e| format!("Failed to queue PCM chunk for AssemblyAI: {e}"))
     }
 
+    pub fn request_force_endpoint(&self) -> Result<(), String> {
+        self.sender
+            .blocking_send(StreamCommand::ForceEndpoint)
+            .map_err(|e| format!("Failed to queue AssemblyAI force endpoint: {e}"))
+    }
+
     pub fn stop(&self) {
+        self.stop_requested.store(true, Ordering::SeqCst);
         if let Some(shutdown) = self.shutdown.lock().unwrap().take() {
             let _ = shutdown.send(());
         }
@@ -84,13 +103,14 @@ async fn run_stream(
     api_key: String,
     sample_rate: u32,
     callback: PcmCallback,
-    mut audio_rx: mpsc::Receiver<Vec<i16>>,
+    mut audio_rx: mpsc::Receiver<StreamCommand>,
     mut shutdown_rx: oneshot::Receiver<()>,
+    stop_requested: Arc<AtomicBool>,
 ) -> Result<(), String> {
     const BASE_URL: &str = "wss://streaming.assemblyai.com/v3/ws";
     const SPEECH_MODEL: &str = "whisper-rt";
     const AUDIO_ENCODING: &str = "pcm_s16le";
-    const MIN_TURN_SILENCE_MS: u32 = 400;
+    const MIN_TURN_SILENCE_MS: u32 = 500;
 
     let query = format!(
         "sample_rate={sample_rate}&speech_model={SPEECH_MODEL}&encoding={AUDIO_ENCODING}&format_turns=true&min_turn_silence={MIN_TURN_SILENCE_MS}"
@@ -124,7 +144,7 @@ async fn run_stream(
                     }
                 },
                 chunk = audio_rx.recv() => match chunk {
-                    Some(samples) => {
+                    Some(StreamCommand::Audio(samples)) => {
                         let audio_bytes = samples
                             .iter()
                             .flat_map(|sample| sample.to_le_bytes())
@@ -133,6 +153,12 @@ async fn run_stream(
                         sink.send(Message::Binary(audio_bytes.into()))
                             .await
                             .map_err(|e| format!("Failed to send audio chunk: {e}"))?;
+                    }
+                    Some(StreamCommand::ForceEndpoint) => {
+                        let payload = json!({ "type": "ForceEndpoint" });
+                        sink.send(Message::Text(payload.to_string().into()))
+                            .await
+                            .map_err(|e| format!("Failed to send AssemblyAI force endpoint: {e}"))?;
                     }
                     None => break,
                 },
@@ -169,7 +195,10 @@ async fn run_stream(
                         match resolve_event_type(&value) {
                             Some("Termination") => {
                                 let _ = termination_tx.send(true);
-                                break;
+                                if stop_requested.load(Ordering::SeqCst) {
+                                    break;
+                                }
+                                return Err("AssemblyAI websocket terminated unexpectedly".into());
                             }
                             _ => {
                                 let transcripts = extract_transcripts(&value);
@@ -180,6 +209,11 @@ async fn run_stream(
                         }
                     }
                 }
+            }
+
+            if !stop_requested.load(Ordering::SeqCst) {
+                let _ = termination_tx.send(true);
+                return Err("AssemblyAI websocket closed unexpectedly".into());
             }
 
             let _ = termination_tx.send(true);
@@ -298,6 +332,10 @@ impl StreamingTranscriber for AssemblyAiTranscriber {
 
     fn get_vendor_name(&self) -> String {
         "AssemblyAI".to_string()
+    }
+
+    fn force_endpoint(&self) -> Result<(), String> {
+        self.request_force_endpoint()
     }
 
     fn shutdown(&self) {

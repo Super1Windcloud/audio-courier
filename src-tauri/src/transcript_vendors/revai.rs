@@ -8,6 +8,8 @@ use futures_util::{SinkExt, StreamExt, future::try_join};
 #[cfg(target_os = "windows")]
 use native_tls::TlsConnector;
 use serde_json::Value;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
@@ -30,6 +32,7 @@ pub struct RevAiTranscriber {
     sender: mpsc::Sender<Vec<i16>>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
     handle: Mutex<Option<JoinHandle<()>>>,
+    stop_requested: Arc<AtomicBool>,
 }
 
 impl RevAiTranscriber {
@@ -55,6 +58,8 @@ impl RevAiTranscriber {
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
         let (shutdown, shutdown_rx) = oneshot::channel::<()>();
+        let stop_requested = Arc::new(AtomicBool::new(false));
+        let stop_requested_for_thread = stop_requested.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
@@ -66,6 +71,7 @@ impl RevAiTranscriber {
                 callback,
                 receiver,
                 shutdown_rx,
+                stop_requested_for_thread,
             )) {
                 if let Some(cb) = status_callback.as_ref() {
                     cb(format!("revai: {err}"));
@@ -78,6 +84,7 @@ impl RevAiTranscriber {
             sender,
             shutdown: Mutex::new(Some(shutdown)),
             handle: Mutex::new(Some(handle)),
+            stop_requested,
         })
     }
 
@@ -88,6 +95,7 @@ impl RevAiTranscriber {
     }
 
     pub fn stop(&self) {
+        self.stop_requested.store(true, Ordering::SeqCst);
         if let Some(shutdown) = self.shutdown.lock().unwrap().take() {
             let _ = shutdown.send(());
         }
@@ -127,6 +135,7 @@ async fn run_stream(
     callback: PcmCallback,
     mut audio_rx: mpsc::Receiver<Vec<i16>>,
     mut shutdown_rx: oneshot::Receiver<()>,
+    stop_requested: Arc<AtomicBool>,
 ) -> Result<(), String> {
     const BASE_URL: &str = "wss://api.rev.ai/speechtotext/v1/stream";
 
@@ -260,10 +269,18 @@ async fn run_stream(
                             eprintln!("RevAI closed websocket without close frame data");
                         }
                         let _ = termination_tx.send(true);
-                        break;
+                        if stop_requested.load(Ordering::SeqCst) {
+                            break;
+                        }
+                        return Err("RevAI websocket closed unexpectedly".into());
                     }
                     _ => {}
                 }
+            }
+
+            if !stop_requested.load(Ordering::SeqCst) {
+                let _ = termination_tx.send(true);
+                return Err("RevAI websocket closed unexpectedly".into());
             }
 
             let _ = termination_tx.send(true);

@@ -6,6 +6,8 @@ use speechmatics::realtime::models::ConversationConfig;
 use speechmatics::realtime::{ReadMessage, RealtimeSession, SessionConfig, models};
 use std::io;
 use std::pin::Pin;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::task::{Context, Poll};
 use std::thread::{self, JoinHandle};
@@ -17,6 +19,7 @@ pub struct SpeechmaticsTranscriber {
     sender: Mutex<Option<mpsc::Sender<Vec<u8>>>>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
     handle: Mutex<Option<JoinHandle<()>>>,
+    stop_requested: Arc<AtomicBool>,
 }
 
 impl SpeechmaticsTranscriber {
@@ -44,6 +47,8 @@ impl SpeechmaticsTranscriber {
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         let callback_clone = callback.clone();
         let status_callback_clone = status_callback.clone();
+        let stop_requested = Arc::new(AtomicBool::new(false));
+        let stop_requested_for_thread = stop_requested.clone();
 
         let handle = thread::spawn(move || {
             let runtime = Runtime::new().expect("Failed to build Tokio runtime");
@@ -55,6 +60,7 @@ impl SpeechmaticsTranscriber {
                 callback_clone,
                 receiver,
                 shutdown_rx,
+                stop_requested_for_thread,
             )) {
                 if let Some(cb) = status_callback_clone.as_ref() {
                     cb(format!("speechmatics: {err}"));
@@ -67,6 +73,7 @@ impl SpeechmaticsTranscriber {
             sender: Mutex::new(Some(sender)),
             shutdown: Mutex::new(Some(shutdown_tx)),
             handle: Mutex::new(Some(handle)),
+            stop_requested,
         })
     }
 
@@ -97,6 +104,7 @@ impl SpeechmaticsTranscriber {
     }
 
     pub fn stop(&self) {
+        self.stop_requested.store(true, Ordering::SeqCst);
         self.sender.lock().unwrap().take();
         if let Some(shutdown) = self.shutdown.lock().unwrap().take() {
             let _ = shutdown.send(());
@@ -137,6 +145,7 @@ async fn run_session(
     callback: PcmCallback,
     audio_rx: mpsc::Receiver<Vec<u8>>,
     mut shutdown_rx: oneshot::Receiver<()>,
+    stop_requested: Arc<AtomicBool>,
 ) -> Result<(), String> {
     let (mut session, mut message_rx) = RealtimeSession::new(api_key, rt_url)
         .map_err(|e| format!("Failed to init Speechmatics session: {e}"))?;
@@ -168,12 +177,22 @@ async fn run_session(
                     }
                 }
                 ReadMessage::Error(err) => {
-                    eprintln!("Speechmatics returned error: {}", err.reason);
-                    break;
+                    return Err(format!("Speechmatics returned error: {}", err.reason));
                 }
-                ReadMessage::EndOfTranscript(_) => break,
+                ReadMessage::EndOfTranscript(_) => {
+                    if stop_requested.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    return Err("Speechmatics websocket closed unexpectedly".into());
+                }
                 _ => {}
             }
+        }
+
+        if stop_requested.load(Ordering::SeqCst) {
+            Ok(())
+        } else {
+            Err("Speechmatics websocket closed unexpectedly".into())
         }
     });
 
@@ -194,7 +213,11 @@ async fn run_session(
         }
     }
 
-    let _ = message_task.await;
+    match message_task.await {
+        Ok(result) => result?,
+        Err(err) => return Err(format!("Speechmatics message task failed: {err}")),
+    }
+
     println!("Speechmatics websocket closed");
     Ok(())
 }
