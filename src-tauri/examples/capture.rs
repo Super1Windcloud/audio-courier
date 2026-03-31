@@ -102,12 +102,12 @@ pub fn record_audio(params: RecordParams) -> Result<(), String> {
     };
 
     let i16_mono = Arc::new(Mutex::new(Some(
-        hound::WavWriter::create(PATH_I16_MONO, spec_i16_mono)
+        WavWriter::create(PATH_I16_MONO, spec_i16_mono)
             .map_err(|e| format!("创建文件失败: {e}"))?,
     )));
 
     let i16_resample_mono = Arc::new(Mutex::new(Some(
-        hound::WavWriter::create(PATH_I16_MONO_RESAMPLE, spec_i16_mono_resample)
+        WavWriter::create(PATH_I16_MONO_RESAMPLE, spec_i16_mono_resample)
             .map_err(|e| format!("创建文件失败: {e}"))?,
     )));
 

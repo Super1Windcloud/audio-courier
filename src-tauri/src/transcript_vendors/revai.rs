@@ -318,7 +318,7 @@ async fn run_stream(
                             .as_ref()
                             .map(|close| {
                                 close.code
-                                    == tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode::Normal
+                                    == tungstenite::protocol::frame::coding::CloseCode::Normal
                             })
                             .unwrap_or(false);
 
