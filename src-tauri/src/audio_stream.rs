@@ -2,6 +2,7 @@
 
 use crate::loopback::{RecordParams, start_record_audio_with_writer, stop_recording};
 use crate::provider_config::TranscriptRuntimeConfig;
+use crate::transcript_vendors::TranscriptEvent;
 use cpal::traits::{DeviceTrait, HostTrait};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -218,7 +219,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
         SelectedAudioDevice::NamedInput { name, occurrence } => (name, true, Some(occurrence)),
     };
 
-    let last_result = Arc::new(Mutex::new((String::new(), false)));
+    let last_result = Arc::new(Mutex::new(None::<TranscriptEvent>));
     let transcript_app = app.clone();
     let error_app = app.clone();
     let status_callback = Arc::new(move |message: String| {
@@ -233,26 +234,15 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
         file_name: String::new(),
         capture_interval,
         only_pcm: true,
-        pcm_callback: Some(Arc::new(move |chunk: &str, is_final: bool| {
-            if chunk.is_empty() {
-                return;
-            }
-
+        pcm_callback: Some(Arc::new(move |event: TranscriptEvent| {
             let mut last = last_result.lock().unwrap();
-            if last.0 == chunk && last.1 == is_final {
+            if last.as_ref() == Some(&event) {
                 return;
             }
 
-            *last = (chunk.to_string(), is_final);
-            let event_name = if is_final {
-                "transcription_result"
-            } else {
-                "transcription_preview"
-            };
-
-            transcript_app.emit(event_name, chunk).unwrap();
-            if is_final {
-                *last = (chunk.to_string(), true);
+            *last = Some(event.clone());
+            if let Err(err) = transcript_app.emit("transcription_event", event) {
+                eprintln!("Failed to emit transcription event: {err}");
             }
         })),
 

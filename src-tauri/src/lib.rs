@@ -24,6 +24,7 @@ use std::path::PathBuf;
 use tauri::LogicalSize;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_log::{Target, TargetKind};
+pub use transcript_vendors::*;
 pub use utils::*;
 
 #[tauri::command]

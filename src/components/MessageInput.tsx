@@ -99,8 +99,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 				lastSubmittedRef.current = { text: normalizedText, at: now };
 				updateQuestionState(text);
 				onSendMessage(text);
-				setInputText("");
-				setFinalTranscript("");
+				setInputText((current) => (current === text ? "" : current));
+				setFinalTranscript((current) => (current === text ? "" : current));
 			}
 		},
 		[

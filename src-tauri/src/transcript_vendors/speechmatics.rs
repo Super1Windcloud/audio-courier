@@ -4,7 +4,9 @@
 use crate::provider_config::{
     TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
 };
-use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
+use crate::transcript_vendors::{
+    PcmCallback, StatusCallback, StreamingTranscriber, emit_commit, emit_draft,
+};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -321,13 +323,13 @@ async fn run_session(
                             "AddPartialTranscript" | "AddPartialTranslation" => {
                                 if let Some(text) = extract_payload_text(&value) {
                                     *last_partial.lock().await = Some(text.clone());
-                                    callback(&text, false);
+                                    emit_draft(&callback, "SpeechMatics", &text);
                                 }
                             }
                             "AddTranscript" | "AddTranslation" => {
                                 if let Some(text) = extract_payload_text(&value) {
                                     *last_partial.lock().await = None;
-                                    callback(&text, true);
+                                    emit_commit(&callback, "SpeechMatics", &text);
                                 }
                             }
                             "EndOfUtterance" => {
@@ -441,7 +443,7 @@ async fn flush_last_partial_as_final(
     if let Some(text) = last_partial.lock().await.take() {
         let trimmed = text.trim();
         if !trimmed.is_empty() {
-            callback(trimmed, true);
+            emit_commit(callback, "SpeechMatics", trimmed);
         }
     }
 }

@@ -4,7 +4,9 @@
 use crate::provider_config::{
     TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
 };
-use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
+use crate::transcript_vendors::{
+    PcmCallback, StatusCallback, StreamingTranscriber, emit_commit, emit_draft,
+};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -27,6 +29,7 @@ const BASE_URL: &str = "wss://api.deepgram.com/v1/listen";
 const KEEPALIVE_INTERVAL_SECONDS: u64 = 3;
 const DEFAULT_ENDPOINTING_MS: u32 = 500;
 const DEFAULT_UTTERANCE_END_MS: u32 = 1_000;
+const VENDOR_NAME: &str = "Deepgram";
 
 enum StreamCommand {
     Audio(Vec<u8>),
@@ -152,7 +155,7 @@ impl StreamingTranscriber for DeepgramApiTranscriber {
     }
 
     fn get_vendor_name(&self) -> String {
-        "Deepgram".to_string()
+        VENDOR_NAME.to_string()
     }
 
     fn force_endpoint(&self) -> Result<(), String> {
@@ -281,6 +284,14 @@ async fn run_session(
                                             transcript.as_str(),
                                         )
                                         .await;
+                                        emit_buffer_as_draft(&utterance_buffer, &callback).await;
+                                    } else {
+                                        emit_buffer_with_segment_as_draft(
+                                            &utterance_buffer,
+                                            &callback,
+                                            transcript.as_str(),
+                                        )
+                                        .await;
                                     }
 
                                     if speech_final {
@@ -298,13 +309,7 @@ async fn run_session(
                                 flush_utterance(&utterance_buffer, &callback).await;
                             }
                             Some("Metadata") => {
-                                let _ = termination_tx.send(true);
-                                flush_utterance(&utterance_buffer, &callback).await;
-                                if close_sent.load(Ordering::SeqCst)
-                                    || stop_requested.load(Ordering::SeqCst)
-                                {
-                                    return Ok::<(), String>(());
-                                }
+                                continue;
                             }
                             Some("Error") => {
                                 let _ = termination_tx.send(true);
@@ -416,6 +421,30 @@ async fn append_utterance_segment(buffer: &AsyncMutex<String>, segment: &str) {
     guard.push_str(segment);
 }
 
+async fn emit_buffer_as_draft(buffer: &AsyncMutex<String>, callback: &PcmCallback) {
+    let guard = buffer.lock().await;
+    let trimmed = guard.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+
+    emit_draft(callback, VENDOR_NAME, trimmed);
+}
+
+async fn emit_buffer_with_segment_as_draft(
+    buffer: &AsyncMutex<String>,
+    callback: &PcmCallback,
+    segment: &str,
+) {
+    let guard = buffer.lock().await;
+    let merged = merge_segments(guard.as_str(), segment);
+    if merged.is_empty() {
+        return;
+    }
+
+    emit_draft(callback, VENDOR_NAME, merged);
+}
+
 async fn flush_utterance(buffer: &AsyncMutex<String>, callback: &PcmCallback) {
     let mut guard = buffer.lock().await;
     let trimmed = guard.trim();
@@ -424,9 +453,77 @@ async fn flush_utterance(buffer: &AsyncMutex<String>, callback: &PcmCallback) {
         return;
     }
 
-    let owned = trimmed.to_string();
-    callback(&owned, true);
+    emit_commit(callback, VENDOR_NAME, trimmed);
     guard.clear();
+}
+
+fn merge_segments(prefix: &str, suffix: &str) -> String {
+    let prefix = prefix.trim();
+    let suffix = suffix.trim();
+
+    match (prefix.is_empty(), suffix.is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => prefix.to_string(),
+        (true, false) => suffix.to_string(),
+        (false, false) => {
+            if should_join_without_space(prefix, suffix) {
+                format!("{prefix}{suffix}")
+            } else {
+                format!("{prefix} {suffix}")
+            }
+        }
+    }
+}
+
+fn should_join_without_space(prefix: &str, suffix: &str) -> bool {
+    let Some(last) = prefix.chars().next_back() else {
+        return true;
+    };
+    let Some(first) = suffix.chars().next() else {
+        return true;
+    };
+
+    last.is_whitespace()
+        || first.is_whitespace()
+        || is_cjk(last)
+        || is_cjk(first)
+        || is_spacing_punctuation(last)
+        || is_spacing_punctuation(first)
+}
+
+fn is_cjk(ch: char) -> bool {
+    matches!(
+        ch as u32,
+        0x4E00..=0x9FFF
+            | 0x3400..=0x4DBF
+            | 0x3040..=0x30FF
+            | 0xAC00..=0xD7AF
+            | 0xF900..=0xFAFF
+    )
+}
+
+fn is_spacing_punctuation(ch: char) -> bool {
+    matches!(
+        ch,
+        ',' | '.'
+            | '!'
+            | '?'
+            | ':'
+            | ';'
+            | ')'
+            | ']'
+            | '}'
+            | '，'
+            | '。'
+            | '！'
+            | '？'
+            | '：'
+            | '；'
+            | '）'
+            | '】'
+            | '」'
+            | '、'
+    )
 }
 
 #[cfg(test)]

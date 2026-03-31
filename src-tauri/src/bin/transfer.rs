@@ -6,8 +6,8 @@ use std::iter::Rev;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri_courier_ai_lib::{
-    RESAMPLE_RATE, RecordParams, get_audio_stream_devices_names, get_record_handle,
-    start_record_audio_with_writer, stop_recording, write_some_log,
+    RESAMPLE_RATE, RecordParams, TranscriptEventKind, get_audio_stream_devices_names,
+    get_record_handle, start_record_audio_with_writer, stop_recording, write_some_log,
 };
 
 fn main() {
@@ -32,12 +32,26 @@ fn main() {
         only_pcm: true,
         capture_interval,
         use_resampled: true,
-        pcm_callback: Some(Arc::new(move |chunk: &str, _is_final: bool| {
-            if !chunk.is_empty() && *last_result.lock().unwrap() != chunk {
-                *last_result.lock().unwrap() += chunk;
-                println!("partial result :{:?}", *last_result.lock().unwrap());
-                write_log(chunk);
+        pcm_callback: Some(Arc::new(move |event| {
+            if event.text.is_empty() {
+                return;
             }
+
+            let mut last = last_result.lock().unwrap();
+            if *last == event.text {
+                return;
+            }
+
+            *last = event.text.clone();
+            match event.kind {
+                TranscriptEventKind::Draft => {
+                    println!("draft result :{:?}", *last);
+                }
+                TranscriptEventKind::Commit => {
+                    println!("commit result :{:?}", *last);
+                }
+            }
+            write_log(&event.text);
         })),
         auto_chunk_buffer: false,
         selected_asr_vendor: vendor.to_string(),

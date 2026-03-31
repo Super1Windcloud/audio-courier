@@ -7,6 +7,12 @@ import useAppStateStore from "@/stores";
 
 let traditionalChineseConverter: ((content: string) => string) | null = null;
 
+interface TranscriptEvent {
+	vendor: string;
+	kind: "draft" | "commit";
+	text: string;
+}
+
 async function convertTraditionalChinese(content: string) {
 	if (!traditionalChineseConverter) {
 		const { convertTraditionalChinese: convert } = await import(
@@ -19,7 +25,6 @@ async function convertTraditionalChinese(content: string) {
 }
 
 let unlistener: UnlistenFn | null = null;
-let previewUnlistener: UnlistenFn | null = null;
 let errorUnlistener: UnlistenFn | null = null;
 
 export async function startAudioLoopbackRecognition(
@@ -35,52 +40,40 @@ export async function startAudioLoopbackRecognition(
 		unlistener();
 		unlistener = null;
 	}
-	if (previewUnlistener) {
-		previewUnlistener();
-		previewUnlistener = null;
-	}
 	if (errorUnlistener) {
 		errorUnlistener();
 		errorUnlistener = null;
 	}
 
-	let content: string = "";
 	const transcriptProviderSettings =
 		useAppStateStore.getState().transcriptProviderSettings;
 
 	const normalizeTranscript = async (payload: string) => {
-		if (
-			selectedAsrVendor.toLowerCase() === "assemblyai" ||
-			selectedAsrVendor.toLowerCase() === "revai" ||
-			selectedAsrVendor.toLowerCase() === "deepgram"
-		) {
-			return payload;
-		}
 		if (selectedAsrVendor.toLowerCase() === "gladia") {
 			return await convertTraditionalChinese(payload);
 		}
 
-		return content + payload;
+		return payload;
 	};
 
-	previewUnlistener = await listen<string>(
-		"transcription_preview",
+	unlistener = await listen<TranscriptEvent>(
+		"transcription_event",
 		async (event) => {
-			if (selectedAsrVendor.toLowerCase() === "assemblyai") {
+			const { kind, text, vendor } = event.payload;
+			if (!text.trim()) {
 				return;
 			}
 
-			logInfo(`transcription_preview received length=${event.payload.length}`);
-			content = await normalizeTranscript(event.payload);
-			onMessageCapture(content);
+			logInfo(
+				`transcription_event received vendor=${vendor} kind=${kind} length=${text.length}`,
+			);
+			const normalized = await normalizeTranscript(text);
+			onMessageCapture(normalized);
+			if (kind === "commit") {
+				onFinalMessageCapture(normalized);
+			}
 		},
 	);
-	unlistener = await listen<string>("transcription_result", async (event) => {
-		logInfo(`transcription_result received length=${event.payload.length}`);
-		content = await normalizeTranscript(event.payload);
-		onMessageCapture(content);
-		onFinalMessageCapture(content);
-	});
 	errorUnlistener = await listen<string>("transcription_error", (event) => {
 		console.error("transcription error:", event.payload);
 		logError("transcription_error received", event.payload);
@@ -119,10 +112,6 @@ export async function stopAudioLoopbackRecognition() {
 	if (unlistener) {
 		unlistener();
 		unlistener = null;
-	}
-	if (previewUnlistener) {
-		previewUnlistener();
-		previewUnlistener = null;
 	}
 	if (errorUnlistener) {
 		errorUnlistener();

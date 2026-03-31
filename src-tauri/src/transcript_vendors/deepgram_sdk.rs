@@ -1,7 +1,9 @@
 use crate::provider_config::{
     TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
 };
-use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
+use crate::transcript_vendors::{
+    PcmCallback, StatusCallback, StreamingTranscriber, emit_commit, emit_draft,
+};
 use bytes::{BufMut, Bytes, BytesMut};
 use deepgram::{
     Deepgram,
@@ -178,6 +180,13 @@ async fn run_stream(
 
                     if is_final && !transcript.is_empty() {
                         append_utterance_segment(&mut utterance_buffer, transcript);
+                        emit_draft(&callback, "Deepgram", utterance_buffer.trim());
+                    } else if !transcript.is_empty() {
+                        emit_draft(
+                            &callback,
+                            "Deepgram",
+                            merge_segments(&utterance_buffer, transcript),
+                        );
                     }
 
                     if speech_final {
@@ -263,9 +272,77 @@ fn flush_utterance(buffer: &mut String, callback: &PcmCallback) {
         return;
     }
 
-    let owned = trimmed.to_string();
-    callback(&owned, true);
+    emit_commit(callback, "Deepgram", trimmed);
     buffer.clear();
+}
+
+fn merge_segments(prefix: &str, suffix: &str) -> String {
+    let prefix = prefix.trim();
+    let suffix = suffix.trim();
+
+    match (prefix.is_empty(), suffix.is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => prefix.to_string(),
+        (true, false) => suffix.to_string(),
+        (false, false) => {
+            if should_join_without_space(prefix, suffix) {
+                format!("{prefix}{suffix}")
+            } else {
+                format!("{prefix} {suffix}")
+            }
+        }
+    }
+}
+
+fn should_join_without_space(prefix: &str, suffix: &str) -> bool {
+    let Some(last) = prefix.chars().next_back() else {
+        return true;
+    };
+    let Some(first) = suffix.chars().next() else {
+        return true;
+    };
+
+    last.is_whitespace()
+        || first.is_whitespace()
+        || is_cjk(last)
+        || is_cjk(first)
+        || is_spacing_punctuation(last)
+        || is_spacing_punctuation(first)
+}
+
+fn is_cjk(ch: char) -> bool {
+    matches!(
+        ch as u32,
+        0x4E00..=0x9FFF
+            | 0x3400..=0x4DBF
+            | 0x3040..=0x30FF
+            | 0xAC00..=0xD7AF
+            | 0xF900..=0xFAFF
+    )
+}
+
+fn is_spacing_punctuation(ch: char) -> bool {
+    matches!(
+        ch,
+        ',' | '.'
+            | '!'
+            | '?'
+            | ':'
+            | ';'
+            | ')'
+            | ']'
+            | '}'
+            | '，'
+            | '。'
+            | '！'
+            | '？'
+            | '：'
+            | '；'
+            | '）'
+            | '】'
+            | '」'
+            | '、'
+    )
 }
 
 impl fmt::Display for StreamBridgeError {

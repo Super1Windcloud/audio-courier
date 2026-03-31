@@ -3,7 +3,9 @@
 ///https://www.assemblyai.com/docs/api-reference/streaming-api/universal-streaming/universal-streaming
 ///
 use crate::provider_config::{TranscriptRuntimeConfig, resolve_required_string};
-use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
+use crate::transcript_vendors::{
+    PcmCallback, StatusCallback, StreamingTranscriber, emit_commit, emit_draft,
+};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -187,6 +189,8 @@ async fn run_stream(
         let termination_tx = termination_tx.clone();
 
         async move {
+            let mut last_emitted: Option<(bool, String)> = None;
+
             while let Some(message) = stream.next().await {
                 let message = message.map_err(|e| {
                     let _ = termination_tx.send(true);
@@ -205,7 +209,22 @@ async fn run_stream(
                             _ => {
                                 let transcripts = extract_transcripts(&value);
                                 for (transcript, is_final) in transcripts {
-                                    callback(&transcript, is_final);
+                                    let trimmed = transcript.trim();
+                                    if trimmed.is_empty() {
+                                        continue;
+                                    }
+
+                                    let next_event = (is_final, trimmed.to_string());
+                                    if last_emitted.as_ref() == Some(&next_event) {
+                                        continue;
+                                    }
+
+                                    last_emitted = Some(next_event);
+                                    if is_final {
+                                        emit_commit(&callback, "AssemblyAI", trimmed);
+                                    } else {
+                                        emit_draft(&callback, "AssemblyAI", trimmed);
+                                    }
                                 }
                             }
                         }

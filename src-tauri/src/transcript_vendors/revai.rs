@@ -5,7 +5,9 @@
 use crate::provider_config::{
     TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
 };
-use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
+use crate::transcript_vendors::{
+    PcmCallback, StatusCallback, StreamingTranscriber, emit_commit, emit_draft,
+};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 #[cfg(target_os = "windows")]
 use native_tls::TlsConnector;
@@ -296,13 +298,14 @@ async fn run_stream(
                                 match kind {
                                     TranscriptKind::Partial => {
                                         *last_partial.lock().await = Some(result.clone());
+                                        emit_draft(&callback, "RevAI", &result);
                                     }
                                     TranscriptKind::Final => {
                                         saw_final.store(true, Ordering::SeqCst);
                                         *last_partial.lock().await = None;
+                                        emit_commit(&callback, "RevAI", &result);
                                     }
                                 }
-                                callback(result.as_str(), kind == TranscriptKind::Final);
                             }
                         } else if is_revai_error(&payload) {
                             eprintln!("RevAI error payload: {payload}");
@@ -373,7 +376,7 @@ async fn flush_last_partial_as_final(
     if let Some(text) = last_partial.lock().await.take() {
         let trimmed = text.trim();
         if !trimmed.is_empty() {
-            callback(trimmed, true);
+            emit_commit(callback, "RevAI", trimmed);
         }
     }
 }

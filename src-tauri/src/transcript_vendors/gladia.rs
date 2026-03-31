@@ -6,7 +6,9 @@ use crate::provider_config::{
     TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
     resolve_string_or_default,
 };
-use crate::transcript_vendors::{PcmCallback, StatusCallback, StreamingTranscriber};
+use crate::transcript_vendors::{
+    PcmCallback, StatusCallback, StreamingTranscriber, emit_commit, emit_draft,
+};
 use futures_util::{SinkExt, StreamExt, future::try_join};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -33,7 +35,7 @@ pub struct GladiaTranscriber {
     stop_requested: Arc<AtomicBool>,
 }
 
-const RECEIVE_PARTIAL_TRANSCRIPTS: bool = false;
+const RECEIVE_PARTIAL_TRANSCRIPTS: bool = true;
 const RECEIVE_FINAL_TRANSCRIPTS: bool = true;
 
 impl GladiaTranscriber {
@@ -219,7 +221,14 @@ async fn run_stream(
                             };
 
                             if should_emit && !text.is_empty() {
-                                callback(text.as_str(), true);
+                                match kind {
+                                    TranscriptKind::Partial => {
+                                        emit_draft(&callback, "Gladia", text.as_str());
+                                    }
+                                    TranscriptKind::Final => {
+                                        emit_commit(&callback, "Gladia", text.as_str());
+                                    }
+                                }
                             }
                         } else if is_error_payload(&payload) {
                             let _ = termination_tx.send(true);

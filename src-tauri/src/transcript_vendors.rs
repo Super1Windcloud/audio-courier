@@ -1,16 +1,57 @@
+use serde::Serialize;
 use std::str::FromStr;
 use std::sync::Arc;
 pub mod assemblyai;
-#[cfg(feature = "api")]
 pub mod deepgram_api;
-#[cfg(feature = "sdk")]
 pub mod deepgram_sdk;
 pub mod gladia;
 pub mod revai;
 pub mod speechmatics;
 
-pub type PcmCallback = Arc<dyn Fn(&str, bool) + Send + Sync + 'static>;
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TranscriptEventKind {
+    Draft,
+    Commit,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscriptEvent {
+    pub vendor: String,
+    pub kind: TranscriptEventKind,
+    pub text: String,
+}
+
+pub type PcmCallback = Arc<dyn Fn(TranscriptEvent) + Send + Sync + 'static>;
 pub type StatusCallback = Arc<dyn Fn(String) + Send + Sync + 'static>;
+
+pub fn emit_draft(callback: &PcmCallback, vendor: &str, text: impl Into<String>) {
+    emit_transcript_event(callback, vendor, TranscriptEventKind::Draft, text);
+}
+
+pub fn emit_commit(callback: &PcmCallback, vendor: &str, text: impl Into<String>) {
+    emit_transcript_event(callback, vendor, TranscriptEventKind::Commit, text);
+}
+
+fn emit_transcript_event(
+    callback: &PcmCallback,
+    vendor: &str,
+    kind: TranscriptEventKind,
+    text: impl Into<String>,
+) {
+    let text = text.into();
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+
+    callback(TranscriptEvent {
+        vendor: vendor.to_string(),
+        kind,
+        text: trimmed.to_string(),
+    });
+}
 
 pub trait StreamingTranscriber: Send + Sync {
     fn queue_chunk(&self, chunk: Vec<i16>) -> Result<(), String>;
