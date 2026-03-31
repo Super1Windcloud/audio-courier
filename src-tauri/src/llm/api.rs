@@ -5,7 +5,10 @@ use serde_json::json;
 use std::env;
 use std::time::Duration;
 use tauri::Emitter;
+use tokio::time;
 use tokio_stream::StreamExt;
+
+const REQUEST_TIMEOUT_SECONDS: u64 = 3;
 
 pub struct ModelRequest {
     pub model: String,
@@ -34,7 +37,7 @@ impl std::fmt::Display for ModelError {
         match self {
             ModelError::NetworkError(msg) => write!(f, "网络连接错误: {}", msg),
             ModelError::InvalidResponse(msg) => write!(f, "服务器响应无效: {}", msg),
-            ModelError::Timeout => write!(f, "请求超时"),
+            ModelError::Timeout => write!(f, "请求或首包超时(3秒)"),
             ModelError::RateLimited => write!(f, "请求频率限制，请稍后重试"),
             ModelError::Unauthorized(msg) => write!(f, "API密钥无效或未授权: {}", msg),
             ModelError::InternalServerError => write!(f, "服务器内部错误"),
@@ -51,8 +54,7 @@ pub async fn call_model_api(
 ) -> Result<String, ModelError> {
     let model_name = req.model.clone();
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(120)) // 设置总超时时间
-        .connect_timeout(Duration::from_secs(30)) // 连接超时
+        .connect_timeout(Duration::from_secs(REQUEST_TIMEOUT_SECONDS))
         .build()
         .map_err(|e| ModelError::NetworkError(format!("客户端创建失败: {}", e)))?;
 
@@ -69,15 +71,17 @@ pub async fn call_model_api(
     }
 
     // 发送请求并处理基本网络错误
-    let response = client
+    let request = client
         .post(format!(
             "{}/chat/completions",
             req.base_url.trim_end_matches('/')
         ))
         .header("Authorization", format!("Bearer {}", req.api_key))
-        .json(&request_body)
-        .send()
+        .json(&request_body);
+
+    let response = time::timeout(Duration::from_secs(REQUEST_TIMEOUT_SECONDS), request.send())
         .await
+        .map_err(|_| ModelError::Timeout)?
         .map_err(|e| {
             if e.is_timeout() {
                 ModelError::Timeout
@@ -135,7 +139,20 @@ pub async fn call_model_api(
         "llm_stream".to_string()
     };
 
-    while let Some(item) = stream.next().await {
+    loop {
+        let item = if result.is_empty() {
+            match time::timeout(Duration::from_secs(REQUEST_TIMEOUT_SECONDS), stream.next()).await {
+                Ok(item) => item,
+                Err(_) => return Err(ModelError::Timeout),
+            }
+        } else {
+            stream.next().await
+        };
+
+        let Some(item) = item else {
+            break;
+        };
+
         match item {
             Ok(chunk) => {
                 consecutive_errors = 0; // 重置错误计数

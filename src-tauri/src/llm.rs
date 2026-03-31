@@ -7,6 +7,23 @@ use crate::provider_config::{
 use api::*;
 use rand::{RngExt, rng as thread_rng};
 use serde_json::json;
+use tauri::Emitter;
+
+const CHAT_PROVIDER_OPTIONS: [&str; 13] = [
+    "siliconflow_pro",
+    "siliconflow_minimax_m2_5",
+    "doubao_lite",
+    "doubao_pro",
+    "kimi",
+    "zhipu",
+    "deepseek_api",
+    "ali_qwen_2_5",
+    "ali_qwen_plus_latest",
+    "ali_qwen_max",
+    "openai",
+    "gemini",
+    "custom_openai",
+];
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FlowArgs {
@@ -40,6 +57,19 @@ struct ResolvedLlmProvider {
     temperature: f32,
     prompt_role: &'static str,
     enable_thinking: Option<bool>,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ResolvedModelEvent {
+    attempt: usize,
+    provider: String,
+    model: String,
+}
+
+struct ProviderAttempt {
+    provider: String,
+    resolved: ResolvedLlmProvider,
 }
 
 pub fn siliconflow_free_models() -> &'static [&'static str] {
@@ -332,6 +362,85 @@ fn resolve_provider(
     }
 }
 
+fn ordered_siliconflow_pro_models() -> Vec<&'static str> {
+    let start_idx = {
+        let mut rng = thread_rng();
+        rng.random_range(0..PRO_MODELS.len())
+    };
+
+    PRO_MODELS
+        .iter()
+        .cycle()
+        .skip(start_idx)
+        .take(PRO_MODELS.len())
+        .copied()
+        .collect()
+}
+
+fn resolve_attempts_for_provider(
+    provider: &str,
+    runtime_config: &LlmRuntimeConfig,
+) -> Result<Vec<ProviderAttempt>, String> {
+    if provider == "siliconflow_pro" {
+        return ordered_siliconflow_pro_models()
+            .into_iter()
+            .map(|model| {
+                resolve_siliconflow_provider(runtime_config, model).map(|resolved| ProviderAttempt {
+                    provider: provider.to_string(),
+                    resolved,
+                })
+            })
+            .collect();
+    }
+
+    resolve_provider(provider, runtime_config).map(|resolved| {
+        vec![ProviderAttempt {
+            provider: provider.to_string(),
+            resolved,
+        }]
+    })
+}
+
+fn fallback_provider_order(provider: &str) -> Vec<&'static str> {
+    let Some(start_index) = CHAT_PROVIDER_OPTIONS
+        .iter()
+        .position(|candidate| *candidate == provider)
+    else {
+        return CHAT_PROVIDER_OPTIONS.to_vec();
+    };
+
+    CHAT_PROVIDER_OPTIONS
+        .iter()
+        .cycle()
+        .skip(start_index + 1)
+        .take(CHAT_PROVIDER_OPTIONS.len() - 1)
+        .copied()
+        .collect()
+}
+
+fn build_attempt_plan(
+    provider: &str,
+    runtime_config: &LlmRuntimeConfig,
+) -> Result<Vec<ProviderAttempt>, String> {
+    let provider = provider.trim();
+    let mut attempts = resolve_attempts_for_provider(provider, runtime_config)?;
+
+    if provider == "siliconflow_pro" {
+        return Ok(attempts);
+    }
+
+    for fallback_provider in fallback_provider_order(provider) {
+        match resolve_attempts_for_provider(fallback_provider, runtime_config) {
+            Ok(mut fallback_attempts) => attempts.append(&mut fallback_attempts),
+            Err(err) => {
+                eprintln!("Skipping fallback provider {fallback_provider}: {err}");
+            }
+        }
+    }
+
+    Ok(attempts)
+}
+
 #[tauri::command]
 pub async fn chat_with_llm_provider(
     app: tauri::AppHandle,
@@ -340,24 +449,96 @@ pub async fn chat_with_llm_provider(
     runtime_config: Option<LlmRuntimeConfig>,
 ) -> Result<String, String> {
     let runtime_config = runtime_config.unwrap_or_default();
-    let resolved = resolve_provider(&provider, &runtime_config)?;
-    let messages = build_messages(&flow_args, resolved.prompt_role);
+    let request_id = flow_args.request_id.clone();
+    let attempts = build_attempt_plan(&provider, &runtime_config)?;
+    let total_attempts = attempts.len();
+    let mut errors = Vec::new();
+    let mut timeout_triggered = false;
 
-    call_model_api(
-        app,
-        ModelRequest {
-            model: resolved.model,
-            messages,
-            base_url: resolved.base_url,
-            api_key: resolved.api_key,
-            max_tokens: resolved.max_tokens,
-            temperature: resolved.temperature,
-            enable_thinking: resolved.enable_thinking,
-        },
-        flow_args.request_id,
-    )
-    .await
-    .map_err(|error| error.to_string())
+    for (attempt_index, attempt) in attempts.into_iter().enumerate() {
+        if attempt_index > 0 && provider != "siliconflow_pro" && !timeout_triggered {
+            break;
+        }
+
+        if let Some(id) = request_id.as_ref() {
+            let event_name = format!("llm_meta_{id}");
+            if let Err(err) = app.emit(
+                &event_name,
+                ResolvedModelEvent {
+                    attempt: attempt_index + 1,
+                    provider: attempt.provider.clone(),
+                    model: attempt.resolved.model.clone(),
+                },
+            ) {
+                eprintln!("Failed to emit resolved LLM model event: {err}");
+            }
+        }
+
+        let messages = build_messages(&flow_args, attempt.resolved.prompt_role);
+        let model_name = attempt.resolved.model.clone();
+        let provider_name = attempt.provider.clone();
+
+        match call_model_api(
+            app.clone(),
+            ModelRequest {
+                model: model_name.clone(),
+                messages,
+                base_url: attempt.resolved.base_url,
+                api_key: attempt.resolved.api_key,
+                max_tokens: attempt.resolved.max_tokens,
+                temperature: attempt.resolved.temperature,
+                enable_thinking: attempt.resolved.enable_thinking,
+            },
+            request_id.clone(),
+        )
+        .await
+        {
+            Ok(result) => return Ok(result),
+            Err(ModelError::Timeout) => {
+                timeout_triggered = true;
+                errors.push(format!(
+                    "attempt={} provider={} model={} timeout=3s",
+                    attempt_index + 1,
+                    provider_name,
+                    model_name
+                ));
+
+                if attempt_index + 1 < total_attempts {
+                    eprintln!(
+                        "LLM timeout after 3s, switching to next model: provider={provider_name} model={model_name}"
+                    );
+                    continue;
+                }
+            }
+            Err(err) => {
+                let detail = format!(
+                    "attempt={} provider={} model={} error={}",
+                    attempt_index + 1,
+                    provider_name,
+                    model_name,
+                    err
+                );
+
+                if attempt_index == 0 && provider != "siliconflow_pro" && !timeout_triggered {
+                    return Err(detail);
+                }
+
+                errors.push(detail);
+                if attempt_index + 1 < total_attempts {
+                    eprintln!(
+                        "LLM fallback attempt failed, trying next candidate: provider={provider_name} model={model_name}"
+                    );
+                    continue;
+                }
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Err("没有可用的 LLM 候选模型".to_string())
+    } else {
+        Err(errors.join(" | "))
+    }
 }
 
 pub async fn siliconflow_pro_with_model(
