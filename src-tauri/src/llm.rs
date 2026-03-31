@@ -385,9 +385,11 @@ fn resolve_attempts_for_provider(
         return ordered_siliconflow_pro_models()
             .into_iter()
             .map(|model| {
-                resolve_siliconflow_provider(runtime_config, model).map(|resolved| ProviderAttempt {
-                    provider: provider.to_string(),
-                    resolved,
+                resolve_siliconflow_provider(runtime_config, model).map(|resolved| {
+                    ProviderAttempt {
+                        provider: provider.to_string(),
+                        resolved,
+                    }
                 })
             })
             .collect();
