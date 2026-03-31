@@ -4,9 +4,9 @@
 use crate::RESAMPLE_RATE;
 use crate::provider_config::TranscriptRuntimeConfig;
 use crate::transcript_vendors::{
-    PcmCallback, StatusCallback, StreamingTranscriber, TranscriptVendors,
-    assemblyai::AssemblyAiTranscriber, deepgram_api::DeepgramApiTranscriber,
-    gladia::GladiaTranscriber, revai::RevAiTranscriber, speechmatics::SpeechmaticsTranscriber,
+    PcmCallback, SelectedDeepgramTranscriber, StatusCallback, StreamingTranscriber,
+    TranscriptVendors, assemblyai::AssemblyAiTranscriber, gladia::GladiaTranscriber,
+    revai::RevAiTranscriber, speechmatics::SpeechmaticsTranscriber,
 };
 use crate::utils::{is_dev, resample_audio_with_rubato, select_output_config, write_some_log};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -222,7 +222,7 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
             Some(transcriber)
         }
         (TranscriptVendors::DeepGram, Some(callback)) => {
-            let transcriber = DeepgramApiTranscriber::start(
+            let transcriber = SelectedDeepgramTranscriber::start(
                 stream_sample_rate,
                 callback,
                 status_callback.clone(),

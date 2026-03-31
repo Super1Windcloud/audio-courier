@@ -1,12 +1,26 @@
 use serde::Serialize;
 use std::str::FromStr;
 use std::sync::Arc;
+
+#[cfg(all(feature = "api", feature = "sdk"))]
+compile_error!("Deepgram features 'api' and 'sdk' are mutually exclusive. Enable only one.");
+
+#[cfg(not(any(feature = "api", feature = "sdk")))]
+compile_error!("One Deepgram feature must be enabled. Use 'api' or 'sdk'.");
+
 pub mod assemblyai;
+#[cfg(feature = "api")]
 pub mod deepgram_api;
+#[cfg(feature = "sdk")]
 pub mod deepgram_sdk;
 pub mod gladia;
 pub mod revai;
 pub mod speechmatics;
+
+#[cfg(all(feature = "api", not(feature = "sdk")))]
+pub use deepgram_api::DeepgramApiTranscriber as SelectedDeepgramTranscriber;
+#[cfg(all(feature = "sdk", not(feature = "api")))]
+pub use deepgram_sdk::DeepgramTranscriber as SelectedDeepgramTranscriber;
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
