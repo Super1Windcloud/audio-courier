@@ -303,10 +303,12 @@ const useAppStateStore = create<AppStateStore>()(
 					return persistedState as PersistedAppConfigState;
 				}
 
-				const { envProviderPresets: _ignored, ...rest } =
-					persistedState as PersistedAppConfigState & {
+				const rest = {
+					...(persistedState as PersistedAppConfigState & {
 						envProviderPresets?: ProviderEnvPresets;
-					};
+					}),
+				};
+				delete rest.envProviderPresets;
 
 				return rest;
 			},

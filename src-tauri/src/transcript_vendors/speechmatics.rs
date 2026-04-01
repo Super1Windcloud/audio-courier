@@ -208,6 +208,7 @@ async fn run_session(
 
     let (termination_tx, mut termination_rx) = watch::channel(false);
     let (started_tx, mut started_rx) = watch::channel(false);
+    let utterance_buffer = Arc::new(AsyncMutex::new(String::new()));
     let last_partial = Arc::new(AsyncMutex::new(None::<String>));
     let eos_sent = Arc::new(AtomicBool::new(false));
 
@@ -293,6 +294,7 @@ async fn run_session(
         let callback = callback.clone();
         let termination_tx = termination_tx.clone();
         let started_tx = started_tx.clone();
+        let utterance_buffer = utterance_buffer.clone();
         let last_partial = last_partial.clone();
         let eos_sent = eos_sent.clone();
         let stop_requested = stop_requested.clone();
@@ -323,20 +325,38 @@ async fn run_session(
                             "AddPartialTranscript" | "AddPartialTranslation" => {
                                 if let Some(text) = extract_payload_text(&value) {
                                     *last_partial.lock().await = Some(text.clone());
-                                    emit_draft(&callback, "SpeechMatics", &text);
+                                    let draft = {
+                                        let buffer = utterance_buffer.lock().await;
+                                        merge_segments(&buffer, &text)
+                                    };
+                                    emit_draft(&callback, "SpeechMatics", draft);
                                 }
                             }
                             "AddTranscript" | "AddTranslation" => {
                                 if let Some(text) = extract_payload_text(&value) {
+                                    {
+                                        let mut buffer = utterance_buffer.lock().await;
+                                        append_utterance_segment(&mut buffer, &text);
+                                        emit_draft(&callback, "SpeechMatics", buffer.trim());
+                                    }
                                     *last_partial.lock().await = None;
-                                    emit_commit(&callback, "SpeechMatics", &text);
                                 }
                             }
                             "EndOfUtterance" => {
-                                flush_last_partial_as_final(&callback, &last_partial).await;
+                                flush_current_utterance(
+                                    &callback,
+                                    &utterance_buffer,
+                                    &last_partial,
+                                )
+                                .await;
                             }
                             "EndOfTranscript" => {
-                                flush_last_partial_as_final(&callback, &last_partial).await;
+                                flush_current_utterance(
+                                    &callback,
+                                    &utterance_buffer,
+                                    &last_partial,
+                                )
+                                .await;
                                 let _ = termination_tx.send(true);
                                 if eos_sent.load(Ordering::SeqCst)
                                     || stop_requested.load(Ordering::SeqCst)
@@ -358,7 +378,7 @@ async fn run_session(
                     }
                     Message::Close(_) => {
                         let _ = termination_tx.send(true);
-                        flush_last_partial_as_final(&callback, &last_partial).await;
+                        flush_current_utterance(&callback, &utterance_buffer, &last_partial).await;
                         if eos_sent.load(Ordering::SeqCst) || stop_requested.load(Ordering::SeqCst)
                         {
                             return Ok::<(), String>(());
@@ -370,7 +390,7 @@ async fn run_session(
             }
 
             let _ = termination_tx.send(true);
-            flush_last_partial_as_final(&callback, &last_partial).await;
+            flush_current_utterance(&callback, &utterance_buffer, &last_partial).await;
             if eos_sent.load(Ordering::SeqCst) || stop_requested.load(Ordering::SeqCst) {
                 Ok::<(), String>(())
             } else {
@@ -437,20 +457,129 @@ fn extract_payload_text(value: &Value) -> Option<String> {
 }
 
 async fn flush_last_partial_as_final(
+    utterance_buffer: &Arc<AsyncMutex<String>>,
+    last_partial: &Arc<AsyncMutex<Option<String>>>,
+) -> Option<String> {
+    let partial = last_partial.lock().await.take();
+    let mut buffer = utterance_buffer.lock().await;
+    if let Some(text) = partial {
+        append_utterance_segment(&mut buffer, &text);
+    }
+
+    let final_text = buffer.trim().to_string();
+    buffer.clear();
+
+    if final_text.is_empty() {
+        None
+    } else {
+        Some(final_text)
+    }
+}
+
+async fn flush_current_utterance(
     callback: &PcmCallback,
+    utterance_buffer: &Arc<AsyncMutex<String>>,
     last_partial: &Arc<AsyncMutex<Option<String>>>,
 ) {
-    if let Some(text) = last_partial.lock().await.take() {
-        let trimmed = text.trim();
-        if !trimmed.is_empty() {
-            emit_commit(callback, "SpeechMatics", trimmed);
+    if let Some(text) = flush_last_partial_as_final(utterance_buffer, last_partial).await {
+        emit_commit(callback, "SpeechMatics", text);
+    }
+}
+
+fn append_utterance_segment(buffer: &mut String, segment: &str) {
+    let segment = segment.trim();
+    if segment.is_empty() {
+        return;
+    }
+
+    if buffer.is_empty() {
+        buffer.push_str(segment);
+        return;
+    }
+
+    if should_join_without_space(buffer, segment) {
+        buffer.push_str(segment);
+    } else {
+        buffer.push(' ');
+        buffer.push_str(segment);
+    }
+}
+
+fn merge_segments(prefix: &str, suffix: &str) -> String {
+    let prefix = prefix.trim();
+    let suffix = suffix.trim();
+
+    match (prefix.is_empty(), suffix.is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => prefix.to_string(),
+        (true, false) => suffix.to_string(),
+        (false, false) => {
+            if should_join_without_space(prefix, suffix) {
+                format!("{prefix}{suffix}")
+            } else {
+                format!("{prefix} {suffix}")
+            }
         }
     }
 }
 
+fn should_join_without_space(prefix: &str, suffix: &str) -> bool {
+    let Some(last) = prefix.chars().next_back() else {
+        return true;
+    };
+    let Some(first) = suffix.chars().next() else {
+        return true;
+    };
+
+    last.is_whitespace()
+        || first.is_whitespace()
+        || is_cjk(last)
+        || is_cjk(first)
+        || is_spacing_punctuation(last)
+        || is_spacing_punctuation(first)
+}
+
+fn is_cjk(ch: char) -> bool {
+    matches!(
+        ch as u32,
+        0x4E00..=0x9FFF
+            | 0x3400..=0x4DBF
+            | 0x3040..=0x30FF
+            | 0xAC00..=0xD7AF
+            | 0xF900..=0xFAFF
+    )
+}
+
+fn is_spacing_punctuation(ch: char) -> bool {
+    matches!(
+        ch,
+        ',' | '.'
+            | '!'
+            | '?'
+            | ':'
+            | ';'
+            | ')'
+            | ']'
+            | '}'
+            | '，'
+            | '。'
+            | '！'
+            | '？'
+            | '：'
+            | '；'
+            | '）'
+            | '】'
+            | '」'
+            | '、'
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{build_start_recognition_payload, extract_payload_text};
+    use super::{
+        append_utterance_segment, build_start_recognition_payload, extract_payload_text,
+        merge_segments,
+    };
     use serde_json::json;
 
     #[test]
@@ -499,5 +628,22 @@ mod tests {
             extract_payload_text(&value),
             Some("ni hao world".to_string())
         );
+    }
+
+    #[test]
+    fn merge_segments_includes_prior_final_text_for_partial_drafts() {
+        assert_eq!(
+            merge_segments("hello world", "again"),
+            "hello world again".to_string()
+        );
+    }
+
+    #[test]
+    fn append_utterance_segment_keeps_cjk_compact() {
+        let mut buffer = String::new();
+        append_utterance_segment(&mut buffer, "你好");
+        append_utterance_segment(&mut buffer, "世界");
+
+        assert_eq!(buffer, "你好世界".to_string());
     }
 }

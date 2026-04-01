@@ -34,6 +34,14 @@ function toUtcIsoString(value: string) {
 	return date.toISOString();
 }
 
+function parseActivationRequest(value: string) {
+	try {
+		return JSON.parse(value) as ActivationRequest;
+	} catch {
+		return null;
+	}
+}
+
 interface LicenseSignerAppProps {
 	embedded?: boolean;
 }
@@ -54,11 +62,7 @@ export function LicenseSignerApp({
 
 	let parsedRequest: ActivationRequest | null = null;
 	if (requestJson.trim()) {
-		try {
-			parsedRequest = JSON.parse(requestJson) as ActivationRequest;
-		} catch {
-			parsedRequest = null;
-		}
+		parsedRequest = parseActivationRequest(requestJson);
 	}
 
 	const loadSignerStatus = useCallback(async () => {
@@ -223,12 +227,8 @@ export function LicenseSignerApp({
 								onChange={(event) => {
 									setRequestJson(event.target.value);
 									if (!userId.trim()) {
-										try {
-											const request = JSON.parse(
-												event.target.value,
-											) as ActivationRequest;
-											setUserId(request.userId ?? "");
-										} catch {}
+										const request = parseActivationRequest(event.target.value);
+										setUserId(request?.userId ?? "");
 									}
 								}}
 								rows={9}

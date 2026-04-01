@@ -66,6 +66,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	);
 
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const wasRecordingRef = useRef(recordingState);
 	const lastSubmittedRef = useRef<{ text: string; at: number } | null>(null);
 	const MIN_RECORDING_DURATION = 3000;
@@ -115,17 +116,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	useEffect(() => {
 		if (!finalTranscript.trim()) return;
 
-		if (remoteModelVendor === "assemblyai") {
-			handleSend(finalTranscript);
-			return () => undefined;
-		}
-
 		if (timeoutRef.current) {
 			clearTimeout(timeoutRef.current);
 		}
 
 		let timeout: number;
-		if (remoteModelVendor === "gladia") {
+		if (remoteModelVendor === "assemblyai") {
+			timeout = 0;
+		} else if (remoteModelVendor === "gladia") {
 			timeout = 100;
 		} else if (
 			remoteModelVendor === "deepgram" ||
@@ -150,6 +148,40 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 			handleSend();
 		}
 	};
+
+	const handleGlobalSendShortcut = useEffectEvent((event: KeyboardEvent) => {
+		if (event.key !== "Enter" || !event.shiftKey || event.isComposing) {
+			return;
+		}
+
+		const activeElement = document.activeElement;
+		if (activeElement === textareaRef.current) {
+			return;
+		}
+
+		if (
+			activeElement instanceof HTMLInputElement ||
+			activeElement instanceof HTMLTextAreaElement ||
+			activeElement instanceof HTMLSelectElement ||
+			activeElement?.getAttribute("contenteditable") === "true"
+		) {
+			return;
+		}
+
+		event.preventDefault();
+		handleSend();
+	});
+
+	useEffect(() => {
+		const onKeyDown = (event: KeyboardEvent) => {
+			handleGlobalSendShortcut(event);
+		};
+
+		window.addEventListener("keydown", onKeyDown);
+		return () => {
+			window.removeEventListener("keydown", onKeyDown);
+		};
+	}, []);
 
 	useEffect(() => {
 		if (!recordingState || recordingStartedAt === null) {
@@ -234,6 +266,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		>
 			<div className="flex border-none items-center space-x-2">
 				<Textarea
+					ref={textareaRef}
 					value={inputText}
 					onChange={(e) => {
 						setInputText(e.target.value);

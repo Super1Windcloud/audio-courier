@@ -8,7 +8,9 @@ export async function copyText(value: string): Promise<boolean> {
 			await navigator.clipboard.writeText(value);
 			return true;
 		}
-	} catch {}
+	} catch {
+		// Fall back to the legacy copy path below when Clipboard API is unavailable.
+	}
 
 	if (typeof document === "undefined") {
 		return false;
