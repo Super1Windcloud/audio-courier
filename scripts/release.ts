@@ -241,7 +241,10 @@ async function publishRelease(version: string) {
 
 	return {
 		tagName,
-		uploadedAssets: [...artifactContext.uploads.map((item) => item.name), "latest.json"],
+		uploadedAssets: [
+			...artifactContext.uploads.map((item) => item.name),
+			"latest.json",
+		],
 	};
 }
 
