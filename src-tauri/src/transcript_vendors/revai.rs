@@ -148,7 +148,7 @@ async fn run_stream(
     stop_requested: Arc<AtomicBool>,
 ) -> Result<(), String> {
     const BASE_URL: &str = "wss://api.rev.ai/speechtotext/v1/stream";
-    const MAX_CONNECTION_WAIT_SECONDS: u32 = 60;
+    const MAX_CONNECTION_WAIT_SECONDS: u32 = 600;
 
     let content_type =
         format!("audio/x-raw;layout=interleaved;rate={sample_rate};format=S16LE;channels=1");
@@ -160,6 +160,7 @@ async fn run_stream(
             "max_connection_wait_seconds".to_string(),
             MAX_CONNECTION_WAIT_SECONDS.to_string(),
         ),
+        ("max_segment_duration_seconds".to_string(), 5.to_string()),
     ];
 
     if let Some(language) = language.as_ref() {

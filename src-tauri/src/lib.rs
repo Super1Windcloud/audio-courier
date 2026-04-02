@@ -20,6 +20,7 @@ pub use llm::*;
 use log::{error, info, warn};
 pub use loopback::*;
 use provider_config::{ProviderEnvPresets, provider_env_presets_from_env};
+pub use provider_config::{TranscriptRuntimeConfig, transcript_runtime_config_from_env};
 use std::path::PathBuf;
 use tauri::LogicalSize;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};

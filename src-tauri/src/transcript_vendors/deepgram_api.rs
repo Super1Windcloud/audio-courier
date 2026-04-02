@@ -395,7 +395,7 @@ fn normalize_language(value: Option<&str>) -> Option<String> {
 
 fn select_model(language: Option<&str>) -> &'static str {
     match normalize_language(language).as_deref() {
-        Some("zh") | Some("zh-CN") | None => "nova-2",
+        Some("zh") | Some("zh-CN") | None => "nova-3",
         _ => "nova-3",
     }
 }

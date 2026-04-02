@@ -1,7 +1,7 @@
 #![allow(clippy::collapsible_if)]
 
 ///https://www.assemblyai.com/docs/api-reference/streaming-api/universal-streaming/universal-streaming
-///
+/// Not set  inactivity_timeout, will no inactivity timeout is applied.
 use crate::provider_config::{TranscriptRuntimeConfig, resolve_required_string};
 use crate::transcript_vendors::{
     PcmCallback, StatusCallback, StreamingTranscriber, emit_commit, emit_draft,

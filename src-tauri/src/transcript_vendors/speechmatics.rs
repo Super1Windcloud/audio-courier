@@ -27,7 +27,7 @@ use tokio_tungstenite::{
 const DEFAULT_RT_URL: &str = "wss://eu2.rt.speechmatics.com/v2/";
 const DEFAULT_LANGUAGE: &str = "en";
 const END_OF_UTTERANCE_SILENCE_TRIGGER: f32 = 0.5;
-const MAX_DELAY_SECONDS: f32 = 1.5;
+const MAX_DELAY_SECONDS: f32 = 0.7;
 
 enum StreamCommand {
     Audio(Vec<u8>),

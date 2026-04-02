@@ -227,7 +227,7 @@ fn build_stream_options(language: Option<&str>) -> Options {
 
     builder = builder.smart_format(false);
     builder = if select_language == Language::zh || select_language == Language::zh_CN {
-        builder.model(Model::Nova2)
+        builder.model(Model::Nova3)
     } else {
         builder.model(Model::Nova3)
     };
