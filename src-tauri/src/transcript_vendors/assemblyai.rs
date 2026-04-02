@@ -141,9 +141,7 @@ async fn run_stream(
     let (termination_tx, mut termination_rx) = watch::channel(false);
 
     let send_audio = async {
-        let mut heartbeat = time::interval(std::time::Duration::from_secs(
-            HEARTBEAT_INTERVAL_SECS,
-        ));
+        let mut heartbeat = time::interval(std::time::Duration::from_secs(HEARTBEAT_INTERVAL_SECS));
         heartbeat.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
         loop {
@@ -415,19 +413,7 @@ fn normalize_transcript_dedup_key(input: &str) -> String {
 fn is_dedup_ignorable_punctuation(ch: char) -> bool {
     matches!(
         ch,
-        '.' | ','
-            | '!'
-            | '?'
-            | ':'
-            | ';'
-            | '，'
-            | '。'
-            | '！'
-            | '？'
-            | '：'
-            | '；'
-            | '、'
-            | '…'
+        '.' | ',' | '!' | '?' | ':' | ';' | '，' | '。' | '！' | '？' | '：' | '；' | '、' | '…'
     )
 }
 
