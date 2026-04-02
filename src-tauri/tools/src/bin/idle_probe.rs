@@ -1,5 +1,4 @@
 use inquire::Select;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -14,7 +13,8 @@ const PROBE_DURATION: Duration = Duration::from_secs(180);
 const SAMPLE_RATE: u32 = 16_000;
 
 fn main() {
-    load_env();
+    dotenv::from_filename("../.env").ok();
+    dotenv::dotenv().ok();
 
     let vendor = Select::new(
         "请选择要测试的供应商:",
@@ -103,12 +103,6 @@ fn main() {
             println!("disconnect_reason=<none>");
         }
     }
-}
-
-fn load_env() {
-    let env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".env");
-    let _ = dotenv::from_filename(&env_path);
-    let _ = dotenv::dotenv();
 }
 
 fn start_transcriber(

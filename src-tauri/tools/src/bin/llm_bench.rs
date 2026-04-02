@@ -36,6 +36,7 @@ fn build_request_id(label: &str, iteration: usize) -> String {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    dotenv::from_filename("../.env").ok();
     dotenv::dotenv().ok();
     println!("LLM 启动耗时基准测试, 每个模型运行 {RUNS_PER_MODEL} 次");
 

@@ -18,6 +18,11 @@ autotests = false
 autoexamples = true
 autobenches = false
 
+[features]
+default = ["api"]
+api = []
+sdk = []
+
 [lib]
 name = "tauri_courier_ai_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
@@ -85,10 +90,7 @@ tauri-plugin-updater = "2.10.0"
 
 
 
-[features]
-default = ["api"]
-api = []
-sdk = []
+
 
 [dev-dependencies]
 

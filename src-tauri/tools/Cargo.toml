@@ -1,0 +1,15 @@
+[package]
+name = "audio-courier-tools"
+version = "1.0.10"
+edition = "2024"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri_courier_ai_lib = { package = "audio-courier", path = ".." }
+tauri = { version = "2", features = ["devtools"] }
+tokio = { version = "1.50.0", features = ["rt-multi-thread", "macros", "rt"] }
+dotenv = "0.15.0"
+inquire = "0.9.4"

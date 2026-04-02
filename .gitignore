@@ -33,3 +33,4 @@ scripts/test_1.pcm
 macro
 assets
 .vite
+.cargo-target
