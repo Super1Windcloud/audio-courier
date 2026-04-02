@@ -18,6 +18,13 @@ use tokio::time::{self, MissedTickBehavior};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tungstenite::client::{ClientRequestBuilder, IntoClientRequest};
 
+const BASE_URL: &str = "wss://streaming.assemblyai.com/v3/ws";
+const SPEECH_MODEL: &str = "whisper-rt";
+const AUDIO_ENCODING: &str = "pcm_s16le";
+const MIN_TURN_SILENCE_MS: u32 = 600;
+const INACTIVITY_TIMEOUT_SECS: u32 = 3600;
+const HEARTBEAT_INTERVAL_SECS: u64 = 20;
+
 enum StreamCommand {
     Audio(Vec<i16>),
     ForceEndpoint,
@@ -111,13 +118,6 @@ async fn run_stream(
     mut shutdown_rx: oneshot::Receiver<()>,
     stop_requested: Arc<AtomicBool>,
 ) -> Result<(), String> {
-    const BASE_URL: &str = "wss://streaming.assemblyai.com/v3/ws";
-    const SPEECH_MODEL: &str = "whisper-rt";
-    const AUDIO_ENCODING: &str = "pcm_s16le";
-    const MIN_TURN_SILENCE_MS: u32 = 600;
-    const INACTIVITY_TIMEOUT_SECS: u32 = 3600;
-    const HEARTBEAT_INTERVAL_SECS: u64 = 20;
-
     let query = format!(
         "sample_rate={sample_rate}&speech_model={SPEECH_MODEL}&encoding={AUDIO_ENCODING}&format_turns=true&min_turn_silence={MIN_TURN_SILENCE_MS}&inactivity_timeout={INACTIVITY_TIMEOUT_SECS}"
     );

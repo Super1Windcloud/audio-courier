@@ -46,6 +46,9 @@ pub struct RevAiTranscriber {
     stop_requested: Arc<AtomicBool>,
 }
 
+const BASE_URL: &str = "wss://api.rev.ai/speechtotext/v1/stream";
+const MAX_CONNECTION_WAIT_SECONDS: u32 = 600;
+const MAX_SEGMENT_DURATION_SECONDS: u32 = 5;
 const MAX_RECONNECT_ATTEMPTS: u32 = 3;
 const MAX_RECONNECT_BACKOFF_SECS: u64 = 5;
 const HEARTBEAT_INTERVAL_SECS: u64 = 20;
@@ -198,9 +201,6 @@ async fn stream_once(
     mut shutdown_rx: &mut oneshot::Receiver<()>,
     stop_requested: Arc<AtomicBool>,
 ) -> Result<(), String> {
-    const BASE_URL: &str = "wss://api.rev.ai/speechtotext/v1/stream";
-    const MAX_CONNECTION_WAIT_SECONDS: u32 = 600;
-
     let content_type =
         format!("audio/x-raw;layout=interleaved;rate={sample_rate};format=S16LE;channels=1");
 
@@ -216,7 +216,10 @@ async fn stream_once(
     ];
 
     if matches!(normalized_language.as_deref(), Some("en") | Some("es")) {
-        params.push(("max_segment_duration_seconds".to_string(), 5.to_string()));
+        params.push((
+            "max_segment_duration_seconds".to_string(),
+            MAX_SEGMENT_DURATION_SECONDS.to_string(),
+        ));
     }
 
     if let Some(language) = language {

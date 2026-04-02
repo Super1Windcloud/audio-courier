@@ -10,6 +10,7 @@ import {
 } from "@/types/provider.ts";
 
 let traditionalChineseConverter: ((content: string) => string) | null = null;
+let hasShownStartRecognitionToast = false;
 
 interface TranscriptEvent {
 	vendor: string;
@@ -52,9 +53,12 @@ export async function startAudioLoopbackRecognition(
 	const vendorLabel =
 		TRANSCRIBE_VENDOR_LABELS[selectedAsrVendor as TranscribeVendor] ??
 		selectedAsrVendor;
-	toast.message("开始转录", {
-		description: `当前使用 ${vendorLabel}`,
-	});
+	if (!hasShownStartRecognitionToast) {
+		toast.message("开始转录", {
+			description: `当前使用 ${vendorLabel}`,
+		});
+		hasShownStartRecognitionToast = true;
+	}
 
 	const transcriptProviderSettings =
 		useAppStateStore.getState().transcriptProviderSettings;
@@ -103,6 +107,7 @@ export async function startAudioLoopbackRecognition(
 	}).catch((err) => {
 		console.error("invoke start output audio recognition failed", err);
 		logError("invoke start output audio recognition failed", err);
+		hasShownStartRecognitionToast = false;
 		toast.error(`invoke start audio capture err${err}`);
 		const appState = useAppStateStore.getState();
 		if (appState.isRecording) {
@@ -119,6 +124,7 @@ export async function stopAudioLoopbackRecognition() {
 			toast.error(`invoke stop audio capture err${err}`);
 		},
 	);
+	hasShownStartRecognitionToast = false;
 
 	if (unlistener) {
 		unlistener();

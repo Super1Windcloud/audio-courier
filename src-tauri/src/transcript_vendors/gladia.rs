@@ -38,6 +38,12 @@ pub struct GladiaTranscriber {
 
 const RECEIVE_PARTIAL_TRANSCRIPTS: bool = true;
 const RECEIVE_FINAL_TRANSCRIPTS: bool = true;
+const DEFAULT_MODEL: &str = "solaria-1";
+const SESSION_AUDIO_ENCODING: &str = "wav/pcm";
+const SESSION_BIT_DEPTH: u8 = 16;
+const SESSION_CHANNELS: u8 = 1;
+const SESSION_ENDPOINTING_SECS: f32 = 0.05;
+const SESSION_MAX_DURATION_WITHOUT_ENDPOINTING_SECS: u32 = 60;
 const HEARTBEAT_INTERVAL_SECS: u64 = 20;
 const IDLE_SILENCE_INTERVAL_SECS: u64 = 15;
 const IDLE_SILENCE_CHUNK_MS: u32 = 100;
@@ -62,7 +68,7 @@ impl GladiaTranscriber {
         let model = resolve_string_or_default(
             transcript_config.gladia_model.as_deref(),
             &["GLADIA_MODEL"],
-            "solaria-1",
+            DEFAULT_MODEL,
         );
 
         let (sender, receiver) = mpsc::channel::<Vec<i16>>(64);
@@ -480,12 +486,12 @@ async fn create_live_session(
         });
 
     let request_body = LiveSessionRequest {
-        encoding: "wav/pcm",
-        bit_depth: 16,
+        encoding: SESSION_AUDIO_ENCODING,
+        bit_depth: SESSION_BIT_DEPTH,
         sample_rate,
-        channels: 1,
-        endpointing: 0.05,
-        maximum_duration_without_endpointing: 60,
+        channels: SESSION_CHANNELS,
+        endpointing: SESSION_ENDPOINTING_SECS,
+        maximum_duration_without_endpointing: SESSION_MAX_DURATION_WITHOUT_ENDPOINTING_SECS,
         model: model.to_string(),
         language_config,
         messages_config: MessagesConfig {
