@@ -475,10 +475,11 @@ fn device_parts() -> Result<Vec<String>, String> {
 
     #[cfg(target_os = "macos")]
     {
-        let hardware_uuid = read_command_output("ioreg", &["-rd1", "-c", "IOPlatformExpertDevice"])?
-            .lines()
-            .collect::<Vec<_>>()
-            .join("\n");
+        let hardware_uuid =
+            read_command_output("ioreg", &["-rd1", "-c", "IOPlatformExpertDevice"])?
+                .lines()
+                .collect::<Vec<_>>()
+                .join("\n");
         let hardware_uuid = extract_quoted_value(&hardware_uuid, "IOPlatformUUID")
             .ok_or_else(|| "读取 macOS Hardware UUID 失败".to_string())?;
         parts.push(hardware_uuid);
@@ -511,7 +512,11 @@ fn read_command_output(command: &str, args: &[&str]) -> Result<String, String> {
         return Err(format!(
             "{} 返回非零状态: {}",
             command,
-            if stderr.is_empty() { "unknown error" } else { &stderr }
+            if stderr.is_empty() {
+                "unknown error"
+            } else {
+                &stderr
+            }
         ));
     }
 
