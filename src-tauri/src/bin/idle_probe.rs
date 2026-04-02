@@ -42,7 +42,10 @@ fn main() {
         }
     };
 
-    println!("idle probe started vendor={vendor} duration={}s", PROBE_DURATION.as_secs());
+    println!(
+        "idle probe started vendor={vendor} duration={}s",
+        PROBE_DURATION.as_secs()
+    );
     println!("No audio chunks will be sent.");
 
     let started_at = Instant::now();
@@ -55,7 +58,9 @@ fn main() {
             break;
         }
 
-        let wait_for = PROBE_DURATION.saturating_sub(elapsed).min(Duration::from_secs(1));
+        let wait_for = PROBE_DURATION
+            .saturating_sub(elapsed)
+            .min(Duration::from_secs(1));
 
         match status_rx.recv_timeout(wait_for) {
             Ok(message) => {
@@ -113,41 +118,22 @@ fn start_transcriber(
     status_callback: StatusCallback,
 ) -> Result<Box<dyn StreamingTranscriber>, String> {
     match vendor {
-        "assemblyai" => AssemblyAiTranscriber::start(
-            SAMPLE_RATE,
-            callback,
-            Some(status_callback),
-            config,
-        )
-        .map(|transcriber| Box::new(transcriber) as Box<dyn StreamingTranscriber>),
-        "deepgram" => SelectedDeepgramTranscriber::start(
-            SAMPLE_RATE,
-            callback,
-            Some(status_callback),
-            config,
-        )
-        .map(|transcriber| Box::new(transcriber) as Box<dyn StreamingTranscriber>),
-        "gladia" => GladiaTranscriber::start(
-            SAMPLE_RATE,
-            callback,
-            Some(status_callback),
-            config,
-        )
-        .map(|transcriber| Box::new(transcriber) as Box<dyn StreamingTranscriber>),
-        "revai" => RevAiTranscriber::start(
-            SAMPLE_RATE,
-            callback,
-            Some(status_callback),
-            config,
-        )
-        .map(|transcriber| Box::new(transcriber) as Box<dyn StreamingTranscriber>),
-        "speechmatics" => SpeechmaticsTranscriber::start(
-            SAMPLE_RATE,
-            callback,
-            Some(status_callback),
-            config,
-        )
-        .map(|transcriber| Box::new(transcriber) as Box<dyn StreamingTranscriber>),
+        "assemblyai" => {
+            AssemblyAiTranscriber::start(SAMPLE_RATE, callback, Some(status_callback), config)
+                .map(|transcriber| Box::new(transcriber) as Box<dyn StreamingTranscriber>)
+        }
+        "deepgram" => {
+            SelectedDeepgramTranscriber::start(SAMPLE_RATE, callback, Some(status_callback), config)
+                .map(|transcriber| Box::new(transcriber) as Box<dyn StreamingTranscriber>)
+        }
+        "gladia" => GladiaTranscriber::start(SAMPLE_RATE, callback, Some(status_callback), config)
+            .map(|transcriber| Box::new(transcriber) as Box<dyn StreamingTranscriber>),
+        "revai" => RevAiTranscriber::start(SAMPLE_RATE, callback, Some(status_callback), config)
+            .map(|transcriber| Box::new(transcriber) as Box<dyn StreamingTranscriber>),
+        "speechmatics" => {
+            SpeechmaticsTranscriber::start(SAMPLE_RATE, callback, Some(status_callback), config)
+                .map(|transcriber| Box::new(transcriber) as Box<dyn StreamingTranscriber>)
+        }
         _ => Err(format!("unsupported vendor: {vendor}")),
     }
 }
