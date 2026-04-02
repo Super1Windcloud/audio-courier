@@ -411,7 +411,7 @@ async fn create_live_session(
         bit_depth: 16,
         sample_rate,
         channels: 1,
-        endpointing: 0.4,
+        endpointing: 0.05,
         maximum_duration_without_endpointing: 60,
         model: model.to_string(),
         language_config,
