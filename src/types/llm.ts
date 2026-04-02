@@ -57,7 +57,7 @@ export const HOTKEYS: HotkeyHelpItem[] = [
 	{
 		label: "快速发送",
 		combo: "Shift+Enter",
-		description: "输入框未聚焦时发送当前消息",
+		description: "Rust 全局快捷键，发送当前消息",
 	},
 	{
 		label: "开发者工具",
