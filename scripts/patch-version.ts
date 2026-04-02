@@ -7,9 +7,6 @@ const packageJsonPath = path.join(rootDir, "package.json");
 const tauriConfigPath = path.join(rootDir, "src-tauri", "tauri.conf.json");
 const cargoTomlPath = path.join(rootDir, "src-tauri", "Cargo.toml");
 
-// 👇 通过命令参数控制
-const mode = process.argv[2]; // "up" | "down"
-
 void main().catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
@@ -47,13 +44,7 @@ async function main() {
   }
 
   const currentVersion = packageJson.version;
-
-  let nextVersion: string;
-  if (mode === "down") {
-    nextVersion = decrementPatchVersion(currentVersion);
-  } else {
-    nextVersion = bumpPatchVersion(currentVersion);
-  }
+  const nextVersion = decrementPatchVersion(currentVersion);
 
   packageJson.version = nextVersion;
   tauriConfig.version = nextVersion;
@@ -77,17 +68,7 @@ async function main() {
     writeFile(cargoTomlPath, nextCargoToml, "utf8"),
   ]);
 
-  console.log(`version changed: ${currentVersion} -> ${nextVersion}`);
-}
-
-function bumpPatchVersion(version: string) {
-  const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
-  if (!match) {
-    throw new Error(`unsupported version format: ${version}`);
-  }
-
-  const [, major, minor, patch] = match;
-  return `${major}.${minor}.${Number.parseInt(patch, 10) + 1}`;
+  console.log(`version rollback: ${currentVersion} -> ${nextVersion}`);
 }
 
 function decrementPatchVersion(version: string) {
