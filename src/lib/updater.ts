@@ -3,6 +3,17 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { toast } from "sonner";
 
 export const OPEN_UPDATER_DIALOG_EVENT = "audio-courier:open-updater-dialog";
+// Keep this in sync with src-tauri/tauri.conf.json plugin updater endpoints.
+export const UPDATER_ENDPOINTS = [
+	"https://raw.githubusercontent.com/Super1Windcloud/audio-courier/main/updater/latest.json",
+] as const;
+
+interface UpdaterManifest {
+	version?: string;
+	notes?: string;
+	pub_date?: string;
+	platforms?: Record<string, unknown>;
+}
 
 export function formatBytes(bytes?: number) {
 	if (!bytes || Number.isNaN(bytes)) {
@@ -22,6 +33,20 @@ export function toErrorMessage(error: unknown) {
 
 export async function checkForUpdate() {
 	return await check();
+}
+
+export async function fetchUpdaterManifest(
+	endpoint = UPDATER_ENDPOINTS[0],
+): Promise<UpdaterManifest | null> {
+	const response = await fetch(endpoint, {
+		cache: "no-store",
+	});
+
+	if (!response.ok) {
+		throw new Error(`updater manifest request failed: ${response.status}`);
+	}
+
+	return (await response.json()) as UpdaterManifest;
 }
 
 export async function downloadAndInstallUpdate(

@@ -193,11 +193,14 @@ export function mergeLlmApiKeyPresetsIntoSettings(
 	currentSettings: LlmProviderSettings,
 	presetSettings: LlmProviderSettings,
 ) {
-	const nextSettings = { ...currentSettings };
+	const nextSettings = {
+		...normalizeLlmProviderSettings(currentSettings),
+	};
+	const normalizedPresetSettings = normalizeLlmProviderSettings(presetSettings);
 
 	for (const field of LLM_API_KEY_FIELDS) {
-		if (hasConfiguredValue(presetSettings[field])) {
-			nextSettings[field] = presetSettings[field];
+		if (hasConfiguredValue(normalizedPresetSettings[field])) {
+			nextSettings[field] = normalizedPresetSettings[field];
 		}
 	}
 
@@ -220,7 +223,11 @@ export function normalizeProviderEnvPresets(
 	};
 }
 
-export function hasConfiguredValue(value: string) {
+export function hasConfiguredValue(value: unknown) {
+	if (typeof value !== "string") {
+		return false;
+	}
+
 	return value.trim().length > 0;
 }
 

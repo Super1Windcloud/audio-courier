@@ -167,11 +167,9 @@ function App() {
 
 	const checkForUpdates = useEffectEvent(
 		async (source: "startup" | "manual") => {
-			const [currentVersion, update, manifestResult] = await Promise.allSettled([
-				getVersion(),
-				checkForUpdate(),
-				fetchUpdaterManifest(),
-			]);
+			const [currentVersion, update, manifestResult] = await Promise.allSettled(
+				[getVersion(), checkForUpdate(), fetchUpdaterManifest()],
+			);
 
 			if (currentVersion.status !== "fulfilled") {
 				throw currentVersion.reason;
@@ -183,7 +181,7 @@ function App() {
 
 			const manifestVersion =
 				manifestResult.status === "fulfilled"
-					? manifestResult.value?.version ?? "unknown"
+					? (manifestResult.value?.version ?? "unknown")
 					: `unavailable (${toErrorMessage(manifestResult.reason)})`;
 			const availableVersion = update.value?.version ?? "none";
 
