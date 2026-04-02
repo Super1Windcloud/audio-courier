@@ -201,22 +201,13 @@ async function publishRelease(version: string) {
 		releaseName,
 		releaseBody,
 	});
-	await deleteManagedReleaseAssets({
+	await deleteSupersededReleaseAssets({
 		token,
 		release,
-		keepNames: new Set([
-			...artifactContext.uploads.map((item) => item.name),
-			"latest.json",
-		]),
+		artifacts: artifactContext.artifacts,
 	});
 
 	for (const upload of artifactContext.uploads) {
-		await deleteReleaseAssetByName({
-			token,
-			release,
-			name: upload.name,
-		});
-
 		await uploadReleaseAsset({
 			token,
 			release,
@@ -224,12 +215,12 @@ async function publishRelease(version: string) {
 		});
 	}
 
-	const nextLatest = {
+	const nextLatest = mergeLatestJson(await readLatestJson(), {
 		version,
 		notes: releaseBody,
 		pub_date: new Date().toISOString(),
 		platforms: artifactContext.platformEntries,
-	};
+	});
 
 	await writeLatestJson(nextLatest);
 
@@ -238,10 +229,19 @@ async function publishRelease(version: string) {
 		release,
 		name: "latest.json",
 	});
+	await uploadReleaseAsset({
+		token,
+		release,
+		upload: {
+			name: "latest.json",
+			contentType: contentTypeFor(updaterMetadataPath),
+			buffer: await readFile(updaterMetadataPath),
+		},
+	});
 
 	return {
 		tagName,
-		uploadedAssets: artifactContext.uploads.map((item) => item.name),
+		uploadedAssets: [...artifactContext.uploads.map((item) => item.name), "latest.json"],
 	};
 }
 
@@ -350,6 +350,7 @@ async function collectArtifacts(input: {
 
 	if (allArtifacts.length === 0) {
 		return {
+			artifacts: [] as CollectedArtifact[],
 			uploads: [] as UploadAsset[],
 			platformEntries: {} as Record<string, PlatformEntry>,
 		};
@@ -429,6 +430,7 @@ async function collectArtifacts(input: {
 	) as Record<string, PlatformEntry>;
 
 	return {
+		artifacts: allArtifacts,
 		uploads,
 		platformEntries: manifestEntries,
 	};
@@ -658,6 +660,32 @@ async function writeLatestJson(content: LatestJson) {
 	);
 }
 
+async function readLatestJson() {
+	try {
+		const raw = await readFile(updaterMetadataPath, "utf8");
+		return JSON.parse(raw) as LatestJson;
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+			return null;
+		}
+
+		throw error;
+	}
+}
+
+function mergeLatestJson(
+	current: LatestJson | null,
+	next: LatestJson,
+): LatestJson {
+	return {
+		...next,
+		platforms: {
+			...(current?.platforms ?? {}),
+			...next.platforms,
+		},
+	};
+}
+
 async function listReleaseAssets(input: {
 	token: string;
 	release: GitHubRelease;
@@ -670,25 +698,26 @@ async function listReleaseAssets(input: {
 	return response.json ?? [];
 }
 
-async function deleteManagedReleaseAssets(input: {
+async function deleteSupersededReleaseAssets(input: {
 	token: string;
 	release: GitHubRelease;
-	keepNames: Set<string>;
+	artifacts: PreferredArtifact[];
 }) {
 	input.release.assets = await listReleaseAssets({
 		token: input.token,
 		release: input.release,
 	});
-
-	const keepNames = new Set(
-		[...input.keepNames].flatMap((name) => [
-			name,
-			sanitizeGitHubAssetName(name),
-		]),
+	const supersededKinds = new Set(
+		input.artifacts.map((artifact) => `${artifact.platform}:${artifact.kind}`),
 	);
 
 	for (const asset of input.release.assets) {
-		if (keepNames.has(asset.name) || !isManagedReleaseAssetName(asset.name)) {
+		const identity = releaseAssetIdentity(asset.name);
+		if (!identity) {
+			continue;
+		}
+
+		if (!supersededKinds.has(`${identity.platform}:${identity.kind}`)) {
 			continue;
 		}
 
@@ -856,8 +885,12 @@ function isManagedReleaseAssetName(name: string) {
 		return true;
 	}
 
+	return releaseAssetIdentity(name) !== null;
+}
+
+function releaseAssetIdentity(name: string) {
 	const normalizedName = name.endsWith(".sig") ? name.slice(0, -4) : name;
-	return classifyArtifact(normalizedName, null) !== null;
+	return classifyArtifact(normalizedName, null);
 }
 
 function releaseAssetDeleteUrl(release: GitHubRelease, assetId: number) {
