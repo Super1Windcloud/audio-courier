@@ -14,7 +14,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
 use tokio::runtime::Runtime;
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{Mutex as AsyncMutex, mpsc, oneshot, watch};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tungstenite::client::{ClientRequestBuilder, IntoClientRequest};
 
@@ -190,6 +190,7 @@ async fn run_stream(
 
         async move {
             let mut last_emitted: Option<(bool, String)> = None;
+            let utterance_buffer = Arc::new(AsyncMutex::new(String::new()));
 
             while let Some(message) = stream.next().await {
                 let message = message.map_err(|e| {
@@ -221,9 +222,20 @@ async fn run_stream(
 
                                     last_emitted = Some(next_event);
                                     if is_final {
-                                        emit_commit(&callback, "AssemblyAI", trimmed);
+                                        let draft = {
+                                            let mut buffer = utterance_buffer.lock().await;
+                                            append_utterance_segment(&mut buffer, trimmed);
+                                            buffer.trim().to_string()
+                                        };
+                                        emit_draft(&callback, "AssemblyAI", &draft);
+                                        emit_commit(&callback, "AssemblyAI", &draft);
+                                        utterance_buffer.lock().await.clear();
                                     } else {
-                                        emit_draft(&callback, "AssemblyAI", trimmed);
+                                        let draft = {
+                                            let buffer = utterance_buffer.lock().await;
+                                            merge_segments(&buffer, trimmed)
+                                        };
+                                        emit_draft(&callback, "AssemblyAI", &draft);
                                     }
                                 }
                             }
@@ -346,6 +358,94 @@ fn first_non_empty_text<'a>(value: &'a Value, fields: &[&str]) -> Option<&'a str
     })
 }
 
+fn append_utterance_segment(buffer: &mut String, segment: &str) {
+    let segment = segment.trim();
+    if segment.is_empty() {
+        return;
+    }
+
+    if buffer.is_empty() {
+        buffer.push_str(segment);
+        return;
+    }
+
+    if should_join_without_space(buffer, segment) {
+        buffer.push_str(segment);
+    } else {
+        buffer.push(' ');
+        buffer.push_str(segment);
+    }
+}
+
+fn merge_segments(prefix: &str, suffix: &str) -> String {
+    let prefix = prefix.trim();
+    let suffix = suffix.trim();
+
+    match (prefix.is_empty(), suffix.is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => prefix.to_string(),
+        (true, false) => suffix.to_string(),
+        (false, false) => {
+            if should_join_without_space(prefix, suffix) {
+                format!("{prefix}{suffix}")
+            } else {
+                format!("{prefix} {suffix}")
+            }
+        }
+    }
+}
+
+fn should_join_without_space(prefix: &str, suffix: &str) -> bool {
+    let Some(last) = prefix.chars().next_back() else {
+        return true;
+    };
+    let Some(first) = suffix.chars().next() else {
+        return true;
+    };
+
+    last.is_whitespace()
+        || first.is_whitespace()
+        || is_cjk(last)
+        || is_cjk(first)
+        || is_spacing_punctuation(last)
+        || is_spacing_punctuation(first)
+}
+
+fn is_cjk(ch: char) -> bool {
+    matches!(
+        ch as u32,
+        0x4E00..=0x9FFF
+            | 0x3400..=0x4DBF
+            | 0x3040..=0x30FF
+            | 0xAC00..=0xD7AF
+            | 0xF900..=0xFAFF
+    )
+}
+
+fn is_spacing_punctuation(ch: char) -> bool {
+    matches!(
+        ch,
+        ',' | '.'
+            | '!'
+            | '?'
+            | ':'
+            | ';'
+            | ')'
+            | ']'
+            | '}'
+            | '，'
+            | '。'
+            | '！'
+            | '？'
+            | '：'
+            | '；'
+            | '）'
+            | '】'
+            | '」'
+            | '、'
+    )
+}
+
 impl StreamingTranscriber for AssemblyAiTranscriber {
     fn queue_chunk(&self, chunk: Vec<i16>) -> Result<(), String> {
         self.enqueue_chunk(chunk)
@@ -362,5 +462,59 @@ impl StreamingTranscriber for AssemblyAiTranscriber {
     fn shutdown(&self) {
         self.stop();
         println!("AssemblyAI websocket shutdown invoked");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        append_utterance_segment, extract_plain_transcripts, extract_turn_transcripts,
+        merge_segments,
+    };
+    use serde_json::json;
+
+    #[test]
+    fn turn_transcript_marks_non_final_turns_as_draft() {
+        let value = json!({
+            "type": "Turn",
+            "utterance": "hello world",
+            "end_of_turn": false
+        });
+
+        assert_eq!(
+            extract_turn_transcripts(&value),
+            vec![("hello world".to_string(), false)]
+        );
+    }
+
+    #[test]
+    fn plain_transcript_respects_final_flags() {
+        let value = json!({
+            "type": "PartialTranscript",
+            "text": "hello world",
+            "turn_is_final": true
+        });
+
+        assert_eq!(
+            extract_plain_transcripts(&value, false),
+            vec![("hello world".to_string(), true)]
+        );
+    }
+
+    #[test]
+    fn merge_segments_includes_prior_final_text_for_partial_drafts() {
+        assert_eq!(
+            merge_segments("hello world", "again"),
+            "hello world again".to_string()
+        );
+    }
+
+    #[test]
+    fn append_utterance_segment_keeps_cjk_compact() {
+        let mut buffer = String::new();
+        append_utterance_segment(&mut buffer, "你好");
+        append_utterance_segment(&mut buffer, "世界");
+
+        assert_eq!(buffer, "你好世界".to_string());
     }
 }
