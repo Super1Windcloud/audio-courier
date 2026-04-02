@@ -59,6 +59,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const wasRecordingRef = useRef(recordingState);
 	const lastSubmittedRef = useRef<{ text: string; at: number } | null>(null);
+	const recordingBaseInputRef = useRef("");
+	const committedTranscriptRef = useRef("");
+	const draftTranscriptRef = useRef("");
 	const MIN_RECORDING_DURATION = 3000;
 	const DUPLICATE_SEND_GUARD_MS = 2000;
 	const canStopRecording =
@@ -66,6 +69,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		recordingStartedAt === null ||
 		recordingTimerStamp - recordingStartedAt >= MIN_RECORDING_DURATION;
 	const recordingTitle = canStopRecording ? "停止语音" : "录音中...3秒后可停止";
+
+	const composeTranscriptInput = useCallback(() => {
+		return `${recordingBaseInputRef.current}${committedTranscriptRef.current}${draftTranscriptRef.current}`;
+	}, []);
+
+	const resetTranscriptComposition = useCallback(() => {
+		recordingBaseInputRef.current = "";
+		committedTranscriptRef.current = "";
+		draftTranscriptRef.current = "";
+	}, []);
 
 	const handleSend = useCallback(
 		(overrideText?: string) => {
@@ -90,7 +103,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 				lastSubmittedRef.current = { text: normalizedText, at: now };
 				updateQuestionState(text);
 				onSendMessage(text);
-				setInputText((current) => (current === text ? "" : current));
+				setInputText((current) => {
+					if (current === text) {
+						resetTranscriptComposition();
+						return "";
+					}
+
+					return current;
+				});
 			}
 		},
 		[
@@ -98,6 +118,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 			isAuthorized,
 			normalizeTranscriptForDuplicateGuard,
 			onSendMessage,
+			resetTranscriptComposition,
 			updateQuestionState,
 		],
 	);
@@ -132,6 +153,19 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		handleSend();
 	});
 
+	const focusTextarea = useCallback(() => {
+		if (!isAuthorized || recordingState) {
+			return;
+		}
+
+		const textarea = textareaRef.current;
+		if (!textarea || document.activeElement === textarea) {
+			return;
+		}
+
+		textarea.focus();
+	}, [isAuthorized, recordingState]);
+
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
 			handleGlobalSendShortcut(event);
@@ -142,6 +176,21 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 			window.removeEventListener("keydown", onKeyDown);
 		};
 	}, []);
+
+	useEffect(() => {
+		const handlePointerOverWindow = (event: MouseEvent) => {
+			if (event.relatedTarget !== null) {
+				return;
+			}
+
+			focusTextarea();
+		};
+
+		window.addEventListener("mouseover", handlePointerOverWindow);
+		return () => {
+			window.removeEventListener("mouseover", handlePointerOverWindow);
+		};
+	}, [focusTextarea]);
 
 	useEffect(() => {
 		if (!recordingState || recordingStartedAt === null) {
@@ -182,10 +231,19 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	};
 
 	const startRecordingEffect = useEffectEvent(() => {
+		recordingBaseInputRef.current = inputText;
+		committedTranscriptRef.current = "";
+		draftTranscriptRef.current = "";
+
 		void startAudioRecognition(
-			setInputText,
 			(message) => {
-				setInputText(message);
+				draftTranscriptRef.current = message;
+				setInputText(composeTranscriptInput());
+			},
+			(message) => {
+				committedTranscriptRef.current += message;
+				draftTranscriptRef.current = "";
+				setInputText(composeTranscriptInput());
 			},
 			currentAudioChannel,
 			remoteModelVendor,
@@ -195,6 +253,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	});
 
 	const stopRecordingEffect = useEffectEvent(() => {
+		draftTranscriptRef.current = "";
 		void stopAudioRecognition(currentAudioChannel);
 	});
 
@@ -211,6 +270,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	}, [recordingState, setIsTyping]);
 
 	const handleClearConversation = () => {
+		resetTranscriptComposition();
 		setInputText("");
 
 		onClearConversation();
@@ -227,7 +287,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 					ref={textareaRef}
 					value={inputText}
 					onChange={(e) => {
-						setInputText(e.target.value);
+						const nextValue = e.target.value;
+						recordingBaseInputRef.current = nextValue;
+						committedTranscriptRef.current = "";
+						draftTranscriptRef.current = "";
+						setInputText(nextValue);
 						e.currentTarget.style.height = "auto"; // 先重置
 						e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // 根据内容调整
 					}}

@@ -883,14 +883,6 @@ function sanitizeGitHubAssetName(name: string) {
 	return name.replace(/[^A-Za-z0-9._-]+/g, ".");
 }
 
-function isManagedReleaseAssetName(name: string) {
-	if (name === "latest.json") {
-		return true;
-	}
-
-	return releaseAssetIdentity(name) !== null;
-}
-
 function releaseAssetIdentity(name: string) {
 	const normalizedName = name.endsWith(".sig") ? name.slice(0, -4) : name;
 	return classifyArtifact(normalizedName, null);
