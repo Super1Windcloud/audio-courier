@@ -29,7 +29,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	setIsTyping,
 }) => {
 	const [inputText, setInputText] = useState("");
-	const [finalTranscript, setFinalTranscript] = useState("");
 	const [recordingTimerStamp, setRecordingTimerStamp] = useState(() =>
 		Date.now(),
 	);
@@ -53,19 +52,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	const shouldUseWaruls =
 		typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
 	const normalizeTranscriptForDuplicateGuard = useCallback(
-		(text: string) => {
-			if (remoteModelVendor !== "assemblyai") {
-				return text;
-			}
-
-			return text
-				.replace(/\s+/g, "")
-				.replace(/[。．.，,、！!？?；;：:“”"'‘’（）()[\]【】]+$/g, "");
-		},
-		[remoteModelVendor],
+		(text: string) => text,
+		[],
 	);
 
-	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const wasRecordingRef = useRef(recordingState);
 	const lastSubmittedRef = useRef<{ text: string; at: number } | null>(null);
@@ -101,7 +91,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 				updateQuestionState(text);
 				onSendMessage(text);
 				setInputText((current) => (current === text ? "" : current));
-				setFinalTranscript((current) => (current === text ? "" : current));
 			}
 		},
 		[
@@ -112,35 +101,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 			updateQuestionState,
 		],
 	);
-
-	useEffect(() => {
-		if (!finalTranscript.trim()) return;
-
-		if (timeoutRef.current) {
-			clearTimeout(timeoutRef.current);
-		}
-
-		let timeout: number;
-		if (remoteModelVendor === "assemblyai") {
-			timeout = 0;
-		} else if (remoteModelVendor === "gladia") {
-			timeout = 100;
-		} else if (
-			remoteModelVendor === "deepgram" ||
-			remoteModelVendor === "revai"
-		) {
-			timeout = 200;
-		} else {
-			timeout = 1000;
-		}
-		timeoutRef.current = setTimeout(() => {
-			handleSend(finalTranscript);
-		}, timeout);
-
-		return () => {
-			if (timeoutRef.current) clearTimeout(timeoutRef.current);
-		};
-	}, [finalTranscript, handleSend, remoteModelVendor]);
 
 	const handleKeyPress = (e: React.KeyboardEvent) => {
 		if (e.key === "Enter" && !e.shiftKey) {
@@ -226,7 +186,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 			setInputText,
 			(message) => {
 				setInputText(message);
-				setFinalTranscript(message);
 			},
 			currentAudioChannel,
 			remoteModelVendor,
@@ -253,7 +212,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
 	const handleClearConversation = () => {
 		setInputText("");
-		setFinalTranscript("");
 
 		onClearConversation();
 	};
@@ -270,7 +228,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 					value={inputText}
 					onChange={(e) => {
 						setInputText(e.target.value);
-						setFinalTranscript("");
 						e.currentTarget.style.height = "auto"; // 先重置
 						e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // 根据内容调整
 					}}
