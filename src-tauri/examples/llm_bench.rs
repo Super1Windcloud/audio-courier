@@ -59,21 +59,13 @@ async fn bench_base(app_handle: &AppHandle<Wry>) {
     }
 
     bench!("doubao_lite", doubao_lite, app_handle);
-    //总结 doubao_lite: 平均 0.54s | 最快 0.30s | 最慢 0.70s | 成功 10 | 失败 0
     bench!("doubao_pro", doubao_pro, app_handle);
-    //总结 doubao_pro: 平均 1.36s | 最快 0.68s | 最慢 2.26s | 成功 10 | 失败 0
     bench!("doubao_seed_flash", doubao_seed_flash, app_handle);
-    //总结 doubao_seed_flash: 平均 0.48s | 最快 0.36s | 最慢 0.77s | 成功 10 | 失败 0
     bench!("doubao_seed", doubao_seed, app_handle);
-    //总结 doubao_seed: 平均 0.99s | 最快 0.78s | 最慢 1.39s | 成功 10 | 失败 0
-    bench!("deepseek_api", deepseek_api, app_handle); // X
-    //总结 deepseek_api: 平均 0.90s | 最快 0.75s | 最慢 1.14s | 成功 10 | 失败 0
+    bench!("deepseek_api", deepseek_api, app_handle);
     bench!("ali_qwen_2_5", ali_qwen_2_5, app_handle);
-    //总结 ali_qwen_2_5: 平均 0.36s | 最快 0.31s | 最慢 0.42s | 成功 10 | 失败 0
     bench!("ali_qwen_plus_latest", ali_qwen_plus_latest, app_handle);
-    //总结 ali_qwen_plus_latest: 平均 0.46s | 最快 0.27s | 最慢 0.99s | 成功 10 | 失败 0
     bench!("ali_qwen_max", ali_qwen_max, app_handle);
-    //总结 ali_qwen_max: 平均 0.38s | 最快 0.29s | 最慢 0.57s | 成功 10 | 失败 0
 
     for &model in siliconflow_free_models() {
         let label = format!("siliconflow_free::{model}");
@@ -89,6 +81,7 @@ async fn bench_base(app_handle: &AppHandle<Wry>) {
         }
     }
 }
+
 async fn bench_models(app_handle: &AppHandle<Wry>) {
     bench_base(app_handle).await;
 

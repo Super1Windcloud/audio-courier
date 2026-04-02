@@ -12,10 +12,25 @@ homepage = "https://github.com/super1windcloud/audio-courier"
 repository = "https://github.com/super1windcloud/audio-courier"
 license = "GPL"
 default-run = "audio-courier"
+autobins = false
+autolib = true
+autotests = false
+autoexamples = true
+autobenches = false
 
 [lib]
 name = "tauri_courier_ai_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+path = "src/lib.rs"
+
+
+[[bin]]
+name = "audio-courier"
+path = "src/main.rs"
+
+[[bin]]
+name = "license_tool"
+path = "src/bin/license_tool.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -68,15 +83,12 @@ winreg = "0.56.0"
 tauri-plugin-updater = "2.10.0"
 
 
-[[bin]]
-name = "transfer"
-path = "src/bin/transfer.rs"
 
 
 [features]
-default= ["api"]
-api= []
-sdk= []
+default = ["api"]
+api = []
+sdk = []
 
 [dev-dependencies]
 
