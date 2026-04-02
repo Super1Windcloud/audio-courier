@@ -23,7 +23,9 @@ import { registryGlobalShortCuts, showWindow } from "@/lib/system.ts";
 import {
 	checkForUpdate,
 	downloadAndInstallUpdate,
+	fetchUpdaterManifest,
 	OPEN_UPDATER_DIALOG_EVENT,
+	toErrorMessage,
 } from "@/lib/updater.ts";
 import useAppStateStore from "@/stores";
 import type { LicenseStatus } from "@/types/license.ts";
@@ -165,27 +167,50 @@ function App() {
 
 	const checkForUpdates = useEffectEvent(
 		async (source: "startup" | "manual") => {
-			const [currentVersion, update] = await Promise.all([
+			const [currentVersion, update, manifestResult] = await Promise.allSettled([
 				getVersion(),
 				checkForUpdate(),
+				fetchUpdaterManifest(),
 			]);
-			const remoteVersion = update?.version ?? currentVersion;
+
+			if (currentVersion.status !== "fulfilled") {
+				throw currentVersion.reason;
+			}
+
+			if (update.status !== "fulfilled") {
+				throw update.reason;
+			}
+
+			const manifestVersion =
+				manifestResult.status === "fulfilled"
+					? manifestResult.value?.version ?? "unknown"
+					: `unavailable (${toErrorMessage(manifestResult.reason)})`;
+			const availableVersion = update.value?.version ?? "none";
+
 			console.log(
-				`[updater] ${source} current=${currentVersion} remote=${remoteVersion}`,
+				`[updater] ${source} current=${currentVersion.value} manifest=${manifestVersion} available=${availableVersion}`,
 			);
-			if (!update) {
-				console.log("[updater] no update available");
-				logInfo(`${source} updater: no update available`);
+			if (!update.value) {
+				console.log(
+					`[updater] ${source} plugin returned null current=${currentVersion.value} manifest=${manifestVersion}`,
+				);
+				logInfo(
+					`${source} updater: no update available current=${currentVersion.value} manifest=${manifestVersion}`,
+				);
 				if (source === "manual") {
-					toast.message("当前已是最新版本");
+					toast.message("未检测到可用更新", {
+						description: `当前版本 ${currentVersion.value}，manifest 版本 ${manifestVersion}`,
+					});
 				}
 				setAvailableUpdate(null);
 				setUpdateDialogOpen(false);
 				return;
 			}
 
-			logInfo(`${source} updater: found version ${update.version}`);
-			setAvailableUpdate(update);
+			logInfo(
+				`${source} updater: found version ${update.value.version} current=${currentVersion.value} manifest=${manifestVersion}`,
+			);
+			setAvailableUpdate(update.value);
 			setUpdateDialogOpen(true);
 			setIsInstallingUpdate(false);
 			setUpdateProgressDownloadedBytes(0);
