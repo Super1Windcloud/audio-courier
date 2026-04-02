@@ -20,6 +20,7 @@ use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
 use tokio::runtime::Runtime;
 use tokio::sync::{mpsc, mpsc::error::TrySendError, oneshot, watch};
+use tokio::time::{self, Duration, MissedTickBehavior};
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{
@@ -37,6 +38,10 @@ pub struct GladiaTranscriber {
 
 const RECEIVE_PARTIAL_TRANSCRIPTS: bool = true;
 const RECEIVE_FINAL_TRANSCRIPTS: bool = true;
+const HEARTBEAT_INTERVAL_SECS: u64 = 20;
+const IDLE_SILENCE_INTERVAL_SECS: u64 = 15;
+const IDLE_SILENCE_CHUNK_MS: u32 = 100;
+const MAX_RECONNECT_BACKOFF_SECS: u64 = 5;
 
 impl GladiaTranscriber {
     pub fn start(
@@ -148,6 +153,47 @@ async fn run_stream(
     stop_requested: Arc<AtomicBool>,
 ) -> Result<(), String> {
     let ws_url = create_live_session(&api_key, &model, sample_rate, language.as_deref()).await?;
+    let mut reconnect_attempt = 0_u32;
+
+    loop {
+        if stop_requested.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+
+        match stream_once(
+            &ws_url,
+            &api_key,
+            sample_rate,
+            &callback,
+            &mut audio_rx,
+            &mut shutdown_rx,
+            stop_requested.clone(),
+        )
+        .await
+        {
+            Ok(()) => return Ok(()),
+            Err(err) if !stop_requested.load(Ordering::SeqCst) => {
+                reconnect_attempt = reconnect_attempt.saturating_add(1);
+                let backoff_secs = (reconnect_attempt as u64).min(MAX_RECONNECT_BACKOFF_SECS);
+                eprintln!(
+                    "Gladia stream interrupted ({err}). Reconnecting to existing session in {backoff_secs}s..."
+                );
+                time::sleep(Duration::from_secs(backoff_secs)).await;
+            }
+            Err(err) => return Err(err),
+        }
+    }
+}
+
+async fn stream_once(
+    ws_url: &str,
+    api_key: &str,
+    sample_rate: u32,
+    callback: &PcmCallback,
+    audio_rx: &mut mpsc::Receiver<Vec<i16>>,
+    mut shutdown_rx: &mut oneshot::Receiver<()>,
+    stop_requested: Arc<AtomicBool>,
+) -> Result<(), String> {
     let uri: Uri = ws_url
         .parse()
         .map_err(|e| format!("Failed to parse Gladia websocket URI: {e}"))?;
@@ -164,8 +210,19 @@ async fn run_stream(
 
     let (mut sink, mut stream) = ws_stream.split();
     let (termination_tx, mut termination_rx) = watch::channel(false);
+    let callback = callback.clone();
 
     let send_audio = async move {
+        let mut heartbeat = time::interval(Duration::from_secs(HEARTBEAT_INTERVAL_SECS));
+        heartbeat.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        heartbeat.tick().await;
+
+        let idle_keepalive_samples =
+            ((sample_rate as u64 * IDLE_SILENCE_CHUNK_MS as u64) / 1000).max(1) as usize;
+        let idle_keepalive_chunk = vec![0_i16; idle_keepalive_samples];
+        let idle_keepalive = time::sleep(Duration::from_secs(IDLE_SILENCE_INTERVAL_SECS));
+        tokio::pin!(idle_keepalive);
+
         loop {
             tokio::select! {
                 _ = &mut shutdown_rx => break,
@@ -183,9 +240,25 @@ async fn run_stream(
                         sink.send(Message::Binary(audio_bytes.into()))
                             .await
                             .map_err(|e| format!("Failed to send audio chunk to Gladia: {e}"))?;
+                        idle_keepalive.as_mut().reset(time::Instant::now() + Duration::from_secs(IDLE_SILENCE_INTERVAL_SECS));
                     }
                     None => break,
                 },
+                _ = heartbeat.tick() => {
+                    sink.send(Message::Ping(Vec::new().into()))
+                        .await
+                        .map_err(|e| format!("Failed to send Gladia heartbeat ping: {e}"))?;
+                }
+                _ = &mut idle_keepalive => {
+                    let audio_bytes = idle_keepalive_chunk
+                        .iter()
+                        .flat_map(|sample| sample.to_le_bytes())
+                        .collect::<Vec<u8>>();
+                    sink.send(Message::Binary(audio_bytes.into()))
+                        .await
+                        .map_err(|e| format!("Failed to send Gladia idle silence chunk: {e}"))?;
+                    idle_keepalive.as_mut().reset(time::Instant::now() + Duration::from_secs(IDLE_SILENCE_INTERVAL_SECS));
+                }
             }
         }
 
