@@ -174,7 +174,10 @@ async fn run_stream(
         .await
         {
             Ok(()) => return Ok(()),
-            Err(err) if !stop_requested.load(Ordering::SeqCst) && should_retry_connection(&err, attempt) => {
+            Err(err)
+                if !stop_requested.load(Ordering::SeqCst)
+                    && should_retry_connection(&err, attempt) =>
+            {
                 attempt = attempt.saturating_add(1);
                 let backoff_secs = (attempt as u64).min(MAX_RECONNECT_BACKOFF_SECS);
                 eprintln!("RevAI stream interrupted ({err}). Retrying in {backoff_secs}s...");
@@ -449,9 +452,7 @@ async fn stream_once(
     Ok(())
 }
 
-fn describe_close_frame(
-    frame: Option<&tungstenite::protocol::CloseFrame>,
-) -> String {
+fn describe_close_frame(frame: Option<&tungstenite::protocol::CloseFrame>) -> String {
     match frame {
         Some(frame) => format!(
             "RevAI websocket closed unexpectedly (code={:?}, reason={})",
