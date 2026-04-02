@@ -473,11 +473,61 @@ fn device_parts() -> Result<Vec<String>, String> {
         parts.push(machine_guid);
     }
 
+    #[cfg(target_os = "macos")]
+    {
+        let hardware_uuid = read_command_output("ioreg", &["-rd1", "-c", "IOPlatformExpertDevice"])?
+            .lines()
+            .collect::<Vec<_>>()
+            .join("\n");
+        let hardware_uuid = extract_quoted_value(&hardware_uuid, "IOPlatformUUID")
+            .ok_or_else(|| "读取 macOS Hardware UUID 失败".to_string())?;
+        parts.push(hardware_uuid);
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let machine_id = fs::read_to_string("/etc/machine-id")
+            .or_else(|_| fs::read_to_string("/var/lib/dbus/machine-id"))
+            .map_err(|err| format!("读取 machine-id 失败: {}", err))?;
+        parts.push(machine_id.trim().to_string());
+    }
+
     if parts.iter().all(|part| part.trim().is_empty()) {
         return Err("无法生成设备指纹".to_string());
     }
 
     Ok(parts)
+}
+
+#[cfg(target_os = "macos")]
+fn read_command_output(command: &str, args: &[&str]) -> Result<String, String> {
+    let output = std::process::Command::new(command)
+        .args(args)
+        .output()
+        .map_err(|err| format!("执行 {} 失败: {}", command, err))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(format!(
+            "{} 返回非零状态: {}",
+            command,
+            if stderr.is_empty() { "unknown error" } else { &stderr }
+        ));
+    }
+
+    String::from_utf8(output.stdout).map_err(|err| format!("解析 {} 输出失败: {}", command, err))
+}
+
+#[cfg(target_os = "macos")]
+fn extract_quoted_value(output: &str, key: &str) -> Option<String> {
+    output.lines().find_map(|line| {
+        let key_index = line.find(key)?;
+        let value_part = &line[key_index + key.len()..];
+        let first_quote = value_part.find('"')?;
+        let rest = &value_part[first_quote + 1..];
+        let second_quote = rest.find('"')?;
+        Some(rest[..second_quote].trim().to_string())
+    })
 }
 
 fn signing_key_from_base64(raw: &str) -> Result<SigningKey, String> {
