@@ -4,6 +4,10 @@ import { toast } from "sonner";
 import { logError, logInfo } from "@/lib/logger.ts";
 import { setRecordingStateImmediately } from "@/lib/recordingState.ts";
 import useAppStateStore from "@/stores";
+import {
+	TRANSCRIBE_VENDOR_LABELS,
+	type TranscribeVendor,
+} from "@/types/provider.ts";
 
 let traditionalChineseConverter: ((content: string) => string) | null = null;
 
@@ -44,6 +48,13 @@ export async function startAudioLoopbackRecognition(
 		errorUnlistener();
 		errorUnlistener = null;
 	}
+
+	const vendorLabel =
+		TRANSCRIBE_VENDOR_LABELS[selectedAsrVendor as TranscribeVendor] ??
+		selectedAsrVendor;
+	toast.message("开始转录", {
+		description: `当前使用 ${vendorLabel}`,
+	});
 
 	const transcriptProviderSettings =
 		useAppStateStore.getState().transcriptProviderSettings;

@@ -21,6 +21,7 @@ use tauri::http::Uri;
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
 use tokio::sync::{Mutex as AsyncMutex, mpsc, oneshot, watch};
+use tokio::time::{self, Duration};
 #[cfg(target_os = "windows")]
 use tokio_tungstenite::tungstenite::{
     Error as WsError,
@@ -44,6 +45,12 @@ pub struct RevAiTranscriber {
     handle: Mutex<Option<JoinHandle<()>>>,
     stop_requested: Arc<AtomicBool>,
 }
+
+const MAX_RECONNECT_ATTEMPTS: u32 = 3;
+const MAX_RECONNECT_BACKOFF_SECS: u64 = 5;
+const HEARTBEAT_INTERVAL_SECS: u64 = 20;
+const IDLE_SILENCE_INTERVAL_SECS: u64 = 15;
+const IDLE_SILENCE_CHUNK_MS: u32 = 100;
 
 impl RevAiTranscriber {
     pub fn start(
@@ -147,31 +154,77 @@ async fn run_stream(
     mut shutdown_rx: oneshot::Receiver<()>,
     stop_requested: Arc<AtomicBool>,
 ) -> Result<(), String> {
+    let mut attempt = 0_u32;
+
+    loop {
+        if stop_requested.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+
+        match stream_once(
+            &api_key,
+            metadata.as_deref(),
+            language.as_deref(),
+            sample_rate,
+            &callback,
+            &mut audio_rx,
+            &mut shutdown_rx,
+            stop_requested.clone(),
+        )
+        .await
+        {
+            Ok(()) => return Ok(()),
+            Err(err) if !stop_requested.load(Ordering::SeqCst) && should_retry_connection(&err, attempt) => {
+                attempt = attempt.saturating_add(1);
+                let backoff_secs = (attempt as u64).min(MAX_RECONNECT_BACKOFF_SECS);
+                eprintln!("RevAI stream interrupted ({err}). Retrying in {backoff_secs}s...");
+                time::sleep(Duration::from_secs(backoff_secs)).await;
+            }
+            Err(err) => return Err(err),
+        }
+    }
+}
+
+async fn stream_once(
+    api_key: &str,
+    metadata: Option<&str>,
+    language: Option<&str>,
+    sample_rate: u32,
+    callback: &PcmCallback,
+    audio_rx: &mut mpsc::Receiver<Vec<i16>>,
+    mut shutdown_rx: &mut oneshot::Receiver<()>,
+    stop_requested: Arc<AtomicBool>,
+) -> Result<(), String> {
     const BASE_URL: &str = "wss://api.rev.ai/speechtotext/v1/stream";
     const MAX_CONNECTION_WAIT_SECONDS: u32 = 600;
 
     let content_type =
         format!("audio/x-raw;layout=interleaved;rate={sample_rate};format=S16LE;channels=1");
 
+    let normalized_language = language.map(|value| value.trim().to_ascii_lowercase());
+
     let mut params = vec![
-        ("access_token".to_string(), api_key),
+        ("access_token".to_string(), api_key.to_string()),
         ("content_type".to_string(), content_type),
         (
             "max_connection_wait_seconds".to_string(),
             MAX_CONNECTION_WAIT_SECONDS.to_string(),
         ),
-        ("max_segment_duration_seconds".to_string(), 5.to_string()),
     ];
 
-    if let Some(language) = language.as_ref() {
+    if matches!(normalized_language.as_deref(), Some("en") | Some("es")) {
+        params.push(("max_segment_duration_seconds".to_string(), 5.to_string()));
+    }
+
+    if let Some(language) = language {
         if !language.trim().is_empty() {
-            params.push(("language".to_string(), language.clone()));
+            params.push(("language".to_string(), language.to_string()));
         }
     }
 
-    if let Some(metadata) = metadata.as_ref() {
+    if let Some(metadata) = metadata {
         if !metadata.trim().is_empty() {
-            params.push(("metadata".to_string(), metadata.clone()));
+            params.push(("metadata".to_string(), metadata.to_string()));
         }
     }
 
@@ -206,9 +259,17 @@ async fn run_stream(
     let last_partial = Arc::new(AsyncMutex::new(None::<String>));
     let saw_final = Arc::new(AtomicBool::new(false));
 
+    let callback = callback.clone();
+
     let send_audio = async {
         let mut should_send_stop = true;
         let eos_sent = eos_sent.clone();
+        let mut heartbeat = time::interval(Duration::from_secs(HEARTBEAT_INTERVAL_SECS));
+        let idle_keepalive_samples =
+            ((sample_rate as u64 * IDLE_SILENCE_CHUNK_MS as u64) / 1000).max(1) as usize;
+        let idle_keepalive_chunk = vec![0_i16; idle_keepalive_samples];
+        let idle_keepalive = time::sleep(Duration::from_secs(IDLE_SILENCE_INTERVAL_SECS));
+        tokio::pin!(idle_keepalive);
 
         loop {
             if *connected_rx.borrow() {
@@ -250,9 +311,26 @@ async fn run_stream(
                         sink.send(Message::Binary(audio_bytes.into()))
                             .await
                             .map_err(|e| format!("Failed to send audio chunk to RevAI: {e}"))?;
+                        idle_keepalive.as_mut().reset(time::Instant::now() + Duration::from_secs(IDLE_SILENCE_INTERVAL_SECS));
                     }
                     None => break,
                 },
+                _ = heartbeat.tick() => {
+                    sink.send(Message::Ping(Vec::new().into()))
+                        .await
+                        .map_err(|e| format!("Failed to send RevAI heartbeat ping: {e}"))?;
+                }
+                _ = &mut idle_keepalive => {
+                    let audio_bytes = idle_keepalive_chunk
+                        .iter()
+                        .flat_map(|sample| sample.to_le_bytes())
+                        .collect::<Vec<u8>>();
+
+                    sink.send(Message::Binary(audio_bytes.into()))
+                        .await
+                        .map_err(|e| format!("Failed to send RevAI idle silence chunk: {e}"))?;
+                    idle_keepalive.as_mut().reset(time::Instant::now() + Duration::from_secs(IDLE_SILENCE_INTERVAL_SECS));
+                }
             }
         }
 
@@ -345,7 +423,7 @@ async fn run_stream(
                             flush_last_partial_as_final(&callback, &last_partial, &saw_final).await;
                             break;
                         }
-                        return Err("RevAI websocket closed unexpectedly".into());
+                        return Err(describe_close_frame(frame.as_ref()));
                     }
                     _ => {}
                 }
@@ -359,7 +437,7 @@ async fn run_stream(
 
             if !stop_requested.load(Ordering::SeqCst) {
                 let _ = termination_tx.send(true);
-                return Err("RevAI websocket closed unexpectedly".into());
+                return Err("RevAI websocket closed unexpectedly without a close frame".into());
             }
 
             let _ = termination_tx.send(true);
@@ -369,6 +447,34 @@ async fn run_stream(
 
     try_join(send_audio, receive_events).await?;
     Ok(())
+}
+
+fn describe_close_frame(
+    frame: Option<&tungstenite::protocol::CloseFrame>,
+) -> String {
+    match frame {
+        Some(frame) => format!(
+            "RevAI websocket closed unexpectedly (code={:?}, reason={})",
+            frame.code, frame.reason
+        ),
+        None => "RevAI websocket closed unexpectedly without a close frame".to_string(),
+    }
+}
+
+fn should_retry_connection(err: &str, attempt: u32) -> bool {
+    if attempt >= MAX_RECONNECT_ATTEMPTS {
+        return false;
+    }
+
+    err.contains("Failed to connect to RevAI")
+        || err.contains("RevAI receive error")
+        || err.contains("closed unexpectedly without a close frame")
+        || err.contains("code=ServiceRestart")
+        || err.contains("code=Abnormal")
+        || err.contains("code=Error")
+        || err.contains("code=Again")
+        || err.contains("code=4006")
+        || err.contains("code=4013")
 }
 
 async fn flush_last_partial_as_final(
