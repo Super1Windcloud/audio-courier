@@ -8,7 +8,7 @@ import Foundation
 struct SystemAudioDump {
   static func main() async {
     do {
-      print("Starting SystemAudioDump...")
+      log("Starting SystemAudioDump...")
 
       // Parse CLI arguments
       let arguments = Array(CommandLine.arguments.dropFirst())
@@ -36,48 +36,47 @@ struct SystemAudioDump {
         index += 1
       }
       if let wavURL = wavOutputURL {
-        print("WAV output enabled: \(wavURL.path)")
+        log("WAV output enabled: \(wavURL.path)")
       }
 
       // Check if we have screen recording permission
-      print("Checking permissions...")
+      log("Checking permissions...")
       let canRecord = CGPreflightScreenCaptureAccess()
       if !canRecord {
-        print("❌ Screen recording permission required!")
-        print("Please go to System Preferences > Security & Privacy > Privacy > Screen Recording")
-        print("and enable access for this application.")
+        log("Screen recording permission required")
+        log("Please enable screen recording access for this application in System Settings")
 
         // Request permission
         let granted = CGRequestScreenCaptureAccess()
         if !granted {
-          print("Permission denied. Exiting.")
+          log("Permission denied. Exiting.")
           exit(1)
         }
       }
-      print("✅ Permissions OK")
+      log("Permissions OK")
 
-      print("Getting shareable content...")
+      log("Getting shareable content...")
       let content = try await SCShareableContent.excludingDesktopWindows(
         false,
         onScreenWindowsOnly: true)
       guard let display = content.displays.first else {
         fatalError("No display found")
       }
-      print("Found display: \(display)")
+      log("Found display: \(display)")
 
       // 2) Build a filter for that display (video is ignored below)
       let filter = SCContentFilter(
         display: display,
         excludingApplications: [],  // don't exclude any
         exceptingWindows: [])
-      print("Created filter")
+      log("Created filter")
 
       // 3) Build a stream config that only captures audio
       let cfg = SCStreamConfiguration()
       cfg.capturesAudio = true
       cfg.captureMicrophone = false
       cfg.excludesCurrentProcessAudio = true  // don't capture our own output
-      print("Created configuration")
+      log("Created configuration")
 
       // 4) Create and start the stream
       let dumper = try AudioDumper(wavOutputURL: wavOutputURL)
@@ -85,30 +84,30 @@ struct SystemAudioDump {
         filter: filter,
         configuration: cfg,
         delegate: dumper)
-      print("Created stream")
+      log("Created stream")
 
       // only install audio output
       try stream.addStreamOutput(
         dumper,
         type: .audio,
         sampleHandlerQueue: DispatchQueue(label: "audio"))
-      print("Added stream output")
+      log("Added stream output")
 
       try await stream.startCapture()
-      print("Started capture")
+      log("Started capture")
 
       await MainActor.run {
-        print("✅ Capturing system audio. Press ⌃C to stop.", to: &standardError)
+        log("Capturing system audio. Press Ctrl+C to stop.")
       }
 
       // keep the process alive with a safer approach
-      print("Entering main loop...")
+      log("Entering main loop...")
 
       // Set up signal handling for graceful shutdown
       signal(SIGINT, SIG_IGN)
       let sigintSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
       sigintSource.setEventHandler {
-        print("Received SIGINT, shutting down...")
+        log("Received SIGINT, shutting down...")
         dumper.stop()
         exit(0)
       }
@@ -192,9 +191,9 @@ final class AudioDumper: NSObject, SCStreamDelegate, SCStreamOutput {
           }
           outputFormat = targetFormat
           converter = AVAudioConverter(from: srcFormat, to: targetFormat)
-          print(
+          log(
             """
-            🔊 Audio Capture Format:
+            Audio Capture Format:
               Source: \(srcFormat.sampleRate) Hz, \(srcFormat.channelCount) channels, \(srcFormat.commonFormat == .pcmFormatFloat32 ? "Float32" : "Other")
               Target: \(targetFormat.sampleRate) Hz, \(targetFormat.channelCount) channels, \(targetFormat.commonFormat == .pcmFormatInt16 ? "Int16" : "Other")
             """)
@@ -384,12 +383,8 @@ final class WAVFileWriter {
   }
 }
 
-// Helper to print to stderr
-@MainActor var standardError = FileHandle.standardError
-extension FileHandle: @retroactive TextOutputStream {
-  public func write(_ string: String) {
-    if let data = string.data(using: .utf8) {
-      self.write(data)
-    }
+func log(_ message: String) {
+  if let data = "\(message)\n".data(using: .utf8) {
+    FileHandle.standardError.write(data)
   }
 }

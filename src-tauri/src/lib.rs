@@ -5,6 +5,8 @@ mod constant;
 pub mod license;
 mod llm;
 mod loopback;
+#[cfg(target_os = "macos")]
+mod macos_system_audio;
 mod provider_config;
 mod transcript_vendors;
 mod utils;
