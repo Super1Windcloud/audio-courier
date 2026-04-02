@@ -32,4 +32,36 @@ export const MODEL_LABELS: Record<ModelOption, string> = {
 	custom_openai: "自定义 OpenAI 兼容",
 };
 
-export const HOTKEYS = ["显示/隐藏 Ctrl+Shift+`", "切换录音 Alt+Space"];
+export interface HotkeyHelpItem {
+	label: string;
+	combo: string;
+	description: string;
+}
+
+export const HOTKEYS: HotkeyHelpItem[] = [
+	{
+		label: "显示/隐藏窗口",
+		combo: "Ctrl+Shift+`",
+		description: "全局快捷键",
+	},
+	{
+		label: "切换录音",
+		combo: "Alt+Space",
+		description: "全局快捷键",
+	},
+	{
+		label: "发送消息",
+		combo: "Enter",
+		description: "输入框聚焦时发送，Shift+Enter 换行",
+	},
+	{
+		label: "快速发送",
+		combo: "Shift+Enter",
+		description: "输入框未聚焦时发送当前消息",
+	},
+	{
+		label: "开发者工具",
+		combo: "Ctrl+F12",
+		description: "全局快捷键",
+	},
+];

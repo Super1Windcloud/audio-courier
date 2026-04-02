@@ -280,13 +280,23 @@ export function MoreMenu() {
 						>
 							快捷键
 						</DropdownMenuSubTrigger>
-						<DropdownMenuSubContent className="w-48 bg-gray-600 text-white border-0">
-							{HOTKEYS.map((key) => (
+						<DropdownMenuSubContent className="w-72 bg-gray-600 text-white border-0">
+							{HOTKEYS.map((hotkey) => (
 								<DropdownMenuItem
-									key={key}
-									className={`data-[highlighted]:bg-gray-500`}
+									key={`${hotkey.label}-${hotkey.combo}`}
+									className="data-[highlighted]:bg-gray-500"
 								>
-									{key}
+									<div className="grid w-full gap-1 py-1">
+										<div className="flex items-center justify-between gap-3">
+											<span>{hotkey.label}</span>
+											<span className="rounded bg-black/20 px-2 py-0.5 font-mono text-xs text-gray-200">
+												{hotkey.combo}
+											</span>
+										</div>
+										<span className="text-xs leading-5 text-gray-300">
+											{hotkey.description}
+										</span>
+									</div>
 								</DropdownMenuItem>
 							))}
 						</DropdownMenuSubContent>

@@ -134,7 +134,7 @@ function createDefaultPersistedConfigState(): PersistedAppConfigState {
 		currentAudioChannel: "",
 		llmPrompt: DEFAULT_LLM_PROMPT,
 		interviewPrompt: DEFAULT_INTERVIEW_PROMPT,
-		isStartScrollToBottom: false,
+		isStartScrollToBottom: true,
 		useRemoteModelTranscribe: "deepgram",
 		captureInterval: 1,
 		isUsePreRecorded: false,

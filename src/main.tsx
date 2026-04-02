@@ -4,8 +4,8 @@ import ReactDOM from "react-dom/client";
 import { initializeAppLogger, logError, logInfo } from "@/lib/logger.ts";
 import useAppStateStore from "@/stores";
 import {
-	mergeLlmApiKeyPresetsIntoSettings,
 	type ProviderEnvPresets,
+	stripLlmApiKeyPresetsFromSettings,
 } from "@/types/provider.ts";
 import App from "./App.tsx";
 
@@ -52,17 +52,15 @@ async function bootstrap() {
 			const appState = useAppStateStore.getState();
 			appState.updateEnvProviderPresets(presets);
 
-			if (!import.meta.env.DEV) {
-				const mergedSettings = mergeLlmApiKeyPresetsIntoSettings(
-					appState.llmProviderSettings,
-					presets.llm,
-				);
-				if (
-					JSON.stringify(mergedSettings) !==
-					JSON.stringify(appState.llmProviderSettings)
-				) {
-					appState.updateLlmProviderSettings(mergedSettings);
-				}
+			const sanitizedSettings = stripLlmApiKeyPresetsFromSettings(
+				appState.llmProviderSettings,
+				presets.llm,
+			);
+			if (
+				JSON.stringify(sanitizedSettings) !==
+				JSON.stringify(appState.llmProviderSettings)
+			) {
+				appState.updateLlmProviderSettings(sanitizedSettings);
 			}
 		} catch (error) {
 			console.error("sync-provider-env-presets-failed", error);

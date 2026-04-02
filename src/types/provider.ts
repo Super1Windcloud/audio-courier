@@ -207,6 +207,27 @@ export function mergeLlmApiKeyPresetsIntoSettings(
 	return nextSettings;
 }
 
+export function stripLlmApiKeyPresetsFromSettings(
+	currentSettings: LlmProviderSettings,
+	presetSettings: LlmProviderSettings,
+) {
+	const nextSettings = {
+		...normalizeLlmProviderSettings(currentSettings),
+	};
+	const normalizedPresetSettings = normalizeLlmProviderSettings(presetSettings);
+
+	for (const field of LLM_API_KEY_FIELDS) {
+		if (
+			hasConfiguredValue(normalizedPresetSettings[field]) &&
+			nextSettings[field] === normalizedPresetSettings[field]
+		) {
+			nextSettings[field] = "";
+		}
+	}
+
+	return nextSettings;
+}
+
 export function normalizeProviderEnvPresets(
 	value: unknown,
 ): ProviderEnvPresets {
