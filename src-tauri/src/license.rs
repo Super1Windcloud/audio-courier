@@ -451,7 +451,7 @@ fn current_public_key() -> Option<String> {
 }
 
 fn device_parts() -> Result<Vec<String>, String> {
-    let mut parts = vec![
+    let parts = vec![
         env::consts::OS.to_string(),
         env::consts::ARCH.to_string(),
         env::var("COMPUTERNAME").unwrap_or_default(),

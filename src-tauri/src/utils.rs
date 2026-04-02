@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 pub const APP_LOG_FILE_NAME: &str = "Audio Courier.log";
 const LEGACY_APP_LOG_FILE_NAME: &str = "app.log";
 const APP_IDENTIFIER: &str = "com.superwindcloud.audio-courier";
+#[cfg(target_os = "windows")]
 const APP_PRODUCT_NAME: &str = "Audio Courier";
 
 pub fn is_dev() -> bool {

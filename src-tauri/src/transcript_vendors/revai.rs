@@ -17,17 +17,23 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
+#[cfg(target_os = "windows")]
 use tokio::net::TcpStream;
 use tokio::runtime::Runtime;
 use tokio::sync::{Mutex as AsyncMutex, mpsc, oneshot, watch};
 #[cfg(target_os = "windows")]
-use tokio_tungstenite::{Connector, connect_async_tls_with_config};
+use tokio_tungstenite::tungstenite::{
+    Error as WsError,
+    handshake::client::{Request as WsRequest, Response as WsResponse},
+};
+#[cfg(target_os = "windows")]
 use tokio_tungstenite::{
-    MaybeTlsStream, WebSocketStream, connect_async,
+    Connector, MaybeTlsStream, WebSocketStream, connect_async_tls_with_config,
+};
+use tokio_tungstenite::{
+    connect_async,
     tungstenite::{
-        Error as WsError,
         client::{ClientRequestBuilder, IntoClientRequest},
-        handshake::client::{Request as WsRequest, Response as WsResponse},
         protocol::Message,
     },
 };
