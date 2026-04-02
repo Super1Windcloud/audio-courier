@@ -78,5 +78,19 @@ function bumpPatchVersion(version: string) {
 	}
 
 	const [, major, minor, patch] = match;
-	return `${major}.${minor}.${Number.parseInt(patch, 10) + 1}`;
+	let nextMajor = Number.parseInt(major, 10);
+	let nextMinor = Number.parseInt(minor, 10);
+	let nextPatch = Number.parseInt(patch, 10) + 1;
+
+	if (nextPatch > 10) {
+		nextMinor += 1;
+		nextPatch = 0;
+	}
+
+	if (nextMinor > 10) {
+		nextMajor += 1;
+		nextMinor = 0;
+	}
+
+	return `${nextMajor}.${nextMinor}.${nextPatch}`;
 }

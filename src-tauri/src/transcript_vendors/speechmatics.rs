@@ -16,6 +16,7 @@ use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
 use tokio::runtime::Runtime;
 use tokio::sync::{Mutex as AsyncMutex, mpsc, mpsc::error::TrySendError, oneshot, watch};
+use tokio::time::{self, Duration, MissedTickBehavior};
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{
@@ -28,6 +29,9 @@ const DEFAULT_RT_URL: &str = "wss://eu2.rt.speechmatics.com/v2/";
 const DEFAULT_LANGUAGE: &str = "cmn";
 const END_OF_UTTERANCE_SILENCE_TRIGGER: f32 = 0.4;
 const MAX_DELAY_SECONDS: f32 = 0.8;
+const HEARTBEAT_INTERVAL_SECS: u64 = 20;
+const IDLE_SILENCE_INTERVAL_SECS: u64 = 15;
+const IDLE_SILENCE_CHUNK_MS: u32 = 100;
 
 enum StreamCommand {
     Audio(Vec<u8>),
@@ -217,6 +221,15 @@ async fn run_session(
         async move {
             let mut chunk_seq_no = 0_i32;
             let mut total_samples_sent = 0_u64;
+            let mut heartbeat = time::interval(Duration::from_secs(HEARTBEAT_INTERVAL_SECS));
+            heartbeat.set_missed_tick_behavior(MissedTickBehavior::Delay);
+            heartbeat.tick().await;
+
+            let idle_keepalive_samples =
+                ((sample_rate as u64 * IDLE_SILENCE_CHUNK_MS as u64) / 1000).max(1) as usize;
+            let idle_keepalive_chunk = vec![0_u8; idle_keepalive_samples * 2];
+            let idle_keepalive = time::sleep(Duration::from_secs(IDLE_SILENCE_INTERVAL_SECS));
+            tokio::pin!(idle_keepalive);
 
             loop {
                 if *started_rx.borrow() {
@@ -256,6 +269,7 @@ async fn run_session(
                                 .await
                                 .map_err(|e| format!("Failed to send audio chunk to Speechmatics: {e}"))?;
                             chunk_seq_no += 1;
+                            idle_keepalive.as_mut().reset(time::Instant::now() + Duration::from_secs(IDLE_SILENCE_INTERVAL_SECS));
                         }
                         Some(StreamCommand::ForceEndpoint) => {
                             let timestamp = total_samples_sent as f64 / sample_rate as f64;
@@ -268,6 +282,19 @@ async fn run_session(
                                 .map_err(|e| format!("Failed to send Speechmatics ForceEndOfUtterance: {e}"))?;
                         }
                         None => break,
+                    },
+                    _ = heartbeat.tick() => {
+                        sink.send(Message::Ping(Vec::new().into()))
+                            .await
+                            .map_err(|e| format!("Failed to send Speechmatics heartbeat ping: {e}"))?;
+                    }
+                    _ = &mut idle_keepalive => {
+                        total_samples_sent = total_samples_sent.saturating_add(idle_keepalive_samples as u64);
+                        sink.send(Message::Binary(idle_keepalive_chunk.clone().into()))
+                            .await
+                            .map_err(|e| format!("Failed to send Speechmatics idle silence chunk: {e}"))?;
+                        chunk_seq_no += 1;
+                        idle_keepalive.as_mut().reset(time::Instant::now() + Duration::from_secs(IDLE_SILENCE_INTERVAL_SECS));
                     }
                 }
             }
