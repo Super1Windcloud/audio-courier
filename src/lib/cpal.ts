@@ -4,13 +4,8 @@ import { toast } from "sonner";
 import { logError, logInfo } from "@/lib/logger.ts";
 import { setRecordingStateImmediately } from "@/lib/recordingState.ts";
 import useAppStateStore from "@/stores";
-import {
-	TRANSCRIBE_VENDOR_LABELS,
-	type TranscribeVendor,
-} from "@/types/provider.ts";
 
 let traditionalChineseConverter: ((content: string) => string) | null = null;
-let hasShownStartRecognitionToast = false;
 
 interface TranscriptEvent {
 	vendor: string;
@@ -48,16 +43,6 @@ export async function startAudioLoopbackRecognition(
 	if (errorUnlistener) {
 		errorUnlistener();
 		errorUnlistener = null;
-	}
-
-	const vendorLabel =
-		TRANSCRIBE_VENDOR_LABELS[selectedAsrVendor as TranscribeVendor] ??
-		selectedAsrVendor;
-	if (!hasShownStartRecognitionToast) {
-		toast.message("开始转录", {
-			description: `当前使用 ${vendorLabel}`,
-		});
-		hasShownStartRecognitionToast = true;
 	}
 
 	const transcriptProviderSettings =
@@ -107,7 +92,6 @@ export async function startAudioLoopbackRecognition(
 	}).catch((err) => {
 		console.error("invoke start output audio recognition failed", err);
 		logError("invoke start output audio recognition failed", err);
-		hasShownStartRecognitionToast = false;
 		toast.error(`invoke start audio capture err${err}`);
 		const appState = useAppStateStore.getState();
 		if (appState.isRecording) {
@@ -124,7 +108,6 @@ export async function stopAudioLoopbackRecognition() {
 			toast.error(`invoke stop audio capture err${err}`);
 		},
 	);
-	hasShownStartRecognitionToast = false;
 
 	if (unlistener) {
 		unlistener();
