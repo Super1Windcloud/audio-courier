@@ -63,6 +63,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const wasRecordingRef = useRef(recordingState);
 	const lastSubmittedRef = useRef<{ text: string; at: number } | null>(null);
+	const transcriptSessionRef = useRef(0);
 	const recordingBaseInputRef = useRef("");
 	const committedTranscriptRef = useRef("");
 	const draftTranscriptRef = useRef("");
@@ -74,15 +75,77 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		recordingTimerStamp - recordingStartedAt >= MIN_RECORDING_DURATION;
 	const recordingTitle = canStopRecording ? "停止语音" : "录音中...3秒后可停止";
 
-	const composeTranscriptInput = useCallback(() => {
-		return `${recordingBaseInputRef.current}${committedTranscriptRef.current}${draftTranscriptRef.current}`;
-	}, []);
-
 	const resetTranscriptComposition = useCallback(() => {
 		recordingBaseInputRef.current = "";
 		committedTranscriptRef.current = "";
 		draftTranscriptRef.current = "";
 	}, []);
+
+	const beginRecognitionSession = useCallback(
+		(baseInput: string) => {
+			const sessionId = transcriptSessionRef.current + 1;
+			transcriptSessionRef.current = sessionId;
+			recordingBaseInputRef.current = baseInput;
+			committedTranscriptRef.current = "";
+			draftTranscriptRef.current = "";
+
+			void startAudioRecognition(
+				(message) => {
+					if (transcriptSessionRef.current !== sessionId) {
+						return;
+					}
+
+					draftTranscriptRef.current = message;
+					setInputText(
+						`${recordingBaseInputRef.current}${committedTranscriptRef.current}${draftTranscriptRef.current}`,
+					);
+				},
+				(message) => {
+					if (transcriptSessionRef.current !== sessionId) {
+						return;
+					}
+
+					committedTranscriptRef.current += message;
+					draftTranscriptRef.current = "";
+					setInputText(
+						`${recordingBaseInputRef.current}${committedTranscriptRef.current}${draftTranscriptRef.current}`,
+					);
+				},
+				currentAudioChannel,
+				remoteModelVendor,
+				captureInterval,
+				isUsePreRecorded,
+			);
+		},
+		[captureInterval, currentAudioChannel, isUsePreRecorded, remoteModelVendor],
+	);
+
+	const endRecognitionSession = useCallback(() => {
+		transcriptSessionRef.current += 1;
+		draftTranscriptRef.current = "";
+		void stopAudioRecognition(currentAudioChannel);
+	}, [currentAudioChannel]);
+
+	const restartRecognitionSession = useCallback(() => {
+		if (!recordingState) {
+			return;
+		}
+
+		transcriptSessionRef.current += 1;
+		resetTranscriptComposition();
+		void stopAudioRecognition(currentAudioChannel).finally(() => {
+			if (!useAppStateStore.getState().isRecording) {
+				return;
+			}
+
+			beginRecognitionSession("");
+		});
+	}, [
+		beginRecognitionSession,
+		currentAudioChannel,
+		recordingState,
+		resetTranscriptComposition,
+	]);
 
 	const handleSend = useCallback(
 		(overrideText?: string) => {
@@ -109,6 +172,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 				onSendMessage(text);
 				resetTranscriptComposition();
 				setInputText("");
+				restartRecognitionSession();
 			}
 		},
 		[
@@ -117,6 +181,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 			normalizeTranscriptForDuplicateGuard,
 			onSendMessage,
 			resetTranscriptComposition,
+			restartRecognitionSession,
 			updateQuestionState,
 		],
 	);
@@ -292,30 +357,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	};
 
 	const startRecordingEffect = useEffectEvent(() => {
-		recordingBaseInputRef.current = inputText;
-		committedTranscriptRef.current = "";
-		draftTranscriptRef.current = "";
-
-		void startAudioRecognition(
-			(message) => {
-				draftTranscriptRef.current = message;
-				setInputText(composeTranscriptInput());
-			},
-			(message) => {
-				committedTranscriptRef.current += message;
-				draftTranscriptRef.current = "";
-				setInputText(composeTranscriptInput());
-			},
-			currentAudioChannel,
-			remoteModelVendor,
-			captureInterval,
-			isUsePreRecorded,
-		);
+		beginRecognitionSession(inputText);
 	});
 
 	const stopRecordingEffect = useEffectEvent(() => {
-		draftTranscriptRef.current = "";
-		void stopAudioRecognition(currentAudioChannel);
+		endRecognitionSession();
 	});
 
 	useEffect(() => {

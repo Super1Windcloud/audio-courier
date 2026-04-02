@@ -1,7 +1,6 @@
 #![allow(clippy::collapsible_if)]
 
 ///https://www.assemblyai.com/docs/api-reference/streaming-api/universal-streaming/universal-streaming
-/// Not set  inactivity_timeout, will no inactivity timeout is applied.
 use crate::provider_config::{TranscriptRuntimeConfig, resolve_required_string};
 use crate::transcript_vendors::{
     PcmCallback, StatusCallback, StreamingTranscriber, emit_commit, emit_draft,
@@ -15,6 +14,7 @@ use std::thread::{self, JoinHandle};
 use tauri::http::Uri;
 use tokio::runtime::Runtime;
 use tokio::sync::{Mutex as AsyncMutex, mpsc, oneshot, watch};
+use tokio::time::{self, MissedTickBehavior};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tungstenite::client::{ClientRequestBuilder, IntoClientRequest};
 
@@ -114,10 +114,12 @@ async fn run_stream(
     const BASE_URL: &str = "wss://streaming.assemblyai.com/v3/ws";
     const SPEECH_MODEL: &str = "whisper-rt";
     const AUDIO_ENCODING: &str = "pcm_s16le";
-    const MIN_TURN_SILENCE_MS: u32 = 500;
+    const MIN_TURN_SILENCE_MS: u32 = 600;
+    const INACTIVITY_TIMEOUT_SECS: u32 = 3600;
+    const HEARTBEAT_INTERVAL_SECS: u64 = 20;
 
     let query = format!(
-        "sample_rate={sample_rate}&speech_model={SPEECH_MODEL}&encoding={AUDIO_ENCODING}&format_turns=true&min_turn_silence={MIN_TURN_SILENCE_MS}"
+        "sample_rate={sample_rate}&speech_model={SPEECH_MODEL}&encoding={AUDIO_ENCODING}&format_turns=true&min_turn_silence={MIN_TURN_SILENCE_MS}&inactivity_timeout={INACTIVITY_TIMEOUT_SECS}"
     );
     let url = format!("{BASE_URL}?{query}");
 
@@ -139,6 +141,11 @@ async fn run_stream(
     let (termination_tx, mut termination_rx) = watch::channel(false);
 
     let send_audio = async {
+        let mut heartbeat = time::interval(std::time::Duration::from_secs(
+            HEARTBEAT_INTERVAL_SECS,
+        ));
+        heartbeat.set_missed_tick_behavior(MissedTickBehavior::Delay);
+
         loop {
             tokio::select! {
                 _ = &mut shutdown_rx => break,
@@ -166,6 +173,11 @@ async fn run_stream(
                     }
                     None => break,
                 },
+                _ = heartbeat.tick() => {
+                    sink.send(Message::Ping(Vec::new().into()))
+                        .await
+                        .map_err(|e| format!("Failed to send AssemblyAI heartbeat ping: {e}"))?;
+                }
             }
         }
 
@@ -210,30 +222,30 @@ async fn run_stream(
                             _ => {
                                 let transcripts = extract_transcripts(&value);
                                 for (transcript, is_final) in transcripts {
-                                    let trimmed = transcript.trim();
-                                    if trimmed.is_empty() {
+                                    let normalized = normalize_transcript_text(&transcript);
+                                    if normalized.is_empty() {
                                         continue;
                                     }
 
-                                    let next_event = (is_final, trimmed.to_string());
+                                    let next_event =
+                                        (is_final, normalize_transcript_dedup_key(&normalized));
                                     if last_emitted.as_ref() == Some(&next_event) {
                                         continue;
                                     }
 
                                     last_emitted = Some(next_event);
                                     if is_final {
-                                        let draft = {
+                                        let commit = {
                                             let mut buffer = utterance_buffer.lock().await;
-                                            append_utterance_segment(&mut buffer, trimmed);
+                                            append_utterance_segment(&mut buffer, &normalized);
                                             buffer.trim().to_string()
                                         };
-                                        emit_draft(&callback, "AssemblyAI", &draft);
-                                        emit_commit(&callback, "AssemblyAI", &draft);
+                                        emit_commit(&callback, "AssemblyAI", &commit);
                                         utterance_buffer.lock().await.clear();
                                     } else {
                                         let draft = {
                                             let buffer = utterance_buffer.lock().await;
-                                            merge_segments(&buffer, trimmed)
+                                            merge_segments(&buffer, &normalized)
                                         };
                                         emit_draft(&callback, "AssemblyAI", &draft);
                                     }
@@ -358,6 +370,76 @@ fn first_non_empty_text<'a>(value: &'a Value, fields: &[&str]) -> Option<&'a str
     })
 }
 
+fn normalize_transcript_text(input: &str) -> String {
+    let chars = input.trim().chars().collect::<Vec<_>>();
+    let mut normalized = String::with_capacity(input.len());
+
+    for (index, ch) in chars.iter().enumerate() {
+        if ch.is_whitespace() {
+            let prev = chars[..index]
+                .iter()
+                .rev()
+                .find(|candidate| !candidate.is_whitespace())
+                .copied();
+            let next = chars[index + 1..]
+                .iter()
+                .find(|candidate| !candidate.is_whitespace())
+                .copied();
+
+            if matches!(
+                (prev, next),
+                (Some(left), Some(right)) if should_collapse_spacing(left, right)
+            ) {
+                continue;
+            }
+
+            if !normalized.ends_with(' ') && !normalized.is_empty() {
+                normalized.push(' ');
+            }
+            continue;
+        }
+
+        normalized.push(*ch);
+    }
+
+    normalized.trim().to_string()
+}
+
+fn normalize_transcript_dedup_key(input: &str) -> String {
+    input
+        .chars()
+        .filter(|ch| !ch.is_whitespace() && !is_dedup_ignorable_punctuation(*ch))
+        .collect()
+}
+
+fn is_dedup_ignorable_punctuation(ch: char) -> bool {
+    matches!(
+        ch,
+        '.' | ','
+            | '!'
+            | '?'
+            | ':'
+            | ';'
+            | '，'
+            | '。'
+            | '！'
+            | '？'
+            | '：'
+            | '；'
+            | '、'
+            | '…'
+    )
+}
+
+fn should_collapse_spacing(left: char, right: char) -> bool {
+    is_cjk(left)
+        || is_cjk(right)
+        || left.is_ascii_digit()
+        || right.is_ascii_digit()
+        || is_spacing_punctuation(left)
+        || is_spacing_punctuation(right)
+}
+
 fn append_utterance_segment(buffer: &mut String, segment: &str) {
     let segment = segment.trim();
     if segment.is_empty() {
@@ -469,7 +551,7 @@ impl StreamingTranscriber for AssemblyAiTranscriber {
 mod tests {
     use super::{
         append_utterance_segment, extract_plain_transcripts, extract_turn_transcripts,
-        merge_segments,
+        merge_segments, normalize_transcript_dedup_key, normalize_transcript_text,
     };
     use serde_json::json;
 
@@ -516,5 +598,29 @@ mod tests {
         append_utterance_segment(&mut buffer, "世界");
 
         assert_eq!(buffer, "你好世界".to_string());
+    }
+
+    #[test]
+    fn normalize_transcript_text_compacts_spaced_cjk_tokens() {
+        assert_eq!(
+            normalize_transcript_text("虽 然 内 心 复 杂 . 却 不 得 不 听 从 莫 斯 科 的 指 令 。"),
+            "虽然内心复杂.却不得不听从莫斯科的指令。".to_string()
+        );
+        assert_eq!(
+            normalize_transcript_text("于 是 9 月 初"),
+            "于是9月初".to_string()
+        );
+    }
+
+    #[test]
+    fn normalize_transcript_dedup_key_ignores_spacing_and_punctuation() {
+        assert_eq!(
+            normalize_transcript_dedup_key("中共与国民政府的接触正式开始"),
+            normalize_transcript_dedup_key("中共与国民政府的接触正式开始.")
+        );
+        assert_eq!(
+            normalize_transcript_dedup_key("事 实 上"),
+            normalize_transcript_dedup_key("事实上。")
+        );
     }
 }

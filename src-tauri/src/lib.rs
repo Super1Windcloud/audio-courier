@@ -232,7 +232,7 @@ pub fn run() {
                 .with_shortcut("Shift+Enter")
                 .expect("failed to register rust global shortcut Shift+Enter")
                 .with_handler(|app, shortcut, event| {
-                    if event.state != ShortcutState::Released {
+                    if event.state != ShortcutState::Pressed {
                         return;
                     }
 
