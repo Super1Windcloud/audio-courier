@@ -23,7 +23,8 @@ use provider_config::{ProviderEnvPresets, provider_env_presets_from_env};
 pub use provider_config::{TranscriptRuntimeConfig, transcript_runtime_config_from_env};
 use std::path::PathBuf;
 use tauri::LogicalSize;
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_global_shortcut::ShortcutState;
 use tauri_plugin_log::{Target, TargetKind};
 pub use transcript_vendors::*;
 pub use utils::*;
@@ -226,7 +227,25 @@ pub fn run() {
             main.set_focus().unwrap();
             main.show().unwrap();
         }))
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_shortcut("Shift+Enter")
+                .expect("failed to register rust global shortcut Shift+Enter")
+                .with_handler(|app, shortcut, event| {
+                    if event.state != ShortcutState::Released {
+                        return;
+                    }
+
+                    info!("global shortcut triggered: {}", shortcut);
+
+                    if let Some(main) = app.get_webview_window("main") {
+                        if let Err(err) = main.emit("global_send_shortcut", ()) {
+                            error!("emit global_send_shortcut failed: {}", err);
+                        }
+                    }
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             show_window,

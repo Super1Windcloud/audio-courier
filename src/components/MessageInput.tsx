@@ -1,3 +1,6 @@
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Mic, SendHorizontal, Trash2 } from "lucide-react";
 import type React from "react";
 import {
@@ -13,6 +16,7 @@ import { MoreMenu } from "@/components/MoreMenu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import Waruls from "@/components/Waruls.tsx";
 import { startAudioRecognition, stopAudioRecognition } from "@/lib/audio.ts";
+import { logInfo } from "@/lib/logger.ts";
 import { setRecordingStateImmediately } from "@/lib/recordingState.ts";
 import useAppStateStore from "@/stores";
 
@@ -103,14 +107,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 				lastSubmittedRef.current = { text: normalizedText, at: now };
 				updateQuestionState(text);
 				onSendMessage(text);
-				setInputText((current) => {
-					if (current === text) {
-						resetTranscriptComposition();
-						return "";
-					}
-
-					return current;
-				});
+				resetTranscriptComposition();
+				setInputText("");
 			}
 		},
 		[
@@ -130,26 +128,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		}
 	};
 
-	const handleGlobalSendShortcut = useEffectEvent((event: KeyboardEvent) => {
-		if (event.key !== "Enter" || !event.shiftKey || event.isComposing) {
-			return;
-		}
-
-		const activeElement = document.activeElement;
-		if (activeElement === textareaRef.current) {
-			return;
-		}
-
-		if (
-			activeElement instanceof HTMLInputElement ||
-			activeElement instanceof HTMLTextAreaElement ||
-			activeElement instanceof HTMLSelectElement ||
-			activeElement?.getAttribute("contenteditable") === "true"
-		) {
-			return;
-		}
-
-		event.preventDefault();
+	const handleGlobalSendShortcutEvent = useEffectEvent(() => {
+		logInfo("frontend received global_send_shortcut");
 		handleSend();
 	});
 
@@ -159,38 +139,119 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		}
 
 		const textarea = textareaRef.current;
-		if (!textarea || document.activeElement === textarea) {
+		const activeElement = document.activeElement;
+		const documentFocused = document.hasFocus();
+		const canStealFocus =
+			!documentFocused ||
+			activeElement === null ||
+			activeElement === document.body ||
+			activeElement === document.documentElement;
+		if (
+			!textarea ||
+			(documentFocused && activeElement === textarea) ||
+			!canStealFocus
+		) {
 			return;
 		}
 
 		textarea.focus();
+		const cursorPosition = textarea.value.length;
+		textarea.setSelectionRange(cursorPosition, cursorPosition);
 	}, [isAuthorized, recordingState]);
 
-	useEffect(() => {
-		const onKeyDown = (event: KeyboardEvent) => {
-			handleGlobalSendShortcut(event);
-		};
+	const activateWindowAndFocusTextarea = useCallback(() => {
+		if (!isAuthorized || recordingState) {
+			return;
+		}
 
-		window.addEventListener("keydown", onKeyDown);
+		void (async () => {
+			await getCurrentWindow()
+				.setFocus()
+				.catch(() => undefined);
+			await getCurrentWebview()
+				.setFocus()
+				.catch(() => undefined);
+
+			window.setTimeout(() => {
+				focusTextarea();
+			}, 0);
+		})();
+	}, [focusTextarea, isAuthorized, recordingState]);
+
+	useEffect(() => {
+		let disposed = false;
+		let unlistenGlobalSendShortcut: (() => void) | null = null;
+
+		void listen("global_send_shortcut", () => {
+			handleGlobalSendShortcutEvent();
+		}).then((unlisten) => {
+			if (disposed) {
+				unlisten();
+				return;
+			}
+			unlistenGlobalSendShortcut = unlisten;
+		});
+
 		return () => {
-			window.removeEventListener("keydown", onKeyDown);
+			disposed = true;
+			unlistenGlobalSendShortcut?.();
 		};
 	}, []);
 
 	useEffect(() => {
-		const handlePointerOverWindow = (event: MouseEvent) => {
+		let focusAttemptInFlight = false;
+
+		const requestFocusFromPointer = () => {
+			if (document.hasFocus() || focusAttemptInFlight) {
+				return;
+			}
+
+			focusAttemptInFlight = true;
+			activateWindowAndFocusTextarea();
+			window.setTimeout(() => {
+				focusAttemptInFlight = false;
+			}, 150);
+		};
+
+		const handlePointerEnterApp = () => {
+			activateWindowAndFocusTextarea();
+		};
+		const handleMouseOverApp = (event: MouseEvent) => {
 			if (event.relatedTarget !== null) {
 				return;
 			}
 
-			focusTextarea();
+			activateWindowAndFocusTextarea();
 		};
+		const handlePointerMoveApp = () => {
+			requestFocusFromPointer();
+		};
+		const appWindow = getCurrentWindow();
+		let unlistenFocusChanged: (() => void) | null = null;
 
-		window.addEventListener("mouseover", handlePointerOverWindow);
+		const root = document.documentElement;
+		root.addEventListener("pointerenter", handlePointerEnterApp, true);
+		root.addEventListener("pointermove", handlePointerMoveApp, true);
+		root.addEventListener("mouseover", handleMouseOverApp, true);
+		void appWindow
+			.onFocusChanged(({ payload: focused }) => {
+				if (!focused) {
+					return;
+				}
+
+				focusTextarea();
+			})
+			.then((unlisten) => {
+				unlistenFocusChanged = unlisten;
+			});
+
 		return () => {
-			window.removeEventListener("mouseover", handlePointerOverWindow);
+			root.removeEventListener("pointerenter", handlePointerEnterApp, true);
+			root.removeEventListener("pointermove", handlePointerMoveApp, true);
+			root.removeEventListener("mouseover", handleMouseOverApp, true);
+			unlistenFocusChanged?.();
 		};
-	}, [focusTextarea]);
+	}, [activateWindowAndFocusTextarea, focusTextarea]);
 
 	useEffect(() => {
 		if (!recordingState || recordingStartedAt === null) {
