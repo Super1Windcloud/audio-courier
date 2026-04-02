@@ -53,11 +53,7 @@ pub fn start_macos_system_audio_transcription(
     RECORDING.store(true, std::sync::atomic::Ordering::SeqCst);
 
     Ok(thread::spawn(move || {
-        if let Err(err) = run_capture_loop(
-            &helper_binary,
-            capture_interval,
-            transcriber,
-        ) {
+        if let Err(err) = run_capture_loop(&helper_binary, capture_interval, transcriber) {
             write_some_log(format!("macOS system audio capture failed: {err}").as_str());
             if let Some(callback) = status_callback.as_ref() {
                 callback(err);
@@ -207,9 +203,7 @@ fn run_capture_loop(
         let status = child
             .wait()
             .map_err(|err| format!("Failed waiting for macOS audio helper: {err}"))?;
-        if !status.success()
-            && RECORDING.load(std::sync::atomic::Ordering::SeqCst)
-        {
+        if !status.success() && RECORDING.load(std::sync::atomic::Ordering::SeqCst) {
             let stderr_output = stderr_lines.lock().unwrap().join("\n");
             let message = if stderr_output.trim().is_empty() {
                 format!("macOS audio helper exited with status {status}")
