@@ -8,7 +8,9 @@ use crate::transcript_vendors::{
     revai::RevAiTranscriber, speechmatics::SpeechmaticsTranscriber,
 };
 use crate::utils::write_some_log;
-use macos_audio_capture::{CaptureSession, selected_backend_name, spawn_system_audio_capture};
+use macos_audio_capture::{
+    CaptureBackend, CaptureSession, selected_backend_name, spawn_system_audio_capture,
+};
 use std::io::{BufRead, BufReader, Read};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::{self, JoinHandle};
@@ -37,7 +39,8 @@ pub fn start_macos_system_audio_transcription(
     transcript_config: Option<TranscriptRuntimeConfig>,
 ) -> Result<JoinHandle<()>, String> {
     let transcript_config = transcript_config.unwrap_or_default();
-    let backend_name = selected_backend_name().to_string();
+    let capture_backend = resolve_capture_backend(&transcript_config);
+    let backend_name = selected_backend_name(capture_backend).to_string();
     let transcriber = build_transcriber(
         &selected_asr_vendor,
         pcm_callback,
@@ -55,7 +58,7 @@ pub fn start_macos_system_audio_transcription(
             )
             .as_str(),
         );
-        if let Err(err) = run_capture_loop(capture_interval, transcriber) {
+        if let Err(err) = run_capture_loop(capture_interval, capture_backend, transcriber) {
             write_some_log(format!("macOS system audio capture failed: {err}").as_str());
             if let Some(callback) = status_callback.as_ref() {
                 callback(err);
@@ -125,10 +128,11 @@ fn build_transcriber(
 
 fn run_capture_loop(
     capture_interval: u32,
+    capture_backend: CaptureBackend,
     transcriber: Arc<dyn StreamingTranscriber>,
 ) -> Result<(), String> {
-    let backend_name = selected_backend_name();
-    let mut session = spawn_system_audio_capture()?;
+    let backend_name = selected_backend_name(capture_backend);
+    let mut session = spawn_system_audio_capture(capture_backend)?;
     let stdout = session.take_stdout()?;
     let stderr = session.take_stderr()?;
 
@@ -205,4 +209,17 @@ fn run_capture_loop(
     }
 
     Ok(())
+}
+
+fn resolve_capture_backend(transcript_config: &TranscriptRuntimeConfig) -> CaptureBackend {
+    match transcript_config
+        .macos_system_audio_backend
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        Some("rust-native") => CaptureBackend::RustNative,
+        Some("swift-helper") => CaptureBackend::SwiftHelper,
+        _ => CaptureBackend::SwiftHelper,
+    }
 }

@@ -51,6 +51,7 @@ pub struct TranscriptRuntimeConfig {
     pub revai_api_key: Option<String>,
     pub revai_language: Option<String>,
     pub revai_metadata: Option<String>,
+    pub macos_system_audio_backend: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -133,6 +134,7 @@ pub fn transcript_runtime_config_from_env() -> TranscriptRuntimeConfig {
         revai_api_key: resolve_optional_string(None, REVAI_ENV_KEYS),
         revai_language: resolve_optional_string(None, &["REVAI_LANGUAGE"]),
         revai_metadata: resolve_optional_string(None, &["REVAI_METADATA"]),
+        macos_system_audio_backend: resolve_optional_string(None, &["MACOS_SYSTEM_AUDIO_BACKEND"]),
     }
 }
 

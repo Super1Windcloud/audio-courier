@@ -19,7 +19,7 @@ autoexamples = true
 autobenches = false
 
 [features]
-default = ["api", "macos-system-audio-swift"]
+default = ["api", "macos-system-audio-swift", "macos-system-audio-rust"]
 api = []
 sdk = []
 macos-system-audio-swift = ["dep:macos-audio-capture", "macos-audio-capture/swift-helper"]

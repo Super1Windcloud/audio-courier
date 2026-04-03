@@ -15,6 +15,7 @@ import useAppStateStore from "@/stores";
 import {
 	createDefaultTranscriptProviderSettings,
 	getTranscriptProviderStatus,
+	MACOS_SYSTEM_AUDIO_BACKEND_LABELS,
 	type TranscriptProviderSettings,
 } from "@/types/provider.ts";
 
@@ -77,6 +78,43 @@ export function TranscriptProviderDialog({
 				</DialogHeader>
 
 				<div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
+					<Section
+						title="macOS 系统音频后端"
+						description="仅在 macOS 输出音频转录时生效。Swift Helper 更稳，Rust Native 便于调试和验证原生实现。"
+					>
+						<div className="grid gap-2">
+							<label
+								className="text-sm font-medium text-slate-200"
+								htmlFor="macos-system-audio-backend"
+							>
+								Capture Backend
+							</label>
+							<select
+								id="macos-system-audio-backend"
+								className="h-11 rounded-xl border border-white/10 bg-slate-900 px-3 text-sm text-white outline-none transition focus:border-emerald-300"
+								value={draft.macosSystemAudioBackend}
+								onChange={(event) =>
+									setDraft((current) => ({
+										...current,
+										macosSystemAudioBackend: event.target
+											.value as TranscriptProviderSettings["macosSystemAudioBackend"],
+									}))
+								}
+							>
+								{Object.entries(MACOS_SYSTEM_AUDIO_BACKEND_LABELS).map(
+									([value, label]) => (
+										<option key={value} value={value}>
+											{label}
+										</option>
+									),
+								)}
+							</select>
+							<p className="text-sm leading-6 text-slate-300">
+								当前值会在下次开始 macOS 系统音频识别时生效。
+							</p>
+						</div>
+					</Section>
+
 					<Section title="Deepgram" description="可配置 API Key 和语言代码。">
 						<div className="grid gap-4 md:grid-cols-2">
 							<ProviderConfigField

@@ -2,9 +2,6 @@
 
 use std::io::Read;
 
-#[cfg(all(feature = "swift-helper", feature = "rust-native"))]
-compile_error!("Enable only one of `swift-helper` or `rust-native` for macos-audio-capture.");
-
 #[cfg(not(any(feature = "swift-helper", feature = "rust-native")))]
 compile_error!("Enable one of `swift-helper` or `rust-native` for macos-audio-capture.");
 
@@ -13,10 +10,11 @@ mod rust_native;
 #[cfg(feature = "swift-helper")]
 mod swift_helper;
 
-#[cfg(feature = "rust-native")]
-use rust_native as selected_backend;
-#[cfg(feature = "swift-helper")]
-use swift_helper as selected_backend;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaptureBackend {
+    SwiftHelper,
+    RustNative,
+}
 
 pub struct CaptureSession {
     stdout: Option<Box<dyn Read + Send>>,
@@ -63,10 +61,52 @@ impl CaptureSession {
     }
 }
 
-pub fn selected_backend_name() -> &'static str {
-    selected_backend::BACKEND_NAME
+pub fn selected_backend_name(backend: CaptureBackend) -> &'static str {
+    match backend {
+        CaptureBackend::SwiftHelper => {
+            #[cfg(feature = "swift-helper")]
+            {
+                swift_helper::BACKEND_NAME
+            }
+            #[cfg(not(feature = "swift-helper"))]
+            {
+                "swift-helper"
+            }
+        }
+        CaptureBackend::RustNative => {
+            #[cfg(feature = "rust-native")]
+            {
+                rust_native::BACKEND_NAME
+            }
+            #[cfg(not(feature = "rust-native"))]
+            {
+                "rust-native"
+            }
+        }
+    }
 }
 
-pub fn spawn_system_audio_capture() -> Result<CaptureSession, String> {
-    selected_backend::spawn()
+pub fn spawn_system_audio_capture(backend: CaptureBackend) -> Result<CaptureSession, String> {
+    match backend {
+        CaptureBackend::SwiftHelper => {
+            #[cfg(feature = "swift-helper")]
+            {
+                swift_helper::spawn()
+            }
+            #[cfg(not(feature = "swift-helper"))]
+            {
+                Err("macOS audio capture backend `swift-helper` is not compiled in".to_string())
+            }
+        }
+        CaptureBackend::RustNative => {
+            #[cfg(feature = "rust-native")]
+            {
+                rust_native::spawn()
+            }
+            #[cfg(not(feature = "rust-native"))]
+            {
+                Err("macOS audio capture backend `rust-native` is not compiled in".to_string())
+            }
+        }
+    }
 }

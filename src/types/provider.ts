@@ -5,6 +5,21 @@ export type TranscribeVendor =
 	| "revai"
 	| "speechmatics";
 
+export type MacosSystemAudioBackend = "swift-helper" | "rust-native";
+
+export const MACOS_SYSTEM_AUDIO_BACKENDS: readonly MacosSystemAudioBackend[] = [
+	"swift-helper",
+	"rust-native",
+];
+
+export const MACOS_SYSTEM_AUDIO_BACKEND_LABELS: Record<
+	MacosSystemAudioBackend,
+	string
+> = {
+	"swift-helper": "Swift Helper",
+	"rust-native": "Rust Native",
+};
+
 export const TRANSCRIBE_VENDORS: readonly TranscribeVendor[] = [
 	"assemblyai",
 	"deepgram",
@@ -53,6 +68,7 @@ export interface TranscriptProviderSettings {
 	revaiApiKey: string;
 	revaiLanguage: string;
 	revaiMetadata: string;
+	macosSystemAudioBackend: MacosSystemAudioBackend;
 }
 
 export interface ProviderEnvPresets {
@@ -111,6 +127,7 @@ export function createDefaultTranscriptProviderSettings(): TranscriptProviderSet
 		revaiApiKey: "",
 		revaiLanguage: "cmn",
 		revaiMetadata: "",
+		macosSystemAudioBackend: "swift-helper",
 	};
 }
 
@@ -179,6 +196,10 @@ export function normalizeTranscriptProviderSettings(
 		revaiApiKey: readString(raw.revaiApiKey),
 		revaiLanguage: readString(raw.revaiLanguage, defaults.revaiLanguage),
 		revaiMetadata: readString(raw.revaiMetadata),
+		macosSystemAudioBackend:
+			raw.macosSystemAudioBackend === "rust-native"
+				? "rust-native"
+				: defaults.macosSystemAudioBackend,
 	};
 }
 
