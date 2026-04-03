@@ -35,6 +35,9 @@ path = "src/lib.rs"
 name = "audio-courier"
 path = "src/main.rs"
 
+
+
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

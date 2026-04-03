@@ -3,6 +3,7 @@ name = "audio-courier-tools"
 version = "1.0.10"
 edition = "2024"
 publish = false
+autobins = true
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

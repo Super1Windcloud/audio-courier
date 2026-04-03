@@ -50,7 +50,8 @@
     "macOS": {
       "entitlements": "./Entitlements.plist",
       "signingIdentity": "Apple Development: 1178933440@qq.com (JSAN7V7R4N)"
-    }
+    },
+    "resources": []
   },
   "plugins": {
     "updater": {
