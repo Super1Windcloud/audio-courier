@@ -19,9 +19,11 @@ autoexamples = true
 autobenches = false
 
 [features]
-default = ["api"]
+default = ["api", "macos-system-audio-swift"]
 api = []
 sdk = []
+macos-system-audio-swift = ["dep:macos-audio-capture", "macos-audio-capture/swift-helper"]
+macos-system-audio-rust = ["dep:macos-audio-capture", "macos-audio-capture/rust-native"]
 
 [lib]
 name = "tauri_courier_ai_lib"
@@ -86,6 +88,9 @@ winreg = "0.56.0"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-updater = "2.10.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+macos-audio-capture = { path = "crates/macos-audio-capture", optional = true, default-features = false }
 
 
 

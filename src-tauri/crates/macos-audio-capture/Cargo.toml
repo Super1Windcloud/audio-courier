@@ -1,0 +1,36 @@
+[package]
+name = "macos-audio-capture"
+version = "1.1.0"
+edition = "2024"
+publish = false
+
+[features]
+default = ["swift-helper"]
+swift-helper = ["dep:hex", "dep:sha2"]
+rust-native = [
+    "dep:block2",
+    "dep:dispatch2",
+    "dep:objc2",
+    "dep:objc2-core-audio-types",
+    "dep:objc2-core-foundation",
+    "dep:objc2-core-graphics",
+    "dep:objc2-core-media",
+    "dep:objc2-foundation",
+    "dep:objc2-screen-capture-kit",
+]
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+block2 = { version = "0.6.2", optional = true, features = ["alloc"] }
+dispatch2 = { version = "0.3.1", optional = true, features = ["alloc", "std", "objc2"] }
+hex = { version = "0.4.3", optional = true }
+objc2 = { version = "0.6.4", optional = true, features = ["std", "catch-all"] }
+objc2-core-audio-types = { version = "0.3.2", optional = true, features = ["std", "CoreAudioBaseTypes"] }
+objc2-core-foundation = { version = "0.3.2", optional = true, features = ["std", "CFBase"] }
+objc2-core-graphics = { version = "0.3.2", optional = true, features = ["std", "CGDirectDisplay", "CGWindow"] }
+objc2-core-media = { version = "0.3.2", optional = true, features = ["std", "CMBlockBuffer", "CMFormatDescription", "CMSampleBuffer", "objc2", "objc2-core-audio-types"] }
+objc2-foundation = { version = "0.3.2", optional = true, features = ["std", "NSArray", "NSError", "NSObject", "NSString"] }
+objc2-screen-capture-kit = { version = "0.3.2", optional = true, features = ["std", "SCShareableContent", "SCStream", "block2", "dispatch2", "objc2-core-graphics", "objc2-core-media"] }
+sha2 = { version = "0.11.0", optional = true }

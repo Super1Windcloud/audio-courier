@@ -8,29 +8,24 @@ use crate::transcript_vendors::{
     revai::RevAiTranscriber, speechmatics::SpeechmaticsTranscriber,
 };
 use crate::utils::write_some_log;
-use hex::encode as hex_encode;
-use sha2::{Digest, Sha256};
-use std::fs;
+use macos_audio_capture::{CaptureSession, selected_backend_name, spawn_system_audio_capture};
 use std::io::{BufRead, BufReader, Read};
-use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::{self, JoinHandle};
 
 const MACOS_CAPTURE_SAMPLE_RATE: u32 = 16_000;
 const MACOS_CAPTURE_SAMPLE_WIDTH_BYTES: usize = 2;
-const AUDIO_DUMP_SWIFT_SOURCE: &str = include_str!("../examples/audio_dump.swift");
 
-static MACOS_CAPTURE_CHILD: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
+static MACOS_CAPTURE_SESSION: OnceLock<Mutex<Option<CaptureSession>>> = OnceLock::new();
 
-fn macos_capture_child() -> &'static Mutex<Option<Child>> {
-    MACOS_CAPTURE_CHILD.get_or_init(|| Mutex::new(None))
+fn macos_capture_session() -> &'static Mutex<Option<CaptureSession>> {
+    MACOS_CAPTURE_SESSION.get_or_init(|| Mutex::new(None))
 }
 
 pub fn stop_macos_system_audio_capture() {
-    if let Some(mut child) = macos_capture_child().lock().unwrap().take() {
-        let _ = child.kill();
-        let _ = child.wait();
+    if let Some(mut session) = macos_capture_session().lock().unwrap().take() {
+        session.stop();
+        let _ = session.wait();
     }
 }
 
@@ -41,8 +36,8 @@ pub fn start_macos_system_audio_transcription(
     status_callback: Option<StatusCallback>,
     transcript_config: Option<TranscriptRuntimeConfig>,
 ) -> Result<JoinHandle<()>, String> {
-    let helper_binary = ensure_audio_dump_binary()?;
     let transcript_config = transcript_config.unwrap_or_default();
+    let backend_name = selected_backend_name().to_string();
     let transcriber = build_transcriber(
         &selected_asr_vendor,
         pcm_callback,
@@ -53,7 +48,14 @@ pub fn start_macos_system_audio_transcription(
     RECORDING.store(true, std::sync::atomic::Ordering::SeqCst);
 
     Ok(thread::spawn(move || {
-        if let Err(err) = run_capture_loop(&helper_binary, capture_interval, transcriber) {
+        write_some_log(
+            format!(
+                "Starting macOS system audio capture with backend: {}",
+                backend_name
+            )
+            .as_str(),
+        );
+        if let Err(err) = run_capture_loop(capture_interval, transcriber) {
             write_some_log(format!("macOS system audio capture failed: {err}").as_str());
             if let Some(callback) = status_callback.as_ref() {
                 callback(err);
@@ -122,33 +124,22 @@ fn build_transcriber(
 }
 
 fn run_capture_loop(
-    helper_binary: &PathBuf,
     capture_interval: u32,
     transcriber: Arc<dyn StreamingTranscriber>,
 ) -> Result<(), String> {
-    let mut command = Command::new(helper_binary);
-    command.stdout(Stdio::piped()).stderr(Stdio::piped());
-    let mut child = command
-        .spawn()
-        .map_err(|err| format!("Failed to start macOS audio helper: {err}"))?;
+    let backend_name = selected_backend_name();
+    let mut session = spawn_system_audio_capture()?;
+    let stdout = session.take_stdout()?;
+    let stderr = session.take_stderr()?;
 
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| "macOS audio helper stdout unavailable".to_string())?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| "macOS audio helper stderr unavailable".to_string())?;
-
-    *macos_capture_child().lock().unwrap() = Some(child);
+    *macos_capture_session().lock().unwrap() = Some(session);
 
     let stderr_lines = Arc::new(Mutex::new(Vec::<String>::new()));
     let stderr_lines_for_thread = stderr_lines.clone();
     let stderr_handle = thread::spawn(move || {
         let reader = BufReader::new(stderr);
         for line in reader.lines().map_while(Result::ok) {
-            write_some_log(format!("macOS helper: {line}").as_str());
+            write_some_log(format!("macOS system audio [{backend_name}]: {line}").as_str());
             stderr_lines_for_thread.lock().unwrap().push(line);
         }
     });
@@ -181,91 +172,37 @@ fn run_capture_loop(
 
         while pcm_samples.len() >= chunk_samples {
             let chunk = pcm_samples.drain(..chunk_samples).collect::<Vec<_>>();
-            transcriber
-                .queue_chunk(chunk)
-                .map_err(|err| format!("macOS helper streaming chunk send failed: {err}"))?;
+            transcriber.queue_chunk(chunk).map_err(|err| {
+                format!("macOS system audio [{backend_name}] chunk send failed: {err}")
+            })?;
         }
     }
 
     if !pcm_samples.is_empty() {
-        transcriber
-            .queue_chunk(pcm_samples)
-            .map_err(|err| format!("macOS helper final chunk send failed: {err}"))?;
+        transcriber.queue_chunk(pcm_samples).map_err(|err| {
+            format!("macOS system audio [{backend_name}] final chunk send failed: {err}")
+        })?;
     }
 
     transcriber.shutdown();
     let _ = stderr_handle.join();
 
-    if let Some(mut child) = macos_capture_child().lock().unwrap().take() {
+    if let Some(mut session) = macos_capture_session().lock().unwrap().take() {
         if RECORDING.load(std::sync::atomic::Ordering::SeqCst) {
-            let _ = child.kill();
+            session.stop();
         }
-        let status = child
-            .wait()
-            .map_err(|err| format!("Failed waiting for macOS audio helper: {err}"))?;
-        if !status.success() && RECORDING.load(std::sync::atomic::Ordering::SeqCst) {
-            let stderr_output = stderr_lines.lock().unwrap().join("\n");
-            let message = if stderr_output.trim().is_empty() {
-                format!("macOS audio helper exited with status {status}")
-            } else {
-                format!("macOS audio helper exited with status {status}: {stderr_output}")
-            };
-            return Err(message);
+        if let Err(err) = session.wait() {
+            if RECORDING.load(std::sync::atomic::Ordering::SeqCst) {
+                let stderr_output = stderr_lines.lock().unwrap().join("\n");
+                let message = if stderr_output.trim().is_empty() {
+                    err
+                } else {
+                    format!("{err}: {stderr_output}")
+                };
+                return Err(message);
+            }
         }
     }
 
     Ok(())
-}
-
-fn ensure_audio_dump_binary() -> Result<PathBuf, String> {
-    let mut hasher = Sha256::new();
-    hasher.update(AUDIO_DUMP_SWIFT_SOURCE.as_bytes());
-    let digest = hex_encode(hasher.finalize());
-    let helper_dir = std::env::temp_dir().join("audio-courier-screen-capture");
-    let source_path = helper_dir.join(format!("audio_dump_{}.swift", &digest[..12]));
-    let binary_path = helper_dir.join(format!("audio_dump_{}", &digest[..12]));
-
-    if binary_path.exists() {
-        return Ok(binary_path);
-    }
-
-    fs::create_dir_all(&helper_dir)
-        .map_err(|err| format!("Failed to create macOS helper directory: {err}"))?;
-    fs::write(&source_path, AUDIO_DUMP_SWIFT_SOURCE)
-        .map_err(|err| format!("Failed to write macOS helper source: {err}"))?;
-
-    let output = Command::new("xcrun")
-        .args([
-            "swiftc",
-            "-parse-as-library",
-            source_path
-                .to_str()
-                .ok_or_else(|| "Failed to encode macOS helper source path".to_string())?,
-            "-o",
-            binary_path
-                .to_str()
-                .ok_or_else(|| "Failed to encode macOS helper binary path".to_string())?,
-            "-framework",
-            "ScreenCaptureKit",
-            "-framework",
-            "AVFoundation",
-            "-framework",
-            "CoreMedia",
-        ])
-        .output()
-        .map_err(|err| format!("Failed to compile macOS audio helper with xcrun: {err}"))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(format!(
-            "Failed compiling macOS audio helper: {}",
-            if stderr.is_empty() {
-                "unknown swiftc error".to_string()
-            } else {
-                stderr
-            }
-        ));
-    }
-
-    Ok(binary_path)
 }
