@@ -10,13 +10,23 @@ use crate::transcript_vendors::TranscriptEvent;
 use cpal::traits::{DeviceTrait, HostTrait};
 use serde::Serialize;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
 
 pub static RECORD_HANDLE: OnceLock<Mutex<Option<std::thread::JoinHandle<()>>>> = OnceLock::new();
+static RECORDING_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 pub fn get_record_handle() -> &'static Mutex<Option<std::thread::JoinHandle<()>>> {
     RECORD_HANDLE.get_or_init(|| Mutex::new(None))
+}
+
+fn set_recording_requested(target: bool) {
+    RECORDING_REQUESTED.store(target, Ordering::SeqCst);
+}
+
+fn is_recording_requested() -> bool {
+    RECORDING_REQUESTED.load(Ordering::SeqCst)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -200,6 +210,8 @@ pub fn get_audio_stream_devices_names() -> Result<Vec<AudioChannelOption>, Strin
 
 #[tauri::command]
 pub fn stop_recognize_audio_stream_from_speaker_loopback() {
+    set_recording_requested(false);
+
     #[cfg(target_os = "macos")]
     stop_macos_system_audio_capture();
 
@@ -218,6 +230,8 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     capture_interval: u32,
     transcript_config: Option<TranscriptRuntimeConfig>,
 ) {
+    set_recording_requested(true);
+
     let selected_device = parse_selected_audio_device(device_name.as_deref());
     let (device, is_input_device, device_occurrence) = match selected_device {
         SelectedAudioDevice::DefaultOutput => ("default".to_string(), false, None),
@@ -256,6 +270,14 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
             transcript_config,
         ) {
             Ok(handle) => {
+                if !is_recording_requested() {
+                    #[cfg(target_os = "macos")]
+                    stop_macos_system_audio_capture();
+                    stop_recording(handle);
+                    println!("macOS 系统音频识别启动结果已丢弃，原因：录制已被停止");
+                    return;
+                }
+
                 let mut guard = get_record_handle().lock().unwrap();
                 *guard = Some(handle);
                 println!("macOS 系统音频识别已开始 ✅");
@@ -284,6 +306,12 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
     };
 
     if let Ok(handle) = start_record_audio_with_writer(params) {
+        if !is_recording_requested() {
+            stop_recording(handle);
+            println!("录音线程启动结果已丢弃，原因：录制已被停止");
+            return;
+        }
+
         let mut guard = get_record_handle().lock().unwrap();
         *guard = Some(handle);
         println!("录音识别已开始 ✅");

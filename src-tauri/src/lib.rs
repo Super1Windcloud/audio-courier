@@ -26,7 +26,7 @@ pub use provider_config::{TranscriptRuntimeConfig, transcript_runtime_config_fro
 use std::path::PathBuf;
 use tauri::LogicalSize;
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
-use tauri_plugin_global_shortcut::ShortcutState;
+use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
 use tauri_plugin_log::{Target, TargetKind};
 pub use transcript_vendors::*;
 pub use utils::*;
@@ -235,6 +235,11 @@ pub fn run() {
                 .expect("failed to register rust global shortcut Shift+Enter")
                 .with_handler(|app, shortcut, event| {
                     if event.state != ShortcutState::Pressed {
+                        return;
+                    }
+
+                    if !shortcut.matches(Modifiers::SHIFT, Code::Enter) {
+                        info!("ignored non-send global shortcut: {}", shortcut);
                         return;
                     }
 
