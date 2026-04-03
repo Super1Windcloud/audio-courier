@@ -157,7 +157,10 @@ async function cleanupExcludedSidecars(extraArgs: string[]) {
 		return;
 	}
 
-	const licenseToolPath = path.join(releaseTargetDir, executableName("license_tool"));
+	const licenseToolPath = path.join(
+		releaseTargetDir,
+		executableName("license_tool"),
+	);
 	await rm(licenseToolPath, { force: true });
 	console.log(`removed stale ${path.relative(rootDir, licenseToolPath)}`);
 }
@@ -167,7 +170,12 @@ function hasFeature(args: string[], feature: string) {
 		const current = args[index];
 		if (current === "--features") {
 			const value = args[index + 1] ?? "";
-			if (value.split(",").map((item) => item.trim()).includes(feature)) {
+			if (
+				value
+					.split(",")
+					.map((item) => item.trim())
+					.includes(feature)
+			) {
 				return true;
 			}
 			index += 1;
@@ -176,7 +184,12 @@ function hasFeature(args: string[], feature: string) {
 
 		if (current.startsWith("--features=")) {
 			const value = current.slice("--features=".length);
-			if (value.split(",").map((item) => item.trim()).includes(feature)) {
+			if (
+				value
+					.split(",")
+					.map((item) => item.trim())
+					.includes(feature)
+			) {
 				return true;
 			}
 		}
