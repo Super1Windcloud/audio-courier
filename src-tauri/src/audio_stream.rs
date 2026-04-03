@@ -1,6 +1,10 @@
 #![allow(clippy::needless_bool)]
 
 use crate::loopback::{RecordParams, start_record_audio_with_writer, stop_recording};
+#[cfg(target_os = "macos")]
+use crate::macos_system_audio::{
+    start_macos_system_audio_transcription, stop_macos_system_audio_capture,
+};
 use crate::provider_config::TranscriptRuntimeConfig;
 use crate::transcript_vendors::TranscriptEvent;
 use cpal::traits::{DeviceTrait, HostTrait};
@@ -196,6 +200,9 @@ pub fn get_audio_stream_devices_names() -> Result<Vec<AudioChannelOption>, Strin
 
 #[tauri::command]
 pub fn stop_recognize_audio_stream_from_speaker_loopback() {
+    #[cfg(target_os = "macos")]
+    stop_macos_system_audio_capture();
+
     if let Some(handle) = get_record_handle().lock().unwrap().take() {
         stop_recording(handle);
     } else {
@@ -227,6 +234,39 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
             eprintln!("Failed to emit transcription error: {err}");
         }
     });
+    let pcm_callback = Arc::new(move |event: TranscriptEvent| {
+        let mut last = last_result.lock().unwrap();
+        if last.as_ref() == Some(&event) {
+            return;
+        }
+
+        *last = Some(event.clone());
+        if let Err(err) = transcript_app.emit("transcription_event", event) {
+            eprintln!("Failed to emit transcription event: {err}");
+        }
+    });
+
+    #[cfg(target_os = "macos")]
+    if !is_input_device {
+        match start_macos_system_audio_transcription(
+            capture_interval,
+            selected_asr_vendor,
+            pcm_callback,
+            Some(status_callback),
+            transcript_config,
+        ) {
+            Ok(handle) => {
+                let mut guard = get_record_handle().lock().unwrap();
+                *guard = Some(handle);
+                println!("macOS 系统音频识别已开始 ✅");
+            }
+            Err(err) => {
+                eprintln!("macOS 系统音频识别启动失败 ❌ {err}");
+            }
+        }
+        return;
+    }
+
     let params = RecordParams {
         device,
         is_input_device,
@@ -234,17 +274,7 @@ pub fn start_recognize_audio_stream_from_speaker_loopback(
         file_name: String::new(),
         capture_interval,
         only_pcm: true,
-        pcm_callback: Some(Arc::new(move |event: TranscriptEvent| {
-            let mut last = last_result.lock().unwrap();
-            if last.as_ref() == Some(&event) {
-                return;
-            }
-
-            *last = Some(event.clone());
-            if let Err(err) = transcript_app.emit("transcription_event", event) {
-                eprintln!("Failed to emit transcription event: {err}");
-            }
-        })),
+        pcm_callback: Some(pcm_callback),
 
         use_resampled: true,
         auto_chunk_buffer: false,
