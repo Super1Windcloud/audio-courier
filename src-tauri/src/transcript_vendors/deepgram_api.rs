@@ -350,10 +350,7 @@ async fn run_session(
     Ok(())
 }
 
-fn describe_close_frame(
-    vendor: &str,
-    frame: Option<&tungstenite::protocol::CloseFrame>,
-) -> String {
+fn describe_close_frame(vendor: &str, frame: Option<&tungstenite::protocol::CloseFrame>) -> String {
     match frame {
         Some(frame) => format!(
             "{vendor} websocket closed unexpectedly (code={:?}, reason={})",

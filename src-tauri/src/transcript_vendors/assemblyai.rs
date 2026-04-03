@@ -216,7 +216,9 @@ async fn run_stream(
                                     if stop_requested.load(Ordering::SeqCst) {
                                         break;
                                     }
-                                    return Err("AssemblyAI websocket terminated unexpectedly".into());
+                                    return Err(
+                                        "AssemblyAI websocket terminated unexpectedly".into()
+                                    );
                                 }
                                 _ => {
                                     let transcripts = extract_transcripts(&value);
@@ -266,7 +268,9 @@ async fn run_stream(
 
             if !stop_requested.load(Ordering::SeqCst) {
                 let _ = termination_tx.send(true);
-                return Err("AssemblyAI websocket closed unexpectedly without a close frame".into());
+                return Err(
+                    "AssemblyAI websocket closed unexpectedly without a close frame".into(),
+                );
             }
 
             let _ = termination_tx.send(true);
@@ -278,10 +282,7 @@ async fn run_stream(
     Ok(())
 }
 
-fn describe_close_frame(
-    vendor: &str,
-    frame: Option<&tungstenite::protocol::CloseFrame>,
-) -> String {
+fn describe_close_frame(vendor: &str, frame: Option<&tungstenite::protocol::CloseFrame>) -> String {
     match frame {
         Some(frame) => format!(
             "{vendor} websocket closed unexpectedly (code={:?}, reason={})",
