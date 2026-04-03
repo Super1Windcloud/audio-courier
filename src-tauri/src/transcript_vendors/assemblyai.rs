@@ -207,56 +207,66 @@ async fn run_stream(
                     let _ = termination_tx.send(true);
                     format!("AssemblyAI receive error: {e}")
                 })?;
-                if let Message::Text(payload) = message {
-                    if let Ok(value) = serde_json::from_str::<Value>(&payload) {
-                        match resolve_event_type(&value) {
-                            Some("Termination") => {
-                                let _ = termination_tx.send(true);
-                                if stop_requested.load(Ordering::SeqCst) {
-                                    break;
+                match message {
+                    Message::Text(payload) => {
+                        if let Ok(value) = serde_json::from_str::<Value>(&payload) {
+                            match resolve_event_type(&value) {
+                                Some("Termination") => {
+                                    let _ = termination_tx.send(true);
+                                    if stop_requested.load(Ordering::SeqCst) {
+                                        break;
+                                    }
+                                    return Err("AssemblyAI websocket terminated unexpectedly".into());
                                 }
-                                return Err("AssemblyAI websocket terminated unexpectedly".into());
-                            }
-                            _ => {
-                                let transcripts = extract_transcripts(&value);
-                                for (transcript, is_final) in transcripts {
-                                    let normalized = normalize_transcript_text(&transcript);
-                                    if normalized.is_empty() {
-                                        continue;
-                                    }
+                                _ => {
+                                    let transcripts = extract_transcripts(&value);
+                                    for (transcript, is_final) in transcripts {
+                                        let normalized = normalize_transcript_text(&transcript);
+                                        if normalized.is_empty() {
+                                            continue;
+                                        }
 
-                                    let next_event =
-                                        (is_final, normalize_transcript_dedup_key(&normalized));
-                                    if last_emitted.as_ref() == Some(&next_event) {
-                                        continue;
-                                    }
+                                        let next_event =
+                                            (is_final, normalize_transcript_dedup_key(&normalized));
+                                        if last_emitted.as_ref() == Some(&next_event) {
+                                            continue;
+                                        }
 
-                                    last_emitted = Some(next_event);
-                                    if is_final {
-                                        let commit = {
-                                            let mut buffer = utterance_buffer.lock().await;
-                                            append_utterance_segment(&mut buffer, &normalized);
-                                            buffer.trim().to_string()
-                                        };
-                                        emit_commit(&callback, "AssemblyAI", &commit);
-                                        utterance_buffer.lock().await.clear();
-                                    } else {
-                                        let draft = {
-                                            let buffer = utterance_buffer.lock().await;
-                                            merge_segments(&buffer, &normalized)
-                                        };
-                                        emit_draft(&callback, "AssemblyAI", &draft);
+                                        last_emitted = Some(next_event);
+                                        if is_final {
+                                            let commit = {
+                                                let mut buffer = utterance_buffer.lock().await;
+                                                append_utterance_segment(&mut buffer, &normalized);
+                                                buffer.trim().to_string()
+                                            };
+                                            emit_commit(&callback, "AssemblyAI", &commit);
+                                            utterance_buffer.lock().await.clear();
+                                        } else {
+                                            let draft = {
+                                                let buffer = utterance_buffer.lock().await;
+                                                merge_segments(&buffer, &normalized)
+                                            };
+                                            emit_draft(&callback, "AssemblyAI", &draft);
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    Message::Close(frame) => {
+                        let _ = termination_tx.send(true);
+                        if stop_requested.load(Ordering::SeqCst) {
+                            break;
+                        }
+                        return Err(describe_close_frame("AssemblyAI", frame.as_ref()));
+                    }
+                    _ => {}
                 }
             }
 
             if !stop_requested.load(Ordering::SeqCst) {
                 let _ = termination_tx.send(true);
-                return Err("AssemblyAI websocket closed unexpectedly".into());
+                return Err("AssemblyAI websocket closed unexpectedly without a close frame".into());
             }
 
             let _ = termination_tx.send(true);
@@ -266,6 +276,19 @@ async fn run_stream(
 
     try_join(send_audio, receive_events).await?;
     Ok(())
+}
+
+fn describe_close_frame(
+    vendor: &str,
+    frame: Option<&tungstenite::protocol::CloseFrame>,
+) -> String {
+    match frame {
+        Some(frame) => format!(
+            "{vendor} websocket closed unexpectedly (code={:?}, reason={})",
+            frame.code, frame.reason
+        ),
+        None => format!("{vendor} websocket closed unexpectedly without a close frame"),
+    }
 }
 
 fn extract_transcripts(value: &Value) -> Vec<(String, bool)> {

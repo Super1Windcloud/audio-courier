@@ -314,12 +314,12 @@ async fn stream_once(
                             return Err(format!("Gladia returned error payload: {payload}"));
                         }
                     }
-                    Message::Close(_) => {
+                    Message::Close(frame) => {
                         let _ = termination_tx.send(true);
                         if stop_requested.load(Ordering::SeqCst) {
                             break;
                         }
-                        return Err("Gladia websocket closed unexpectedly".into());
+                        return Err(describe_close_frame("Gladia", frame.as_ref()));
                     }
                     _ => {}
                 }
@@ -327,7 +327,7 @@ async fn stream_once(
 
             if !stop_requested.load(Ordering::SeqCst) {
                 let _ = termination_tx.send(true);
-                return Err("Gladia websocket closed unexpectedly".into());
+                return Err("Gladia websocket closed unexpectedly without a close frame".into());
             }
 
             let _ = termination_tx.send(true);
@@ -337,6 +337,19 @@ async fn stream_once(
 
     try_join(send_audio, receive_events).await?;
     Ok(())
+}
+
+fn describe_close_frame(
+    vendor: &str,
+    frame: Option<&tungstenite::protocol::CloseFrame>,
+) -> String {
+    match frame {
+        Some(frame) => format!(
+            "{vendor} websocket closed unexpectedly (code={:?}, reason={})",
+            frame.code, frame.reason
+        ),
+        None => format!("{vendor} websocket closed unexpectedly without a close frame"),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

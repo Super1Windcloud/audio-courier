@@ -390,7 +390,7 @@ async fn run_session(
                                 {
                                     return Ok::<(), String>(());
                                 }
-                                return Err("Speechmatics websocket closed unexpectedly".into());
+                                return Err("Speechmatics websocket closed unexpectedly without a close frame".into());
                             }
                             "Error" => {
                                 let _ = termination_tx.send(true);
@@ -403,14 +403,14 @@ async fn run_session(
                             _ => {}
                         }
                     }
-                    Message::Close(_) => {
+                    Message::Close(frame) => {
                         let _ = termination_tx.send(true);
                         flush_current_utterance(&callback, &utterance_buffer, &last_partial).await;
                         if eos_sent.load(Ordering::SeqCst) || stop_requested.load(Ordering::SeqCst)
                         {
                             return Ok::<(), String>(());
                         }
-                        return Err("Speechmatics websocket closed unexpectedly".into());
+                        return Err(describe_close_frame("Speechmatics", frame.as_ref()));
                     }
                     _ => {}
                 }
@@ -421,13 +421,26 @@ async fn run_session(
             if eos_sent.load(Ordering::SeqCst) || stop_requested.load(Ordering::SeqCst) {
                 Ok::<(), String>(())
             } else {
-                Err("Speechmatics websocket closed unexpectedly".into())
+                Err("Speechmatics websocket closed unexpectedly without a close frame".into())
             }
         }
     };
 
     try_join(send_audio, receive_events).await?;
     Ok(())
+}
+
+fn describe_close_frame(
+    vendor: &str,
+    frame: Option<&tungstenite::protocol::CloseFrame>,
+) -> String {
+    match frame {
+        Some(frame) => format!(
+            "{vendor} websocket closed unexpectedly (code={:?}, reason={})",
+            frame.code, frame.reason
+        ),
+        None => format!("{vendor} websocket closed unexpectedly without a close frame"),
+    }
 }
 
 fn build_start_recognition_payload(language: &str, sample_rate: u32) -> Value {

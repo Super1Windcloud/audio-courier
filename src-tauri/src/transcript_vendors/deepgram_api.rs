@@ -322,7 +322,7 @@ async fn run_session(
                             _ => {}
                         }
                     }
-                    Message::Close(_) => {
+                    Message::Close(frame) => {
                         let _ = termination_tx.send(true);
                         flush_utterance(&utterance_buffer, &callback).await;
                         if close_sent.load(Ordering::SeqCst)
@@ -330,7 +330,7 @@ async fn run_session(
                         {
                             return Ok::<(), String>(());
                         }
-                        return Err("Deepgram websocket closed unexpectedly".into());
+                        return Err(describe_close_frame("Deepgram", frame.as_ref()));
                     }
                     _ => {}
                 }
@@ -341,13 +341,26 @@ async fn run_session(
             if close_sent.load(Ordering::SeqCst) || stop_requested.load(Ordering::SeqCst) {
                 Ok::<(), String>(())
             } else {
-                Err("Deepgram websocket closed unexpectedly".into())
+                Err("Deepgram websocket closed unexpectedly without a close frame".into())
             }
         }
     };
 
     try_join(send_audio, receive_events).await?;
     Ok(())
+}
+
+fn describe_close_frame(
+    vendor: &str,
+    frame: Option<&tungstenite::protocol::CloseFrame>,
+) -> String {
+    match frame {
+        Some(frame) => format!(
+            "{vendor} websocket closed unexpectedly (code={:?}, reason={})",
+            frame.code, frame.reason
+        ),
+        None => format!("{vendor} websocket closed unexpectedly without a close frame"),
+    }
 }
 
 fn build_streaming_url(language: Option<&str>, sample_rate: u32) -> String {
