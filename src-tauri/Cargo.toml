@@ -1,6 +1,6 @@
 [package]
 name = "audio-courier"
-version = "1.1.0"
+version = "1.1.1"
 description = "A Tauri App for audio capture"
 authors = ["superwindcloud"]
 edition = "2024"
@@ -12,7 +12,7 @@ homepage = "https://github.com/super1windcloud/audio-courier"
 repository = "https://github.com/super1windcloud/audio-courier"
 license = "GPL"
 default-run = "audio-courier"
-autobins = false
+autobins = true
 autolib = true
 autotests = false
 autoexamples = true
@@ -34,10 +34,6 @@ path = "src/lib.rs"
 [[bin]]
 name = "audio-courier"
 path = "src/main.rs"
-
-[[bin]]
-name = "license_tool"
-path = "src/bin/license_tool.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

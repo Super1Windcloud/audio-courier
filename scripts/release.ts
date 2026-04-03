@@ -19,6 +19,7 @@ const bundleDir = path.join(
 	"release",
 	"bundle",
 );
+const releaseTargetDir = path.join(rootDir, "src-tauri", "target", "release");
 const macosBundleDir = path.join(bundleDir, "macos");
 const tauriConfigPath = path.join(rootDir, "src-tauri", "tauri.conf.json");
 const cargoTomlPath = path.join(rootDir, "src-tauri", "Cargo.toml");
@@ -136,6 +137,7 @@ function assertVersions(versions: {
 async function buildRelease(version: string) {
 	await ensureSigningEnv();
 	const extraArgs = splitArgs(process.env.RELEASE_TAURI_ARGS);
+	await cleanupExcludedSidecars(extraArgs);
 	await rm(bundleDir, { recursive: true, force: true });
 	console.log(`removed ${path.relative(rootDir, bundleDir)} before build`);
 	console.log(`building audio-courier ${version}`);
@@ -145,6 +147,46 @@ async function buildRelease(version: string) {
 			CI: "true",
 		},
 	});
+}
+
+async function cleanupExcludedSidecars(extraArgs: string[]) {
+	const shouldIncludeLicenseTool =
+		process.platform === "win32" || hasFeature(extraArgs, "license-tool");
+
+	if (shouldIncludeLicenseTool) {
+		return;
+	}
+
+	const licenseToolPath = path.join(releaseTargetDir, executableName("license_tool"));
+	await rm(licenseToolPath, { force: true });
+	console.log(`removed stale ${path.relative(rootDir, licenseToolPath)}`);
+}
+
+function hasFeature(args: string[], feature: string) {
+	for (let index = 0; index < args.length; index += 1) {
+		const current = args[index];
+		if (current === "--features") {
+			const value = args[index + 1] ?? "";
+			if (value.split(",").map((item) => item.trim()).includes(feature)) {
+				return true;
+			}
+			index += 1;
+			continue;
+		}
+
+		if (current.startsWith("--features=")) {
+			const value = current.slice("--features=".length);
+			if (value.split(",").map((item) => item.trim()).includes(feature)) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+function executableName(name: string) {
+	return process.platform === "win32" ? `${name}.exe` : name;
 }
 
 async function cleanupMacOsBundle() {

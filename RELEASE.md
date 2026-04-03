@@ -27,6 +27,9 @@ That means every release must upload:
 pnpm release
 ```
 
+`license_tool` is no longer part of the main Tauri crate, so app bundles on macOS, Linux, and Windows do not include it as a nested application binary.
+If you need the licensing helper, run it from the separate tools crate at `src-tauri/tools`.
+
 This script will:
 
 - build the signed Tauri bundle
@@ -52,6 +55,12 @@ $env:GITHUB_TOKEN="..."
 $env:RELEASE_NOTES_FILE="release-notes.md"
 $env:RELEASE_TAURI_ARGS="--target x86_64-pc-windows-msvc"
 pnpm release
+```
+
+If you want to run the licensing helper from `just`, use:
+
+```powershell
+just license_tool -- generate-keypair
 ```
 
 ## CI release

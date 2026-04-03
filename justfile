@@ -23,6 +23,7 @@ release:
 publish:
     pnpm release
 
+
 rollback:
     tsx scripts/patch-version.ts  &&  just build
 
@@ -31,6 +32,13 @@ build:
 
 apple_arm:
     RELEASE_TAURI_ARGS="--target aarch64-apple-darwin" just release
+
+release_windows:
+    pnpm bump
+    pnpm release
+
+license_tool:
+    cargo run --manifest-path src-tauri/tools/Cargo.toml --bin license_tool --
 
 clean:
     cd  src-tauri &&  cargo clean
