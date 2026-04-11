@@ -54,10 +54,13 @@ pub struct AudioChannelOption {
 }
 
 fn device_display_name(device: &cpal::Device) -> Option<String> {
-    device
-        .description()
-        .ok()
-        .map(|description| description.name().to_string())
+    device.description().ok().map(|description| {
+        description
+            .extended()
+            .first()
+            .cloned()
+            .unwrap_or_else(|| description.name().to_string())
+    })
 }
 
 fn build_audio_channel_value(

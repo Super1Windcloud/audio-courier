@@ -24,10 +24,13 @@ use std::thread::JoinHandle;
 pub static TOTAL_SAMPLES_WRITTEN: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
 
 fn device_display_name(device: &cpal::Device) -> Option<String> {
-    device
-        .description()
-        .ok()
-        .map(|description| description.name().to_string())
+    device.description().ok().map(|description| {
+        description
+            .extended()
+            .first()
+            .cloned()
+            .unwrap_or_else(|| description.name().to_string())
+    })
 }
 
 /** static 全局变量，用于控制录音线程的状态
