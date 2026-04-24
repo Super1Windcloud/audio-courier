@@ -4,6 +4,9 @@
 
 `https://github.com/Super1Windcloud/audio-courier/releases/latest/download/latest.json`
 
+Do not point the updater to `raw.githubusercontent.com/.../updater/latest.json`.
+That file is only a local build artifact before upload and can also be delayed by CDN caching.
+
 That means every release must upload:
 
 - the platform bundle used by the updater

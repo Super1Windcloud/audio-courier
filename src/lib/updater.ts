@@ -5,7 +5,7 @@ import { toast } from "sonner";
 export const OPEN_UPDATER_DIALOG_EVENT = "audio-courier:open-updater-dialog";
 // Keep this in sync with src-tauri/tauri.conf.json plugin updater endpoints.
 export const UPDATER_ENDPOINTS = [
-	"https://raw.githubusercontent.com/Super1Windcloud/audio-courier/main/updater/latest.json",
+	"https://github.com/Super1Windcloud/audio-courier/releases/latest/download/latest.json",
 ] as const;
 
 interface UpdaterManifest {
