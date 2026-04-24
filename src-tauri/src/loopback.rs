@@ -166,21 +166,28 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
     let asr_vendor: TranscriptVendors = params.selected_asr_vendor.parse()?;
 
     let config_sample_rate = config.sample_rate();
-    let spec = hound::WavSpec {
-        channels: 1,
-        sample_rate: config_sample_rate,
-        bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
-    };
-    let path = if params.file_name.trim().is_empty() {
-        concat!(env!("CARGO_MANIFEST_DIR"), "/assets/transfer_recorded.wav")
+    let path = if params.only_pcm {
+        None
     } else {
-        params.file_name.as_str()
+        Some(if params.file_name.trim().is_empty() {
+            concat!(env!("CARGO_MANIFEST_DIR"), "/assets/transfer_recorded.wav").to_string()
+        } else {
+            params.file_name.clone()
+        })
     };
-
-    let writer = hound::WavWriter::create(path, spec)
-        .map_err(|e| format!("Failed to create WAV writer: {e}"))?;
-    let writer = Arc::new(Mutex::new(Some(writer)));
+    let writer = if let Some(path) = path.as_deref() {
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: config_sample_rate,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let writer = hound::WavWriter::create(path, spec)
+            .map_err(|e| format!("Failed to create WAV writer: {e}"))?;
+        Arc::new(Mutex::new(Some(writer)))
+    } else {
+        Arc::new(Mutex::new(None))
+    };
 
     let writer_clone = writer.clone();
     let err_fn = move |err| {
@@ -327,7 +334,9 @@ pub fn record_audio_worker(mut params: RecordParams) -> Result<(), String> {
             .finalize()
             .map_err(|e| format!("Failed to finalize WAV file: {e}"))?;
 
-        write_some_log(format!("Recording complete! Saved to {path}").as_str());
+        if let Some(path) = path.as_deref() {
+            write_some_log(format!("Recording complete! Saved to {path}").as_str());
+        }
     }
 
     Ok(())
