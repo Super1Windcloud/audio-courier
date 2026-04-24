@@ -102,7 +102,7 @@ export function createDefaultLlmProviderSettings(): LlmProviderSettings {
 		aliQwenApiKey: "",
 		openaiApiKey: "",
 		openaiBaseUrl: "https://api.openai.com/v1",
-		openaiModel: "gpt-4.1-mini",
+		openaiModel: "gpt-5.4",
 		geminiApiKey: "",
 		geminiBaseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
 		geminiModel: "gemini-3-flash-preview",

@@ -210,7 +210,7 @@ export function LlmProviderDialog({
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, openaiModel: value }))
 								}
-								placeholder="gpt-4.1-mini"
+								placeholder="gpt-5.4"
 								officialLink={llmProviderOfficialLinks.openaiModel}
 							/>
 							<div className="md:col-span-2">

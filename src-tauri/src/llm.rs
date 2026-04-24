@@ -299,7 +299,7 @@ fn resolve_provider(
             model: resolve_string_or_default(
                 runtime_config.openai_model.as_deref(),
                 &["OPENAI_MODEL"],
-                "gpt-4.1-mini",
+                "gpt-5.4",
             ),
             base_url: resolve_string_or_default(
                 runtime_config.openai_base_url.as_deref(),
