@@ -1,19 +1,9 @@
+import { isTauri } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { toast } from "sonner";
 
 export const OPEN_UPDATER_DIALOG_EVENT = "audio-courier:open-updater-dialog";
-// Keep this in sync with src-tauri/tauri.conf.json plugin updater endpoints.
-export const UPDATER_ENDPOINTS = [
-	"https://github.com/Super1Windcloud/audio-courier/releases/latest/download/latest.json",
-] as const;
-
-interface UpdaterManifest {
-	version?: string;
-	notes?: string;
-	pub_date?: string;
-	platforms?: Record<string, unknown>;
-}
 
 export function formatBytes(bytes?: number) {
 	if (!bytes || Number.isNaN(bytes)) {
@@ -31,22 +21,16 @@ export function toErrorMessage(error: unknown) {
 	return String(error);
 }
 
-export async function checkForUpdate() {
-	return await check();
+export function isUpdaterSupported() {
+	return isTauri();
 }
 
-export async function fetchUpdaterManifest(
-	endpoint = UPDATER_ENDPOINTS[0],
-): Promise<UpdaterManifest | null> {
-	const response = await fetch(endpoint, {
-		cache: "no-store",
-	});
-
-	if (!response.ok) {
-		throw new Error(`updater manifest request failed: ${response.status}`);
+export async function checkForUpdate() {
+	if (!isUpdaterSupported()) {
+		return null;
 	}
 
-	return (await response.json()) as UpdaterManifest;
+	return await check();
 }
 
 export async function downloadAndInstallUpdate(
@@ -57,6 +41,10 @@ export async function downloadAndInstallUpdate(
 		downloadedBytes: number;
 	}) => void,
 ) {
+	if (!isUpdaterSupported()) {
+		throw new Error("当前仅 Tauri 桌面端支持应用更新");
+	}
+
 	let totalBytes = 0;
 	let downloadedBytes = 0;
 
@@ -104,6 +92,13 @@ export async function downloadAndInstallUpdate(
 }
 
 export async function runUpdater() {
+	if (!isUpdaterSupported()) {
+		toast.message("当前运行在浏览器预览模式", {
+			description: "检查更新仅在 Tauri 桌面端可用。",
+		});
+		return;
+	}
+
 	try {
 		window.dispatchEvent(new CustomEvent(OPEN_UPDATER_DIALOG_EVENT));
 	} catch (error) {

@@ -1,3 +1,4 @@
+import { isTauri } from "@tauri-apps/api/core";
 import "./App.css";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
@@ -23,9 +24,7 @@ import { registryGlobalShortCuts, showWindow } from "@/lib/system.ts";
 import {
 	checkForUpdate,
 	downloadAndInstallUpdate,
-	fetchUpdaterManifest,
 	OPEN_UPDATER_DIALOG_EVENT,
-	toErrorMessage,
 } from "@/lib/updater.ts";
 import useAppStateStore from "@/stores";
 import type { LicenseStatus } from "@/types/license.ts";
@@ -110,6 +109,7 @@ function App() {
 	const [updateProgressTotalBytes, setUpdateProgressTotalBytes] = useState(0);
 	const [updateProgressDownloadedBytes, setUpdateProgressDownloadedBytes] =
 		useState(0);
+	const updaterSupported = isTauri();
 	const updateLicenseStatus = useAppStateStore(
 		(state) => state.updateLicenseStatus,
 	);
@@ -167,9 +167,10 @@ function App() {
 
 	const checkForUpdates = useEffectEvent(
 		async (source: "startup" | "manual") => {
-			const [currentVersion, update, manifestResult] = await Promise.allSettled(
-				[getVersion(), checkForUpdate(), fetchUpdaterManifest()],
-			);
+			const [currentVersion, update] = await Promise.allSettled([
+				getVersion(),
+				checkForUpdate(),
+			]);
 
 			if (currentVersion.status !== "fulfilled") {
 				throw currentVersion.reason;
@@ -179,25 +180,21 @@ function App() {
 				throw update.reason;
 			}
 
-			const manifestVersion =
-				manifestResult.status === "fulfilled"
-					? (manifestResult.value?.version ?? "unknown")
-					: `unavailable (${toErrorMessage(manifestResult.reason)})`;
 			const availableVersion = update.value?.version ?? "none";
 
 			console.log(
-				`[updater] ${source} current=${currentVersion.value} manifest=${manifestVersion} available=${availableVersion}`,
+				`[updater] ${source} current=${currentVersion.value} available=${availableVersion}`,
 			);
 			if (!update.value) {
 				console.log(
-					`[updater] ${source} plugin returned null current=${currentVersion.value} manifest=${manifestVersion}`,
+					`[updater] ${source} plugin returned null current=${currentVersion.value}`,
 				);
 				logInfo(
-					`${source} updater: no update available current=${currentVersion.value} manifest=${manifestVersion}`,
+					`${source} updater: no update available current=${currentVersion.value}`,
 				);
 				if (source === "manual") {
 					toast.message("未检测到可用更新", {
-						description: `当前版本 ${currentVersion.value}，manifest 版本 ${manifestVersion}`,
+						description: `当前版本 ${currentVersion.value}`,
 					});
 				}
 				setAvailableUpdate(null);
@@ -206,7 +203,7 @@ function App() {
 			}
 
 			logInfo(
-				`${source} updater: found version ${update.value.version} current=${currentVersion.value} manifest=${manifestVersion}`,
+				`${source} updater: found version ${update.value.version} current=${currentVersion.value}`,
 			);
 			setAvailableUpdate(update.value);
 			setUpdateDialogOpen(true);
@@ -217,7 +214,7 @@ function App() {
 	);
 
 	useEffect(() => {
-		if (isSignerMode || didCheckForUpdates.current) {
+		if (isSignerMode || !updaterSupported || didCheckForUpdates.current) {
 			return;
 		}
 
@@ -227,10 +224,10 @@ function App() {
 			console.error("startup updater check failed", error);
 			logError("startup updater check failed", error);
 		});
-	}, [isSignerMode]);
+	}, [isSignerMode, updaterSupported]);
 
 	useEffect(() => {
-		if (isSignerMode) {
+		if (isSignerMode || !updaterSupported) {
 			return;
 		}
 
@@ -250,7 +247,7 @@ function App() {
 				handleManualUpdateCheck,
 			);
 		};
-	}, [isSignerMode]);
+	}, [isSignerMode, updaterSupported]);
 
 	const handleInstallUpdate = async () => {
 		if (!availableUpdate || isInstallingUpdate) {

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { MoreVertical, RotateCcw, Save, Sparkles } from "lucide-react";
+import { MoreVertical, RotateCcw, Save, Sparkles, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { LlmProviderDialog } from "@/components/LlmProviderDialog.tsx";
@@ -22,6 +22,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import { extractResumeTextFromFile } from "@/lib/resumeImport.ts";
 import { runUpdater } from "@/lib/updater.ts";
 import useAppStateStore, {
 	type TranscribeVendor,
@@ -39,6 +40,7 @@ import {
 
 export function MoreMenu() {
 	const appState = useAppStateStore();
+	const resumeFileInputRef = useRef<HTMLInputElement>(null);
 	const currentAudioChannel = useAppStateStore(
 		(state) => state.currentAudioChannel,
 	);
@@ -55,6 +57,10 @@ export function MoreMenu() {
 	const [isTranscriptConfigDialogOpen, setIsTranscriptConfigDialogOpen] =
 		useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
+	const [isImportingResume, setIsImportingResume] = useState(false);
+	const [resumeImportTarget, setResumeImportTarget] = useState<
+		"llm" | "interview" | null
+	>(null);
 	const didAutoOpenTranscriptDialog = useRef(false);
 	const [promptDraft, setPromptDraft] = useState(appState.llmPrompt);
 	const [interviewPromptDraft, setInterviewPromptDraft] = useState(
@@ -179,8 +185,75 @@ export function MoreMenu() {
 		setInterviewPromptDraft(defaultInterviewPrompt);
 	};
 
+	const handleResumeImportTrigger = (target: "llm" | "interview") => {
+		setResumeImportTarget(target);
+		const input = resumeFileInputRef.current;
+		if (!input) {
+			toast.error("当前环境不支持文件导入");
+			return;
+		}
+		input.value = "";
+		input.click();
+	};
+
+	const handleResumeFileChange = async (
+		event: React.ChangeEvent<HTMLInputElement>,
+	) => {
+		const file = event.target.files?.[0];
+		const target = resumeImportTarget;
+		event.target.value = "";
+
+		if (!file || !target) {
+			return;
+		}
+
+		const lowerName = file.name.toLowerCase();
+		if (!lowerName.endsWith(".pdf") && !lowerName.endsWith(".docx")) {
+			toast.error("仅支持导入 PDF 或 DOCX 简历");
+			return;
+		}
+
+		setIsImportingResume(true);
+		try {
+			await new Promise((resolve) => window.setTimeout(resolve, 0));
+			const extractedText = await extractResumeTextFromFile(file);
+			const contextBlock = [
+				"【简历上下文】",
+				`来源文件：${file.name}`,
+				extractedText,
+				"【简历上下文结束】",
+			].join("\n");
+			if (target === "llm") {
+				setPromptDraft((current) =>
+					current.trim()
+						? `${current.trim()}\n\n${contextBlock}`
+						: contextBlock,
+				);
+			} else {
+				setInterviewPromptDraft((current) =>
+					current.trim()
+						? `${current.trim()}\n\n${contextBlock}`
+						: contextBlock,
+				);
+			}
+			toast.success(`已导入 ${file.name}`);
+		} catch (error) {
+			toast.error(String(error));
+		} finally {
+			setIsImportingResume(false);
+			setResumeImportTarget(null);
+		}
+	};
+
 	return (
 		<>
+			<input
+				ref={resumeFileInputRef}
+				type="file"
+				accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+				className="hidden"
+				onChange={handleResumeFileChange}
+			/>
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<MoreVertical className="text-gray-400 cursor-pointer bg-transparent" />
@@ -496,6 +569,11 @@ export function MoreMenu() {
 								<div className="prompt-editor-chip prompt-editor-chip-muted">
 									自我介绍 {interviewPromptDraft.length} 字符
 								</div>
+								{isImportingResume ? (
+									<div className="prompt-editor-chip prompt-editor-chip-muted">
+										简历解析中...
+									</div>
+								) : null}
 							</div>
 
 							<div className="prompt-editor-scroll">
@@ -507,6 +585,18 @@ export function MoreMenu() {
 									<p className="prompt-editor-field-description">
 										建议描述长期角色设定、回答风格、语言偏好和输出深度。
 									</p>
+									<div className="prompt-editor-field-toolbar">
+										<Button
+											type="button"
+											variant="ghost"
+											className="prompt-editor-import-button"
+											onClick={() => handleResumeImportTrigger("llm")}
+											disabled={isImportingResume}
+										>
+											<Upload className="h-4 w-4" />
+											导入 PDF / DOCX 简历
+										</Button>
+									</div>
 									<Textarea
 										value={promptDraft}
 										onChange={(e) => {
@@ -536,6 +626,18 @@ export function MoreMenu() {
 									<p className="prompt-editor-field-description">
 										适合写面试场景、身份口径、回答结构和需要优先强调的经历。
 									</p>
+									<div className="prompt-editor-field-toolbar">
+										<Button
+											type="button"
+											variant="ghost"
+											className="prompt-editor-import-button"
+											onClick={() => handleResumeImportTrigger("interview")}
+											disabled={isImportingResume}
+										>
+											<Upload className="h-4 w-4" />
+											导入 PDF / DOCX 简历
+										</Button>
+									</div>
 									<Textarea
 										value={interviewPromptDraft}
 										onChange={(e) => {
@@ -551,7 +653,8 @@ export function MoreMenu() {
 								</div>
 
 								<div className="prompt-editor-note">
-									每次请求只会携带一份提示词。开场自我介绍请求使用自我介绍提示词，之后的请求继续使用常规提示词。
+									每次请求只会携带一份提示词。开场自我介绍请求使用自我介绍提示词，之后的请求继续使用常规提示词。PDF
+									仅支持可提取文本的简历，扫描件或纯图片型 PDF 可能无法解析。
 								</div>
 
 								<div className="prompt-editor-actions">
