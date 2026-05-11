@@ -15,18 +15,29 @@ export const MessageList: React.FC<MessageListProps> = ({
 	messages,
 	isTyping,
 }) => {
-	const messagesEndRef = useRef<HTMLDivElement>(null);
+	const scrollAreaRef = useRef<HTMLDivElement>(null);
 	const isScrolling = useAppStateStore((state) => state.isStartScrollToBottom);
-	const shouldScroll = isScrolling && (messages.length > 0 || isTyping);
 
 	useEffect(() => {
-		if (shouldScroll) {
-			messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-		}
-	}, [shouldScroll]);
+		const shouldScroll = isScrolling && (messages.length > 0 || isTyping);
+
+		if (!shouldScroll) return;
+
+		const scrollViewport = scrollAreaRef.current?.querySelector(
+			"[data-radix-scroll-area-viewport]",
+		);
+
+		if (!(scrollViewport instanceof HTMLDivElement)) return;
+
+		scrollViewport.scrollTo({
+			top: scrollViewport.scrollHeight,
+			behavior: "smooth",
+		});
+	}, [isScrolling, isTyping, messages]);
 
 	return (
 		<ScrollArea
+			ref={scrollAreaRef}
 			className="h-full px-4"
 			style={{
 				scrollbarWidth: "none",
@@ -42,7 +53,6 @@ export const MessageList: React.FC<MessageListProps> = ({
 					<MessageItem key={message.id} message={message} />
 				))}
 				{isTyping && <TypingIndicator />}
-				<div ref={messagesEndRef} />
 			</div>
 		</ScrollArea>
 	);
