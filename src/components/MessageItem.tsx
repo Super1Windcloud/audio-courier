@@ -1,7 +1,7 @@
 import type React from "react";
 import { cn } from "@/lib/utils";
-import { MarkdownMessage } from "./MarkdownMessage";
 import type { Message } from "./ChatContainer";
+import { MarkdownMessage } from "./MarkdownMessage";
 
 interface MessageItemProps {
 	message: Message;
