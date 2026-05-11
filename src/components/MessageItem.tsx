@@ -1,5 +1,6 @@
 import type React from "react";
 import { cn } from "@/lib/utils";
+import { MarkdownMessage } from "./MarkdownMessage";
 import type { Message } from "./ChatContainer";
 
 interface MessageItemProps {
@@ -26,9 +27,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
 					<p className="text-sm leading-relaxed break-words">{message.text}</p>
 				) : (
 					<div className={"flex flex-col"}>
-						<p className="text-sm leading-relaxed break-words">
-							{message.text}
-						</p>
+						<MarkdownMessage content={message.text} />
 					</div>
 				)}
 			</div>
