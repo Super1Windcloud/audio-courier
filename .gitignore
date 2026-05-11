@@ -34,3 +34,4 @@ macro
 assets
 .vite
 .cargo-target
+bundle
