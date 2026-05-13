@@ -80,7 +80,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 				isUser ? "justify-end" : "justify-start",
 			)}
 		>
-			<div
+			<article
 				className={cn(
 					"relative rounded-2xl px-4 py-2 shadow-sm backdrop-blur-md  bg-white/10 border border-white/10",
 					isUser
@@ -96,15 +96,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 						<MarkdownMessage content={message.text} />
 					</div>
 				)}
-			</div>
+			</article>
 			{contextMenuPosition ? (
 				<div
 					className="fixed z-50 min-w-28 overflow-hidden rounded-xl border border-white/10 bg-slate-900/95 p-1 text-sm text-white shadow-2xl backdrop-blur-md"
+					role="menu"
 					style={{
 						left: contextMenuPosition.x,
 						top: contextMenuPosition.y,
 					}}
-					onClick={(event) => event.stopPropagation()}
 					onContextMenu={(event) => {
 						event.preventDefault();
 						event.stopPropagation();
@@ -112,8 +112,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 				>
 					<button
 						type="button"
+						role="menuitem"
 						className="block w-full rounded-lg px-3 py-2 text-left transition-colors hover:bg-white/10 focus:bg-white/10 focus:outline-none"
-						onClick={() => {
+						onClick={(event) => {
+							event.stopPropagation();
 							void handleCopy();
 						}}
 					>
@@ -121,8 +123,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 					</button>
 					<button
 						type="button"
+						role="menuitem"
 						className="block w-full rounded-lg px-3 py-2 text-left text-red-200 transition-colors hover:bg-red-500/20 focus:bg-red-500/20 focus:outline-none"
-						onClick={handleDelete}
+						onClick={(event) => {
+							event.stopPropagation();
+							handleDelete();
+						}}
 					>
 						删除
 					</button>
