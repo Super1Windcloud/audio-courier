@@ -9,11 +9,13 @@ import { TypingIndicator } from "./TypingIndicator";
 interface MessageListProps {
 	messages: Message[];
 	isTyping: boolean;
+	onDeleteMessage: (id: number) => void;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
 	messages,
 	isTyping,
+	onDeleteMessage,
 }) => {
 	const scrollAreaRef = useRef<HTMLDivElement>(null);
 	const isScrolling = useAppStateStore((state) => state.isStartScrollToBottom);
@@ -50,7 +52,11 @@ export const MessageList: React.FC<MessageListProps> = ({
 				className="space-y-4 py-4"
 			>
 				{messages.map((message) => (
-					<MessageItem key={message.id} message={message} />
+					<MessageItem
+						key={message.id}
+						message={message}
+						onDeleteMessage={onDeleteMessage}
+					/>
 				))}
 				{isTyping && <TypingIndicator />}
 			</div>

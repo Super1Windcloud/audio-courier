@@ -14,6 +14,7 @@ export interface Message {
 
 export const ChatContainer: React.FC = () => {
 	const didRun = useRef(false);
+	const nextMessageIdRef = useRef(1);
 	// 用 ref 存消息，避免 React 状态更新导致未更新完成的旧的状态丢失
 	const messagesRef = useRef<Message[]>([
 		{
@@ -83,18 +84,20 @@ export const ChatContainer: React.FC = () => {
 			}
 
 			const userMsg: Message = {
-				id: messagesRef.current.length,
+				id: nextMessageIdRef.current,
 				text,
 				sender: "user",
 			};
+			nextMessageIdRef.current += 1;
 			messagesRef.current.push(userMsg);
 
 			// 添加机器人占位
 			const botMsg: Message = {
-				id: messagesRef.current.length,
+				id: nextMessageIdRef.current,
 				text: "",
 				sender: "robot",
 			};
+			nextMessageIdRef.current += 1;
 			messagesRef.current.push(botMsg);
 
 			setMessages([...messagesRef.current]);
@@ -135,6 +138,7 @@ export const ChatContainer: React.FC = () => {
 	);
 
 	const handleClearConversation = () => {
+		nextMessageIdRef.current = 1;
 		messagesRef.current = [
 			{
 				id: 0,
@@ -184,7 +188,11 @@ export const ChatContainer: React.FC = () => {
 							。点击顶部“许可证”生成设备请求码并导入授权。
 						</div>
 					) : null}
-					<MessageList messages={messages} isTyping={isTyping} />
+					<MessageList
+						messages={messages}
+						isTyping={isTyping}
+						onDeleteMessage={removeMessageById}
+					/>
 				</div>
 
 				<div
