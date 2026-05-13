@@ -50,7 +50,7 @@ fn show_window(window: tauri::Window) -> Result<(), String> {
     }
 
     window
-        .set_size(LogicalSize::<i32>::from((800, 900)))
+        .set_size(LogicalSize::<i32>::from((600, 700)))
         .map_err(|e| format!("Failed to set size: {}", e))?;
 
     // 在 macOS 上，必须先 show 再 set_focus

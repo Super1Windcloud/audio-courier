@@ -19,8 +19,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
 		>
 			<div
 				className={cn(
-					"relative max-w-[70%] rounded-2xl px-4 py-2 shadow-sm backdrop-blur-md  bg-white/10 border border-white/10",
-					isUser ? "text-white rounded-br-md" : "text-white rounded-bl-md",
+					"relative rounded-2xl px-4 py-2 shadow-sm backdrop-blur-md  bg-white/10 border border-white/10",
+					isUser
+						? "max-w-[70%] text-white rounded-br-md"
+						: "w-full max-w-none text-white rounded-bl-md",
 				)}
 			>
 				{isUser ? (
