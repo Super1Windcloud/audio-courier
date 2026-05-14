@@ -38,10 +38,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 	}, [isScrolling, isTyping, messages]);
 
 	return (
-		<ScrollArea
-			ref={scrollAreaRef}
-			className="h-full px-4"
-		>
+		<ScrollArea ref={scrollAreaRef} className="h-full px-4">
 			<div className="space-y-4 py-4">
 				{messages.map((message) => (
 					<MessageItem

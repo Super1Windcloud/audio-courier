@@ -342,7 +342,7 @@ export function LlmProviderDialog({
 					</Section>
 				</div>
 
-				<div className="flex shrink-0 flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+				<div className="flex shrink-0 flex-row items-center justify-between gap-3 border-t border-white/10 pt-4">
 					<Button
 						type="button"
 						variant="ghost"
@@ -352,9 +352,9 @@ export function LlmProviderDialog({
 						}}
 					>
 						<RotateCcw className="size-4" />
-						恢复默认
+						重置
 					</Button>
-					<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+					<div className="flex flex-row items-center gap-2">
 						<Button
 							type="button"
 							variant="ghost"
@@ -374,7 +374,7 @@ export function LlmProviderDialog({
 							}}
 						>
 							<Save className="size-4" />
-							保存配置
+							保存
 						</Button>
 					</div>
 				</div>
