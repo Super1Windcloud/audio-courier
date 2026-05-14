@@ -422,10 +422,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 						type="button"
 						title="清空输入"
 						disabled={!inputText}
-						className="-translate-y-1/2 absolute top-1/2 right-2 text-gray-400 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+						className="-translate-y-1/2 absolute top-1/2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-white/15 text-white shadow-sm shadow-black/20 transition-colors hover:border-red-300/60 hover:bg-red-400/25 hover:text-red-100 disabled:cursor-not-allowed disabled:bg-white/8 disabled:text-gray-400 disabled:opacity-40"
 						onClick={handleClearInput}
 					>
-						<X className="h-4 w-4" />
+						<X className="h-4 w-4 stroke-[2.8]" />
 					</button>
 				</div>
 
