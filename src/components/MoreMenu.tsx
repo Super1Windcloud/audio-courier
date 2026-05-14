@@ -56,6 +56,7 @@ export function MoreMenu() {
 	const [isLlmConfigDialogOpen, setIsLlmConfigDialogOpen] = useState(false);
 	const [isTranscriptConfigDialogOpen, setIsTranscriptConfigDialogOpen] =
 		useState(false);
+	const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 	const [isUpdating, setIsUpdating] = useState(false);
 	const [isImportingResume, setIsImportingResume] = useState(false);
 	const [resumeImportTarget, setResumeImportTarget] = useState<
@@ -160,6 +161,34 @@ export function MoreMenu() {
 		setIsTranscriptConfigDialogOpen(true);
 	}, [appState.transcriptProviderSettings, isPromptDialogOpen]);
 
+	useEffect(() => {
+		if (!isMoreMenuOpen) {
+			return;
+		}
+
+		const closeMoreMenu = () => setIsMoreMenuOpen(false);
+		const handleVisibilityChange = () => {
+			if (document.hidden) {
+				closeMoreMenu();
+			}
+		};
+		const handleMouseOut = (event: MouseEvent) => {
+			if (!event.relatedTarget) {
+				closeMoreMenu();
+			}
+		};
+
+		window.addEventListener("blur", closeMoreMenu);
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		document.addEventListener("mouseout", handleMouseOut);
+
+		return () => {
+			window.removeEventListener("blur", closeMoreMenu);
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
+			document.removeEventListener("mouseout", handleMouseOut);
+		};
+	}, [isMoreMenuOpen]);
+
 	const handleCheckUpdate = async () => {
 		if (isUpdating) {
 			return;
@@ -254,7 +283,7 @@ export function MoreMenu() {
 				className="hidden"
 				onChange={handleResumeFileChange}
 			/>
-			<DropdownMenu>
+			<DropdownMenu open={isMoreMenuOpen} onOpenChange={setIsMoreMenuOpen}>
 				<DropdownMenuTrigger asChild>
 					<MoreVertical className="text-gray-400 cursor-pointer bg-transparent" />
 				</DropdownMenuTrigger>
