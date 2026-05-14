@@ -54,6 +54,8 @@ const StyledWrapper = styled.div`
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: calc(100px * var(--size));
+    height: calc(100px * var(--size));
     padding: 0;
     border: 0;
     background: transparent;
@@ -68,8 +70,12 @@ const StyledWrapper = styled.div`
     --color-five: #ffbf4740;
     --time-animation: 2s;
     position: relative;
+    width: 100px;
+    height: 100px;
     border-radius: 50%;
     transform: scale(var(--size));
+    transform-origin: center;
+    pointer-events: none;
     box-shadow:
       0 0 25px 0 var(--color-three),
       0 20px 50px 0 var(--color-four);
