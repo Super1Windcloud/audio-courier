@@ -201,7 +201,6 @@ export const ChatContainer: React.FC = () => {
 					<MessageInput
 						onSendMessage={handleSendMessage}
 						onClearConversation={handleClearConversation}
-						setIsTyping={setIsTyping}
 						setMessages={setMessages}
 					/>
 				</div>

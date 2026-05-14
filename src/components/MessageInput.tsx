@@ -24,13 +24,11 @@ interface MessageInputProps {
 	onSendMessage: (text: string) => void;
 	onClearConversation: () => void;
 	setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-	setIsTyping: (record: boolean) => void;
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
 	onSendMessage,
 	onClearConversation,
-	setIsTyping,
 }) => {
 	const [inputText, setInputText] = useState("");
 	const [recordingTimerStamp, setRecordingTimerStamp] = useState(() =>
@@ -365,8 +363,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	});
 
 	useEffect(() => {
-		setIsTyping(recordingState);
-
 		if (recordingState) {
 			startRecordingEffect();
 		} else if (wasRecordingRef.current) {
@@ -374,7 +370,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		}
 
 		wasRecordingRef.current = recordingState;
-	}, [recordingState, setIsTyping]);
+	}, [recordingState]);
 
 	const handleClearConversation = () => {
 		resetTranscriptComposition();
