@@ -45,8 +45,8 @@ export function ProviderConfigField({
 
 	return (
 		<div className="grid gap-2">
-			<div className="flex items-center justify-between gap-3">
-				<div className="flex flex-wrap items-center gap-2">
+			<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+				<div className="flex min-w-0 flex-wrap items-center gap-2">
 					<span className="text-sm font-medium text-white">{label}</span>
 					{officialLink ? (
 						<button
@@ -60,7 +60,7 @@ export function ProviderConfigField({
 					) : null}
 				</div>
 				{status ? (
-					<span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] text-slate-200">
+					<span className="w-fit rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[11px] text-slate-200">
 						{status}
 					</span>
 				) : null}

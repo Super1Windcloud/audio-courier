@@ -64,8 +64,8 @@ export function LlmProviderDialog({
 				onOpenChange(nextOpen);
 			}}
 		>
-			<DialogContent className="border-white/10 bg-slate-950 text-white sm:max-w-4xl">
-				<DialogHeader>
+			<DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-4xl grid-rows-none flex-col gap-4 overflow-hidden border-white/10 bg-slate-950 p-4 text-white sm:p-6">
+				<DialogHeader className="shrink-0 pr-6">
 					<DialogTitle>大模型 API 配置</DialogTitle>
 					<DialogDescription className="text-slate-300">
 						这里的配置只影响大模型请求，不影响转录供应商。API Key 留空时会回退到
@@ -75,7 +75,7 @@ export function LlmProviderDialog({
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
+				<div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
 					<Section
 						title="内置供应商 API Key"
 						description="这些字段对应当前仓库已有的大模型供应商。只需要填 API Key。"
@@ -342,7 +342,7 @@ export function LlmProviderDialog({
 					</Section>
 				</div>
 
-				<div className="flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+				<div className="flex shrink-0 flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
 					<Button
 						type="button"
 						variant="ghost"
@@ -354,7 +354,7 @@ export function LlmProviderDialog({
 						<RotateCcw className="size-4" />
 						恢复默认
 					</Button>
-					<div className="flex items-center gap-2">
+					<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
 						<Button
 							type="button"
 							variant="ghost"

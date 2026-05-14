@@ -85,10 +85,10 @@ function StatusHero({ licenseStatus }: { licenseStatus: LicenseStatus }) {
 				className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accentClass}`}
 			/>
 			<div className="relative flex flex-col gap-6">
-				<div className="flex items-start justify-between gap-4">
-					<div className="flex items-center gap-4">
+				<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+					<div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center">
 						<div
-							className={`flex size-14 items-center justify-center rounded-2xl backdrop-blur ${iconClass}`}
+							className={`flex size-14 shrink-0 items-center justify-center rounded-2xl backdrop-blur ${iconClass}`}
 						>
 							{isHostSigner ? (
 								<MonitorSmartphone className="size-7" />
@@ -96,7 +96,7 @@ function StatusHero({ licenseStatus }: { licenseStatus: LicenseStatus }) {
 								<ShieldCheck className="size-7" />
 							)}
 						</div>
-						<div className="space-y-2">
+						<div className="min-w-0 space-y-2">
 							<div className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1 text-[11px] tracking-[0.24em] text-slate-200 uppercase ring-1 ring-white/10">
 								<Sparkles className="size-3.5" />
 								{badgeLabel}
@@ -112,7 +112,7 @@ function StatusHero({ licenseStatus }: { licenseStatus: LicenseStatus }) {
 						</div>
 					</div>
 					<div
-						className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${statusClass}`}
+						className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${statusClass}`}
 					>
 						<BadgeCheck className="size-4" />
 						{isHostSigner ? "宿主机放行" : "校验通过"}
@@ -254,8 +254,8 @@ export function LicenseCenter() {
 					许可证
 				</button>
 			</DialogTrigger>
-			<DialogContent className="border-white/10 bg-slate-950 text-white sm:max-w-2xl">
-				<DialogHeader>
+			<DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-2xl grid-rows-none flex-col gap-4 overflow-hidden border-white/10 bg-slate-950 p-4 text-white sm:p-6">
+				<DialogHeader className="shrink-0 pr-6">
 					<DialogTitle>{isAuthorized ? "许可证状态" : "离线激活"}</DialogTitle>
 					<DialogDescription className="text-slate-300">
 						{isAuthorized
@@ -264,13 +264,13 @@ export function LicenseCenter() {
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="grid gap-4">
+				<div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
 					{licenseStatus && isAuthorized ? (
 						<StatusHero licenseStatus={licenseStatus} />
 					) : null}
 
 					<div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-						<div className="mb-2 flex items-center justify-between">
+						<div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 							<div>
 								<p className="text-sm font-medium">当前状态</p>
 								<p className="text-xs text-slate-300">
@@ -278,7 +278,7 @@ export function LicenseCenter() {
 								</p>
 							</div>
 							<span
-								className={`rounded-full px-3 py-1 text-xs ${licenseStatus?.isValid ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-200"}`}
+								className={`w-fit rounded-full px-3 py-1 text-xs ${licenseStatus?.isValid ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-200"}`}
 							>
 								{licenseStatus?.isHostSigner
 									? "宿主机"
@@ -366,9 +366,9 @@ export function LicenseCenter() {
 							</div>
 
 							<div className="grid gap-2">
-								<div className="flex items-center justify-between">
+								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
 									<p className="text-sm font-medium">设备请求码</p>
-									<div className="flex gap-2">
+									<div className="flex flex-col gap-2 sm:flex-row">
 										<Button
 											type="button"
 											variant="outline"
