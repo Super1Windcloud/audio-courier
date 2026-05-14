@@ -5,6 +5,7 @@ import { copyText } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import type { Message } from "./ChatContainer";
 import { MarkdownMessage } from "./MarkdownMessage";
+import { TypingIndicator } from "./TypingIndicator";
 
 interface MessageItemProps {
 	message: Message;
@@ -21,6 +22,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 	onDeleteMessage,
 }) => {
 	const isUser = message.sender === "user";
+	const isPendingRobotMessage = !isUser && message.text.trim().length === 0;
 	const [contextMenuPosition, setContextMenuPosition] =
 		useState<ContextMenuPosition | null>(null);
 
@@ -91,6 +93,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 			>
 				{isUser ? (
 					<p className="text-sm leading-relaxed break-words">{message.text}</p>
+				) : isPendingRobotMessage ? (
+					<TypingIndicator />
 				) : (
 					<div className={"flex flex-col"}>
 						<MarkdownMessage content={message.text} />
