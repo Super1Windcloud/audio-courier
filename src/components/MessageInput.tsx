@@ -1,7 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Mic, SendHorizontal, Trash2 } from "lucide-react";
+import { Mic, SendHorizontal, Trash2, X } from "lucide-react";
 import type React from "react";
 import {
 	useCallback,
@@ -383,6 +383,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		onClearConversation();
 	};
 
+	const handleClearInput = () => {
+		resetTranscriptComposition();
+		setInputText("");
+		if (textareaRef.current) {
+			textareaRef.current.style.height = "auto";
+			textareaRef.current.focus();
+		}
+	};
+
 	return (
 		<div
 			className="p-4
@@ -390,24 +399,35 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       backdrop-blur-xl  bg-white/10 border border-white/10"
 		>
 			<div className="flex border-none items-center space-x-2">
-				<Textarea
-					ref={textareaRef}
-					value={inputText}
-					onChange={(e) => {
-						const nextValue = e.target.value;
-						recordingBaseInputRef.current = nextValue;
-						committedTranscriptRef.current = "";
-						draftTranscriptRef.current = "";
-						setInputText(nextValue);
-						e.currentTarget.style.height = "auto"; // 先重置
-						e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // 根据内容调整
-					}}
-					onKeyDown={handleKeyPress}
-					placeholder="输入消息..."
-					rows={1}
-					disabled={!isAuthorized}
-					className="flex-1 resize-none overflow-hidden text-white border-none focus-visible:ring-0 placeholder:text-gray-300 focus-visible:ring-offset-0 bg-transparent"
-				/>
+				<div className="relative flex-1">
+					<Textarea
+						ref={textareaRef}
+						value={inputText}
+						onChange={(e) => {
+							const nextValue = e.target.value;
+							recordingBaseInputRef.current = nextValue;
+							committedTranscriptRef.current = "";
+							draftTranscriptRef.current = "";
+							setInputText(nextValue);
+							e.currentTarget.style.height = "auto"; // 先重置
+							e.currentTarget.style.height = `${e.currentTarget.scrollHeight}px`; // 根据内容调整
+						}}
+						onKeyDown={handleKeyPress}
+						placeholder="输入消息..."
+						rows={1}
+						disabled={!isAuthorized}
+						className="resize-none overflow-hidden border-none bg-transparent pr-9 text-white placeholder:text-gray-300 focus-visible:ring-0 focus-visible:ring-offset-0"
+					/>
+					<button
+						type="button"
+						title="清空输入"
+						disabled={!inputText}
+						className="-translate-y-1/2 absolute top-1/2 right-2 text-gray-400 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+						onClick={handleClearInput}
+					>
+						<X className="h-4 w-4" />
+					</button>
+				</div>
 
 				{recordingState ? (
 					shouldUseWaruls ? (
