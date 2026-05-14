@@ -6,7 +6,58 @@ import { AboutDialog } from "@/components/AboutDialog.tsx";
 import { LicenseCenter } from "@/components/LicenseCenter.tsx";
 import { LicenseSignerCenter } from "@/components/LicenseSignerCenter.tsx";
 import { logError, logInfo } from "@/lib/logger.ts";
+import useAppStateStore from "@/stores";
 import type { SignerStatus } from "@/types/license.ts";
+
+function RecordingTimerPill() {
+	const isRecording = useAppStateStore((state) => state.isRecording);
+	const recordingStartedAt = useAppStateStore(
+		(state) => state.recordingStartedAt,
+	);
+	const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+	useEffect(() => {
+		if (!isRecording || recordingStartedAt === null) {
+			setElapsedSeconds(0);
+			return () => undefined;
+		}
+
+		const updateElapsedSeconds = () => {
+			setElapsedSeconds(
+				Math.max(0, Math.floor((Date.now() - recordingStartedAt) / 1000)),
+			);
+		};
+
+		updateElapsedSeconds();
+		const timer = window.setInterval(updateElapsedSeconds, 1000);
+
+		return () => {
+			window.clearInterval(timer);
+		};
+	}, [isRecording, recordingStartedAt]);
+
+	if (!isRecording || recordingStartedAt === null) {
+		return null;
+	}
+
+	const minutes = Math.floor(elapsedSeconds / 60)
+		.toString()
+		.padStart(2, "0");
+	const seconds = (elapsedSeconds % 60).toString().padStart(2, "0");
+
+	return (
+		<div
+			className="inline-flex h-7 items-center gap-2 rounded-full border border-red-300/25 bg-red-500/15 px-3 text-xs font-medium text-red-100 shadow-sm shadow-red-950/20"
+			role="timer"
+			aria-label={`录制时长 ${minutes}:${seconds}`}
+		>
+			<span className="h-2 w-2 rounded-full bg-red-300 shadow-[0_0_10px_rgba(252,165,165,0.75)]" />
+			<span className="font-mono tabular-nums">
+				{minutes}:{seconds}
+			</span>
+		</div>
+	);
+}
 
 const TitleBar: React.FC = () => {
 	const [isMaximized, setIsMaximized] = useState(false);
@@ -61,6 +112,7 @@ const TitleBar: React.FC = () => {
 					<AboutDialog />
 					<LicenseCenter />
 					<LicenseSignerCenter signerStatus={signerStatus} />
+					<RecordingTimerPill />
 				</div>
 			</div>
 			<div
