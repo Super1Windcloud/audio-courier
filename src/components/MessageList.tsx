@@ -21,7 +21,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 	const isScrolling = useAppStateStore((state) => state.isStartScrollToBottom);
 
 	useEffect(() => {
-		const shouldScroll = isScrolling && (messages.length > 0 || isTyping);
+		const shouldScroll = isScrolling && messages.length > 0;
 
 		if (!shouldScroll) return;
 
@@ -35,20 +35,26 @@ export const MessageList: React.FC<MessageListProps> = ({
 			top: scrollViewport.scrollHeight,
 			behavior: "smooth",
 		});
-	}, [isScrolling, isTyping, messages]);
+	}, [isScrolling, messages]);
 
 	return (
-		<ScrollArea ref={scrollAreaRef} className="h-full px-4">
-			<div className="space-y-4 py-4">
-				{messages.map((message) => (
-					<MessageItem
-						key={message.id}
-						message={message}
-						onDeleteMessage={onDeleteMessage}
-					/>
-				))}
-				{isTyping && <TypingIndicator />}
-			</div>
-		</ScrollArea>
+		<div className="relative h-full">
+			<ScrollArea ref={scrollAreaRef} className="h-full px-4">
+				<div className="space-y-4 py-4">
+					{messages.map((message) => (
+						<MessageItem
+							key={message.id}
+							message={message}
+							onDeleteMessage={onDeleteMessage}
+						/>
+					))}
+				</div>
+			</ScrollArea>
+			{isTyping && (
+				<div className="pointer-events-none absolute bottom-4 left-4 z-10">
+					<TypingIndicator />
+				</div>
+			)}
+		</div>
 	);
 };
