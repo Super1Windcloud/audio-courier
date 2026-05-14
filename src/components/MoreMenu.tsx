@@ -576,7 +576,7 @@ export function MoreMenu() {
 								) : null}
 							</div>
 
-							<div className="prompt-editor-scroll">
+							<div className="prompt-editor-scroll app-scrollbar">
 								<div className="prompt-editor-field">
 									<div className="prompt-editor-field-label">
 										<span>常规对话提示词</span>

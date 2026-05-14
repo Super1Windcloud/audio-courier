@@ -77,7 +77,7 @@ export function TranscriptProviderDialog({
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+				<div className="app-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
 					<Section
 						title="macOS 系统音频后端"
 						description="仅在 macOS 输出音频转录时生效。Swift Helper 更稳，Rust Native 便于调试和验证原生实现。"

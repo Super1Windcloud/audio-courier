@@ -75,7 +75,7 @@ export function LlmProviderDialog({
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+				<div className="app-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
 					<Section
 						title="内置供应商 API Key"
 						description="这些字段对应当前仓库已有的大模型供应商。只需要填 API Key。"

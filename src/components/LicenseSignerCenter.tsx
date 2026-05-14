@@ -50,7 +50,7 @@ export function LicenseSignerCenter({
 						这里直接在主应用里签发 license.json，不再创建新的 Tauri 窗口。
 					</DialogDescription>
 				</DialogHeader>
-				<div className="min-h-0 flex-1 overflow-y-auto pr-1">
+				<div className="app-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
 					<LicenseSignerApp embedded />
 				</div>
 			</DialogContent>

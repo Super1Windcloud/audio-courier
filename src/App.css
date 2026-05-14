@@ -176,6 +176,35 @@
 	caret-color: #f8fafc;
 }
 
+.app-scrollbar {
+	scrollbar-width: thin;
+	scrollbar-color: rgb(255 255 255 / 0.16) transparent;
+}
+
+.app-scrollbar::-webkit-scrollbar,
+.app-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb,
+.app-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
+	border-radius: 999px;
+	background: rgb(255 255 255 / 0.16);
+}
+
+.app-scrollbar::-webkit-scrollbar-track,
+.app-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar-track,
+.app-scrollbar::-webkit-scrollbar-corner,
+.app-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
+.app-scrollbar [data-radix-scroll-area-viewport] {
+	scrollbar-width: thin;
+	scrollbar-color: rgb(255 255 255 / 0.16) transparent;
+}
+
 .prompt-editor-dialog {
 	position: fixed;
 	z-index: 60;
@@ -277,17 +306,6 @@
 	padding-right: 0.25rem;
 	margin-right: -0.25rem;
 	overflow-y: auto;
-	scrollbar-width: thin;
-	scrollbar-color: rgb(255 255 255 / 0.16) transparent;
-}
-
-.prompt-editor-scroll::-webkit-scrollbar {
-	width: 6px;
-}
-
-.prompt-editor-scroll::-webkit-scrollbar-thumb {
-	border-radius: 999px;
-	background: rgb(255 255 255 / 0.16);
 }
 
 .prompt-editor-orb {

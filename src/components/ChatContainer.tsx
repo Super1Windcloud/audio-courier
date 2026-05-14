@@ -175,11 +175,10 @@ export const ChatContainer: React.FC = () => {
 					<TitleBar />
 				</div>
 				<div
-					className="flex-1 w-full overflow-auto self-center"
+					className="app-scrollbar flex-1 w-full overflow-auto self-center"
 					style={{
 						overflow: "auto",
 						scrollBehavior: "smooth",
-						scrollbarWidth: "none",
 					}}
 				>
 					{!isAuthorized ? (
