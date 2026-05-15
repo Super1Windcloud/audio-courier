@@ -164,7 +164,7 @@ export const ChatContainer: React.FC = () => {
 	}, [handleSendMessage, isAuthorized, licenseStatus]);
 
 	return (
-		<div className="flex h-screen w-screen">
+		<div className="flex h-full w-full overflow-hidden">
 			<div
 				className={`flex h-full w-full flex-col overflow-hidden border backdrop-blur-xl ${
 					uiTextTone === "dark" ? "ui-text-dark" : "ui-text-light"
@@ -174,24 +174,20 @@ export const ChatContainer: React.FC = () => {
 				<div className="flex-shrink-0 border-b border-white/10">
 					<TitleBar />
 				</div>
-				<div
-					className="app-scrollbar flex-1 w-full overflow-auto self-center"
-					style={{
-						overflow: "auto",
-						scrollBehavior: "smooth",
-					}}
-				>
+				<div className="flex min-h-0 w-full flex-1 flex-col self-center">
 					{!isAuthorized ? (
-						<div className="mx-4 mt-4 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4 text-sm text-amber-100">
+						<div className="mx-4 mt-4 flex-shrink-0 rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4 text-sm text-amber-100">
 							许可证状态: {licenseStatus?.reason ?? "未加载"}
 							。点击顶部“许可证”生成设备请求码并导入授权。
 						</div>
 					) : null}
-					<MessageList
-						messages={messages}
-						isTyping={isTyping}
-						onDeleteMessage={removeMessageById}
-					/>
+					<div className="min-h-0 flex-1">
+						<MessageList
+							messages={messages}
+							isTyping={isTyping}
+							onDeleteMessage={removeMessageById}
+						/>
+					</div>
 				</div>
 
 				<div

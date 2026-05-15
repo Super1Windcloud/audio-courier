@@ -37,7 +37,7 @@ const Conversation = lazy(() =>
 
 function Home() {
 	return (
-		<div className="h-screen w-full">
+		<div className="h-full w-full overflow-hidden">
 			<ChatContainer />
 			<Toaster
 				position="top-center"
@@ -290,7 +290,7 @@ function App() {
 	}
 
 	return (
-		<div>
+		<div className="h-full overflow-hidden">
 			<BrowserRouter>
 				<Suspense fallback={<Home />}>
 					<Routes>

@@ -9,6 +9,8 @@ const ScrollArea = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
 	<ScrollAreaPrimitive.Root
 		ref={ref}
+		type="hover"
+		scrollHideDelay={500}
 		className={cn("app-scrollbar relative overflow-hidden", className)}
 		{...props}
 	>
@@ -32,7 +34,7 @@ const ScrollBar = React.forwardRef<
 			backgroundColor: "transparent",
 		}}
 		className={cn(
-			"flex touch-none select-none transition-colors",
+			"flex touch-none select-none opacity-0 transition-opacity duration-200 data-[state=visible]:opacity-100",
 			orientation === "vertical" &&
 				"h-full w-2.5 border-l border-l-transparent p-[1px]",
 			orientation === "horizontal" &&

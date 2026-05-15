@@ -201,8 +201,13 @@
 }
 
 .app-scrollbar [data-radix-scroll-area-viewport] {
-	scrollbar-width: thin;
-	scrollbar-color: rgb(255 255 255 / 0.16) transparent;
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+}
+
+.app-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar {
+	width: 0;
+	height: 0;
 }
 
 .prompt-editor-dialog {
