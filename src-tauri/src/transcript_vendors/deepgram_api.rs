@@ -27,7 +27,7 @@ use tokio_tungstenite::{
 
 const BASE_URL: &str = "wss://api.deepgram.com/v1/listen";
 const KEEPALIVE_INTERVAL_SECONDS: u64 = 3;
-const DEFAULT_ENDPOINTING_MS: u32 = 500;
+const DEFAULT_ENDPOINTING_MS: u32 = 300;
 const DEFAULT_UTTERANCE_END_MS: u32 = 1_000;
 const VENDOR_NAME: &str = "Deepgram";
 
