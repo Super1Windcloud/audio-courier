@@ -34,10 +34,6 @@ export const llmProviderOfficialLinks: Partial<
 		label: "官网",
 		url: "https://www.volcengine.com/docs/82379?lang=zh",
 	},
-	kimiApiKey: {
-		label: "官网",
-		url: "https://platform.moonshot.ai/docs/overview",
-	},
 	zhipuApiKey: {
 		label: "官网",
 		url: "https://docs.bigmodel.cn/cn/guide/start/introduction",

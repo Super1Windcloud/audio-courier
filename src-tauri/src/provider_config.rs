@@ -3,7 +3,6 @@ use std::env;
 
 pub const SILICONFLOW_ENV_KEYS: &[&str] = &["SILICONFLOW_API_KEY", "Siliconflow"];
 pub const DOUBAO_ENV_KEYS: &[&str] = &["DOUBAO_API_KEY", "DOUBAO"];
-pub const KIMI_ENV_KEYS: &[&str] = &["KIMI_API_KEY", "KIMI"];
 pub const ZHIPU_ENV_KEYS: &[&str] = &["ZHIPU_API_KEY", "ZHIPU"];
 pub const DEEPSEEK_ENV_KEYS: &[&str] = &["DEEPSEEK_API_KEY", "DEEPSEEK"];
 pub const ALI_QWEN_ENV_KEYS: &[&str] = &["ALI_QWEN_QWQ_API_KEY", "ALI_QWEN_QWQ"];
@@ -20,7 +19,6 @@ pub const REVAI_ENV_KEYS: &[&str] = &["REVAI_API_KEY"];
 pub struct LlmRuntimeConfig {
     pub siliconflow_api_key: Option<String>,
     pub doubao_api_key: Option<String>,
-    pub kimi_api_key: Option<String>,
     pub zhipu_api_key: Option<String>,
     pub deepseek_api_key: Option<String>,
     pub ali_qwen_api_key: Option<String>,
@@ -103,7 +101,6 @@ pub fn llm_runtime_config_from_env() -> LlmRuntimeConfig {
     LlmRuntimeConfig {
         siliconflow_api_key: resolve_optional_string(None, SILICONFLOW_ENV_KEYS),
         doubao_api_key: resolve_optional_string(None, DOUBAO_ENV_KEYS),
-        kimi_api_key: resolve_optional_string(None, KIMI_ENV_KEYS),
         zhipu_api_key: resolve_optional_string(None, ZHIPU_ENV_KEYS),
         deepseek_api_key: resolve_optional_string(None, DEEPSEEK_ENV_KEYS),
         ali_qwen_api_key: resolve_optional_string(None, ALI_QWEN_ENV_KEYS),

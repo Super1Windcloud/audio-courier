@@ -272,7 +272,6 @@ pub fn run() {
             doubao_pro,
             doubao_seed_flash,
             doubao_seed,
-            kimi,
             zhipu,
             deepseek_api,
             ali_qwen_2_5,

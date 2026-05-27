@@ -39,7 +39,6 @@ export const TRANSCRIBE_VENDOR_LABELS: Record<TranscribeVendor, string> = {
 export interface LlmProviderSettings {
 	siliconflowApiKey: string;
 	doubaoApiKey: string;
-	kimiApiKey: string;
 	zhipuApiKey: string;
 	deepseekApiKey: string;
 	aliQwenApiKey: string;
@@ -79,7 +78,6 @@ export interface ProviderEnvPresets {
 const LLM_API_KEY_FIELDS = [
 	"siliconflowApiKey",
 	"doubaoApiKey",
-	"kimiApiKey",
 	"zhipuApiKey",
 	"deepseekApiKey",
 	"aliQwenApiKey",
@@ -96,7 +94,6 @@ export function createDefaultLlmProviderSettings(): LlmProviderSettings {
 	return {
 		siliconflowApiKey: "",
 		doubaoApiKey: "",
-		kimiApiKey: "",
 		zhipuApiKey: "",
 		deepseekApiKey: "",
 		aliQwenApiKey: "",
@@ -144,7 +141,6 @@ export function normalizeLlmProviderSettings(
 	return {
 		siliconflowApiKey: readString(raw.siliconflowApiKey),
 		doubaoApiKey: readString(raw.doubaoApiKey),
-		kimiApiKey: readString(raw.kimiApiKey),
 		zhipuApiKey: readString(raw.zhipuApiKey),
 		deepseekApiKey: readString(raw.deepseekApiKey),
 		aliQwenApiKey: readString(raw.aliQwenApiKey),

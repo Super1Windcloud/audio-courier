@@ -1,20 +1,19 @@
 mod api;
 use crate::provider_config::{
-    ALI_QWEN_ENV_KEYS, DEEPSEEK_ENV_KEYS, DOUBAO_ENV_KEYS, GEMINI_ENV_KEYS, KIMI_ENV_KEYS,
-    LlmRuntimeConfig, OPENAI_ENV_KEYS, SILICONFLOW_ENV_KEYS, ZHIPU_ENV_KEYS,
-    resolve_required_string, resolve_string_or_default,
+    ALI_QWEN_ENV_KEYS, DEEPSEEK_ENV_KEYS, DOUBAO_ENV_KEYS, GEMINI_ENV_KEYS, LlmRuntimeConfig,
+    OPENAI_ENV_KEYS, SILICONFLOW_ENV_KEYS, ZHIPU_ENV_KEYS, resolve_required_string,
+    resolve_string_or_default,
 };
 use api::*;
 use rand::{RngExt, rng as thread_rng};
 use serde_json::json;
 use tauri::Emitter;
 
-const CHAT_PROVIDER_OPTIONS: [&str; 13] = [
+const CHAT_PROVIDER_OPTIONS: [&str; 12] = [
     "siliconflow_pro",
     "siliconflow_minimax_m2_5",
     "doubao_lite",
     "doubao_pro",
-    "kimi",
     "zhipu",
     "deepseek_api",
     "ali_qwen_2_5",
@@ -215,19 +214,6 @@ fn resolve_provider(
             max_tokens: 4096,
             temperature: 0.7,
             prompt_role: "assistant",
-            enable_thinking: None,
-        }),
-        "kimi" => Ok(ResolvedLlmProvider {
-            model: "kimi-k2.6".to_string(),
-            base_url: "https://api.moonshot.cn/v1".to_string(),
-            api_key: resolve_required_string(
-                runtime_config.kimi_api_key.as_deref(),
-                KIMI_ENV_KEYS,
-                "KIMI_API_KEY",
-            )?,
-            max_tokens: 4096,
-            temperature: 1.0,
-            prompt_role: "system",
             enable_thinking: None,
         }),
         "zhipu" => Ok(ResolvedLlmProvider {
@@ -695,33 +681,6 @@ pub async fn doubao_seed(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<S
 }
 
 #[tauri::command]
-
-pub async fn kimi(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
-    let api_key = get_env_key("KIMI_API_KEY");
-    let messages = vec![
-        json!({"role":"system","content":flow_args.llm_prompt}),
-        json!({"role":"user","content":flow_args.question}),
-    ];
-
-    call_model_api(
-        app,
-        ModelRequest {
-            model: "kimi-k2.6".to_string(),
-            messages,
-            base_url: "https://api.moonshot.cn/v1".to_string(),
-            api_key,
-            max_tokens: 4096,
-            temperature: 1.0,
-            enable_thinking: None,
-        },
-        flow_args.request_id,
-    )
-    .await
-    .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-
 pub async fn zhipu(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, String> {
     let api_key = get_env_key("ZHIPU_API_KEY");
     let messages = vec![

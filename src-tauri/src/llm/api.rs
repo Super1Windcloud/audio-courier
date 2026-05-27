@@ -3,6 +3,7 @@
 use crate::utils::write_some_log;
 use serde_json::json;
 use std::env;
+use std::str;
 use std::time::Duration;
 use tauri::Emitter;
 use tokio::time;
@@ -129,7 +130,9 @@ pub async fn call_model_api(
 
     let mut result = String::new();
     let mut stream = response.bytes_stream();
+    let mut line_buffer = Vec::new();
     let mut consecutive_errors = 0;
+    let mut received_first_chunk = false;
     const MAX_CONSECUTIVE_ERRORS: usize = 5;
 
     // 确定事件名称 - 如果有请求ID则使用带ID的事件名
@@ -140,7 +143,7 @@ pub async fn call_model_api(
     };
 
     loop {
-        let item = if result.is_empty() {
+        let item = if !received_first_chunk {
             match time::timeout(Duration::from_secs(REQUEST_TIMEOUT_SECONDS), stream.next()).await {
                 Ok(item) => item,
                 Err(_) => return Err(ModelError::Timeout),
@@ -155,65 +158,71 @@ pub async fn call_model_api(
 
         match item {
             Ok(chunk) => {
+                received_first_chunk = true;
                 consecutive_errors = 0; // 重置错误计数
 
-                let chunk_str = String::from_utf8_lossy(&chunk);
-
                 // 处理空数据块
-                if chunk_str.trim().is_empty() {
+                if chunk.is_empty() {
                     continue;
                 }
 
-                // 解析SSE格式数据
-                for line in chunk_str.lines() {
-                    let line = line.trim();
+                line_buffer.extend_from_slice(&chunk);
 
-                    if line.is_empty() || line.starts_with(':') {
-                        continue; // 跳过空行和注释行
+                while let Some(newline_index) = line_buffer.iter().position(|byte| *byte == b'\n') {
+                    let mut line_bytes = line_buffer.drain(..=newline_index).collect::<Vec<_>>();
+                    if line_bytes.last() == Some(&b'\n') {
+                        line_bytes.pop();
+                    }
+                    if line_bytes.last() == Some(&b'\r') {
+                        line_bytes.pop();
                     }
 
-                    if let Some(data) = line.strip_prefix("data: ") {
-                        if data == "[DONE]" {
-                            return Ok(result);
-                        }
-
-                        // JSON解析错误处理
-                        match serde_json::from_str::<serde_json::Value>(data) {
-                            Ok(json_chunk) => {
-                                // 检查是否有错误信息
-                                if let Some(error) = json_chunk.get("error") {
-                                    return Err(ModelError::InvalidResponse(format!(
-                                        "model={model_name}, API错误: {}",
-                                        error
-                                    )));
-                                }
-
-                                // 提取内容
-                                if let Some(content) =
-                                    json_chunk["choices"][0]["delta"]["content"].as_str()
-                                {
-                                    result.push_str(content);
-
-                                    // 发送流式数据到前端，处理发送错误
-                                    if let Err(e) = app.emit(&event_name, content) {
-                                        eprintln!("警告: 无法发送流式数据到前端: {}", e);
-                                        write_some_log(
-                                            format!(" 无法发送流式数据到前端: {}", e).as_str(),
-                                        )
-                                    }
-                                }
+                    let line = match str::from_utf8(&line_bytes) {
+                        Ok(line) => line.trim(),
+                        Err(e) => {
+                            eprintln!("SSE行UTF-8解析警告: {}", e);
+                            consecutive_errors += 1;
+                            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+                                return Err(ModelError::JsonParseError(format!(
+                                    "连续SSE行解析失败次数过多: {}",
+                                    e
+                                )));
                             }
-                            Err(e) => {
-                                // JSON解析失败，可能是部分数据，记录但继续
-                                eprintln!("JSON解析警告: {} (数据: {})", e, data);
-                                consecutive_errors += 1;
+                            continue;
+                        }
+                    };
 
-                                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
-                                    return Err(ModelError::JsonParseError(format!(
-                                        "连续JSON解析失败次数过多: {}",
-                                        e
-                                    )));
-                                }
+                    let Some(data) = parse_sse_data_line(line) else {
+                        continue;
+                    };
+
+                    if data == "[DONE]" {
+                        return Ok(result);
+                    }
+
+                    match parse_chat_completion_chunk(data, &model_name) {
+                        Ok(Some(content)) => {
+                            consecutive_errors = 0;
+                            result.push_str(&content);
+
+                            // 发送流式数据到前端，处理发送错误
+                            if let Err(e) = app.emit(&event_name, content.as_str()) {
+                                eprintln!("警告: 无法发送流式数据到前端: {}", e);
+                                write_some_log(format!(" 无法发送流式数据到前端: {}", e).as_str())
+                            }
+                        }
+                        Ok(None) => {
+                            consecutive_errors = 0;
+                        }
+                        Err(e) => {
+                            eprintln!("JSON解析警告: {} (数据: {})", e, data);
+                            consecutive_errors += 1;
+
+                            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+                                return Err(ModelError::JsonParseError(format!(
+                                    "连续JSON解析失败次数过多: {}",
+                                    e
+                                )));
                             }
                         }
                     }
@@ -241,9 +250,78 @@ pub async fn call_model_api(
     }
 }
 
+fn parse_sse_data_line(line: &str) -> Option<&str> {
+    if line.is_empty() || line.starts_with(':') {
+        return None;
+    }
+
+    line.strip_prefix("data:")
+        .map(str::trim_start)
+        .filter(|data| !data.is_empty())
+}
+
+fn parse_chat_completion_chunk(data: &str, model_name: &str) -> Result<Option<String>, ModelError> {
+    let json_chunk = serde_json::from_str::<serde_json::Value>(data)
+        .map_err(|e| ModelError::JsonParseError(e.to_string()))?;
+
+    if let Some(error) = json_chunk.get("error") {
+        return Err(ModelError::InvalidResponse(format!(
+            "model={model_name}, API错误: {}",
+            error
+        )));
+    }
+
+    Ok(json_chunk["choices"][0]["delta"]["content"]
+        .as_str()
+        .map(str::to_string))
+}
+
 pub fn get_env_key(key_name: &str) -> String {
     env::var(key_name).unwrap_or_else(|_| {
         eprintln!("环境变量 {} 未设置，请设置后重试", key_name);
         std::process::exit(1);
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_sse_data_line_accepts_optional_space() {
+        assert_eq!(
+            parse_sse_data_line("data: {\"ok\":true}"),
+            Some("{\"ok\":true}")
+        );
+        assert_eq!(
+            parse_sse_data_line("data:{\"ok\":true}"),
+            Some("{\"ok\":true}")
+        );
+        assert_eq!(parse_sse_data_line(": keep-alive"), None);
+    }
+
+    #[test]
+    fn parse_chat_completion_chunk_extracts_content() {
+        let data = r#"{"choices":[{"delta":{"content":"hello"}}]}"#;
+        assert_eq!(
+            parse_chat_completion_chunk(data, "test-model").unwrap(),
+            Some("hello".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_chat_completion_chunk_ignores_reasoning_content() {
+        let data = r#"{"choices":[{"delta":{"reasoning_content":"thinking"}}]}"#;
+        assert_eq!(
+            parse_chat_completion_chunk(data, "test-model").unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn parse_chat_completion_chunk_returns_api_error() {
+        let data = r#"{"error":{"message":"bad request"}}"#;
+        let err = parse_chat_completion_chunk(data, "test-model").unwrap_err();
+        assert!(err.to_string().contains("API错误"));
+    }
 }

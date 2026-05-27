@@ -117,22 +117,6 @@ export function LlmProviderDialog({
 								officialLink={llmProviderOfficialLinks.doubaoApiKey}
 							/>
 							<ProviderConfigField
-								label="Kimi API Key"
-								value={draft.kimiApiKey}
-								onChange={(value) =>
-									setDraft((current) => ({ ...current, kimiApiKey: value }))
-								}
-								placeholder={getLlmProviderStatus(
-									draft.kimiApiKey,
-									presets.kimiApiKey,
-								)}
-								status={getLlmProviderStatus(
-									draft.kimiApiKey,
-									presets.kimiApiKey,
-								)}
-								officialLink={llmProviderOfficialLinks.kimiApiKey}
-							/>
-							<ProviderConfigField
 								label="Zhipu API Key"
 								value={draft.zhipuApiKey}
 								onChange={(value) =>
