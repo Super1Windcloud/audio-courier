@@ -218,7 +218,7 @@ fn resolve_provider(
             enable_thinking: None,
         }),
         "kimi" => Ok(ResolvedLlmProvider {
-            model: "kimi-k2-0905-preview".to_string(),
+            model: "kimi-k2.6".to_string(),
             base_url: "https://api.moonshot.cn/v1".to_string(),
             api_key: resolve_required_string(
                 runtime_config.kimi_api_key.as_deref(),
@@ -706,7 +706,7 @@ pub async fn kimi(app: tauri::AppHandle, flow_args: FlowArgs) -> Result<String, 
     call_model_api(
         app,
         ModelRequest {
-            model: "kimi-k2-0905-preview".to_string(),
+            model: "kimi-k2.6".to_string(),
             messages,
             base_url: "https://api.moonshot.cn/v1".to_string(),
             api_key,
