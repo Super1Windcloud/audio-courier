@@ -152,9 +152,10 @@ async function buildRelease(version: string) {
 	await ensureSigningEnv();
 	const extraArgs = splitArgs(process.env.RELEASE_TAURI_ARGS);
 	const targetTriple = targetTripleFromArgs(extraArgs);
+	const rustBuildEnv = await resolveRustBuildEnv(targetTriple);
 	const tauriArgs = [...extraArgs, ...(await fallbackMacosSigningArgs())];
 	if (targetTriple) {
-		await ensureRustTargetAvailable(targetTriple);
+		await ensureRustTargetAvailable(targetTriple, rustBuildEnv);
 	}
 	await cleanupExcludedSidecars(extraArgs);
 	await cleanupBundleDirs(targetTriple);
@@ -162,6 +163,7 @@ async function buildRelease(version: string) {
 	await runCommand("pnpm", ["tauri", "build", "--ci", ...tauriArgs], {
 		env: {
 			...process.env,
+			...rustBuildEnv,
 			CI: "true",
 		},
 	});
@@ -208,12 +210,50 @@ async function hasCodesigningIdentity() {
 	return !output.includes("0 valid identities found");
 }
 
-async function ensureRustTargetAvailable(targetTriple: string) {
+async function resolveRustBuildEnv(targetTriple: string | null) {
+	if (!targetTriple) {
+		return {};
+	}
+
 	if (await hasRustStdForTarget(targetTriple)) {
+		return {};
+	}
+
+	const installedTargets = await readCommandOutput("rustup", [
+		"target",
+		"list",
+		"--installed",
+	]);
+	if (!installedTargets?.split(/\s+/).includes(targetTriple)) {
+		return {};
+	}
+
+	const rustupCargo = (await readCommandOutput("rustup", ["which", "cargo"]))
+		?.trim()
+		.replace(/\n.*$/s, "");
+	if (!rustupCargo) {
+		return {};
+	}
+
+	const rustupToolchainBin = path.dirname(rustupCargo);
+	console.log(
+		`using rustup toolchain for ${targetTriple}: ${rustupToolchainBin}`,
+	);
+	return {
+		PATH: `${rustupToolchainBin}${path.delimiter}${process.env.PATH ?? ""}`,
+	};
+}
+
+async function ensureRustTargetAvailable(
+	targetTriple: string,
+	env: NodeJS.ProcessEnv = {},
+) {
+	if (await hasRustStdForTarget(targetTriple, env)) {
 		return;
 	}
 
-	const rustcPath = (await readCommandOutput("which", ["rustc"]))?.trim() ?? "";
+	const rustcPath =
+		(await readCommandOutput("which", ["rustc"], { env }))?.trim() ?? "";
 	const rustupPath =
 		(await readCommandOutput("which", ["rustup"]))?.trim() ?? "";
 	const isRustupToolchain =
@@ -222,12 +262,14 @@ async function ensureRustTargetAvailable(targetTriple: string) {
 
 	if (rustupPath && isRustupToolchain) {
 		await runCommand("rustup", ["target", "add", targetTriple]);
-		if (await hasRustStdForTarget(targetTriple)) {
+		if (await hasRustStdForTarget(targetTriple, env)) {
 			return;
 		}
 	}
 
-	const sysroot = (await readCommandOutput("rustc", ["--print", "sysroot"]))
+	const sysroot = (
+		await readCommandOutput("rustc", ["--print", "sysroot"], { env })
+	)
 		?.trim()
 		.replace(/\n.*$/s, "");
 	throw new Error(
@@ -245,14 +287,16 @@ async function ensureRustTargetAvailable(targetTriple: string) {
 	);
 }
 
-async function hasRustStdForTarget(targetTriple: string) {
+async function hasRustStdForTarget(
+	targetTriple: string,
+	env: NodeJS.ProcessEnv = {},
+) {
 	const targetLibDir = (
-		await readCommandOutput("rustc", [
-			"--print",
-			"target-libdir",
-			"--target",
-			targetTriple,
-		])
+		await readCommandOutput(
+			"rustc",
+			["--print", "target-libdir", "--target", targetTriple],
+			{ env },
+		)
 	)?.trim();
 
 	if (!targetLibDir) {
@@ -1211,11 +1255,21 @@ async function runCommand(
 	});
 }
 
-async function readCommandOutput(command: string, args: string[]) {
+async function readCommandOutput(
+	command: string,
+	args: string[],
+	options: {
+		env?: NodeJS.ProcessEnv;
+	} = {},
+) {
 	return await new Promise<string | null>((resolve) => {
 		const child = spawn(command, args, {
 			stdio: ["ignore", "pipe", "pipe"],
 			shell: process.platform === "win32",
+			env: {
+				...process.env,
+				...options.env,
+			},
 		});
 		const chunks: Buffer[] = [];
 
