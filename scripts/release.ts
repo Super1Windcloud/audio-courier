@@ -152,15 +152,124 @@ async function buildRelease(version: string) {
 	await ensureSigningEnv();
 	const extraArgs = splitArgs(process.env.RELEASE_TAURI_ARGS);
 	const targetTriple = targetTripleFromArgs(extraArgs);
+	const tauriArgs = [...extraArgs, ...(await fallbackMacosSigningArgs())];
+	if (targetTriple) {
+		await ensureRustTargetAvailable(targetTriple);
+	}
 	await cleanupExcludedSidecars(extraArgs);
 	await cleanupBundleDirs(targetTriple);
 	console.log(`building audio-courier ${version}`);
-	await runCommand("pnpm", ["tauri", "build", "--ci", ...extraArgs], {
+	await runCommand("pnpm", ["tauri", "build", "--ci", ...tauriArgs], {
 		env: {
 			...process.env,
 			CI: "true",
 		},
 	});
+}
+
+async function fallbackMacosSigningArgs() {
+	if (process.platform !== "darwin") {
+		return [];
+	}
+
+	if (process.env.APPLE_SIGNING_IDENTITY) {
+		return [];
+	}
+
+	if (await hasCodesigningIdentity()) {
+		return [];
+	}
+
+	console.log("no macOS codesigning identity found; using ad-hoc signing");
+	return [
+		"--config",
+		JSON.stringify({
+			bundle: {
+				macOS: {
+					signingIdentity: "-",
+				},
+			},
+		}),
+	];
+}
+
+async function hasCodesigningIdentity() {
+	const output = await readCommandOutput("security", [
+		"find-identity",
+		"-v",
+		"-p",
+		"codesigning",
+	]);
+
+	if (output === null) {
+		return false;
+	}
+
+	return !output.includes("0 valid identities found");
+}
+
+async function ensureRustTargetAvailable(targetTriple: string) {
+	if (await hasRustStdForTarget(targetTriple)) {
+		return;
+	}
+
+	const rustcPath = (await readCommandOutput("which", ["rustc"]))?.trim() ?? "";
+	const rustupPath = (await readCommandOutput("which", ["rustup"]))?.trim() ?? "";
+	const isRustupToolchain =
+		rustcPath.includes(`${path.sep}.cargo${path.sep}bin${path.sep}`) ||
+		rustcPath.includes(`${path.sep}rustup${path.sep}`);
+
+	if (rustupPath && isRustupToolchain) {
+		await runCommand("rustup", ["target", "add", targetTriple]);
+		if (await hasRustStdForTarget(targetTriple)) {
+			return;
+		}
+	}
+
+	const sysroot = (await readCommandOutput("rustc", ["--print", "sysroot"]))
+		?.trim()
+		.replace(/\n.*$/s, "");
+	throw new Error(
+		[
+			`Rust target ${targetTriple} is missing for the active Rust toolchain.`,
+			rustcPath ? `active rustc: ${rustcPath}` : null,
+			sysroot ? `active sysroot: ${sysroot}` : null,
+			"Homebrew Rust usually cannot install additional Rust std targets.",
+			"Install/use rustup, then run:",
+			"  rustup target add aarch64-apple-darwin x86_64-apple-darwin",
+			"  just publish",
+		]
+			.filter(Boolean)
+			.join("\n"),
+	);
+}
+
+async function hasRustStdForTarget(targetTriple: string) {
+	const targetLibDir = (
+		await readCommandOutput("rustc", [
+			"--print",
+			"target-libdir",
+			"--target",
+			targetTriple,
+		])
+	)?.trim();
+
+	if (!targetLibDir) {
+		return false;
+	}
+
+	try {
+		const entries = await readdir(targetLibDir);
+		return entries.some(
+			(entry) => entry.startsWith("libstd-") && entry.endsWith(".rlib"),
+		);
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+			return false;
+		}
+
+		throw error;
+	}
 }
 
 async function publishForCurrentPlatform(version: string) {
@@ -1098,6 +1207,23 @@ async function runCommand(
 		});
 
 		child.on("error", reject);
+	});
+}
+
+async function readCommandOutput(command: string, args: string[]) {
+	return await new Promise<string | null>((resolve) => {
+		const child = spawn(command, args, {
+			stdio: ["ignore", "pipe", "pipe"],
+			shell: process.platform === "win32",
+		});
+		const chunks: Buffer[] = [];
+
+		child.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
+		child.stderr.on("data", (chunk: Buffer) => chunks.push(chunk));
+		child.on("error", () => resolve(null));
+		child.on("exit", () => {
+			resolve(Buffer.concat(chunks).toString("utf8"));
+		});
 	});
 }
 
