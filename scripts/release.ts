@@ -214,7 +214,8 @@ async function ensureRustTargetAvailable(targetTriple: string) {
 	}
 
 	const rustcPath = (await readCommandOutput("which", ["rustc"]))?.trim() ?? "";
-	const rustupPath = (await readCommandOutput("which", ["rustup"]))?.trim() ?? "";
+	const rustupPath =
+		(await readCommandOutput("which", ["rustup"]))?.trim() ?? "";
 	const isRustupToolchain =
 		rustcPath.includes(`${path.sep}.cargo${path.sep}bin${path.sep}`) ||
 		rustcPath.includes(`${path.sep}rustup${path.sep}`);
