@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import {
+	cp,
 	mkdir,
 	readdir,
 	readFile,
@@ -20,7 +21,14 @@ const bundleDir = path.join(
 	"bundle",
 );
 const releaseTargetDir = path.join(rootDir, "src-tauri", "target", "release");
+const targetDir = path.join(rootDir, "src-tauri", "target");
 const macosBundleDir = path.join(bundleDir, "macos");
+const localMacosStagingDir = path.join(
+	rootDir,
+	"src-tauri",
+	"target",
+	"local-macos-bundle",
+);
 const tauriConfigPath = path.join(rootDir, "src-tauri", "tauri.conf.json");
 const cargoTomlPath = path.join(rootDir, "src-tauri", "Cargo.toml");
 const packageJsonPath = path.join(rootDir, "package.json");
@@ -48,11 +56,17 @@ async function main() {
 	const versions = await loadVersions();
 	assertVersions(versions);
 
-	if (mode === "build" || mode === "all") {
+	if (mode === "all") {
+		await publishForCurrentPlatform(versions.packageVersion);
+		await cleanupMacOsBundle();
+		return;
+	}
+
+	if (mode === "build") {
 		await buildRelease(versions.packageVersion);
 	}
 
-	if (mode === "publish" || mode === "all") {
+	if (mode === "publish") {
 		const releaseContext = await publishRelease(versions.packageVersion);
 		console.log(
 			`published ${releaseContext.tagName} with ${releaseContext.uploadedAssets.length} asset(s)`,
@@ -137,9 +151,9 @@ function assertVersions(versions: {
 async function buildRelease(version: string) {
 	await ensureSigningEnv();
 	const extraArgs = splitArgs(process.env.RELEASE_TAURI_ARGS);
+	const targetTriple = targetTripleFromArgs(extraArgs);
 	await cleanupExcludedSidecars(extraArgs);
-	await rm(bundleDir, { recursive: true, force: true });
-	console.log(`removed ${path.relative(rootDir, bundleDir)} before build`);
+	await cleanupBundleDirs(targetTriple);
 	console.log(`building audio-courier ${version}`);
 	await runCommand("pnpm", ["tauri", "build", "--ci", ...extraArgs], {
 		env: {
@@ -147,6 +161,113 @@ async function buildRelease(version: string) {
 			CI: "true",
 		},
 	});
+}
+
+async function publishForCurrentPlatform(version: string) {
+	if (process.platform === "darwin" && process.arch === "arm64") {
+		await publishAppleSiliconMacosRelease(version);
+		return;
+	}
+
+	if (process.platform === "darwin" && process.arch === "x64") {
+		process.env.RELEASE_TAURI_ARGS = "--target x86_64-apple-darwin";
+		await buildAndPublishRelease(version);
+		delete process.env.RELEASE_TAURI_ARGS;
+		return;
+	}
+
+	await buildAndPublishRelease(version);
+}
+
+async function buildAndPublishRelease(version: string) {
+	await buildRelease(version);
+	await publishOnlyRelease(version);
+}
+
+async function publishOnlyRelease(version: string) {
+	const releaseContext = await publishRelease(version);
+	console.log(
+		`published ${releaseContext.tagName} with ${releaseContext.uploadedAssets.length} asset(s)`,
+	);
+}
+
+async function publishAppleSiliconMacosRelease(version: string) {
+	if (process.platform !== "darwin") {
+		throw new Error("Apple Silicon macOS release can only run on macOS");
+	}
+
+	if (process.arch !== "arm64") {
+		throw new Error("Apple Silicon macOS release must run on Apple Silicon");
+	}
+
+	await runCommand("rustup", [
+		"target",
+		"add",
+		"aarch64-apple-darwin",
+		"x86_64-apple-darwin",
+	]);
+
+	await rm(localMacosStagingDir, { recursive: true, force: true });
+	await mkdir(localMacosStagingDir, { recursive: true });
+
+	for (const targetTriple of ["aarch64-apple-darwin", "x86_64-apple-darwin"]) {
+		process.env.RELEASE_TAURI_ARGS = `--target ${targetTriple}`;
+		await buildRelease(version);
+		await stageBuiltBundles(targetTriple);
+	}
+
+	delete process.env.RELEASE_TAURI_ARGS;
+	await rm(bundleDir, { recursive: true, force: true });
+	await cp(localMacosStagingDir, bundleDir, { recursive: true });
+	await rm(localMacosStagingDir, { recursive: true, force: true });
+	await publishOnlyRelease(version);
+}
+
+async function cleanupBundleDirs(targetTriple: string | null) {
+	const candidates = bundleDirsForTarget(targetTriple);
+	for (const candidate of candidates) {
+		await rm(candidate, { recursive: true, force: true });
+		console.log(`removed ${path.relative(rootDir, candidate)} before build`);
+	}
+}
+
+async function stageBuiltBundles(targetTriple: string) {
+	const builtBundleDir = await findBuiltBundleDir(targetTriple);
+	const destination = path.join(localMacosStagingDir, targetTriple);
+	await rm(destination, { recursive: true, force: true });
+	await cp(builtBundleDir, destination, { recursive: true });
+	console.log(
+		`staged ${path.relative(rootDir, builtBundleDir)} -> ${path.relative(
+			rootDir,
+			destination,
+		)}`,
+	);
+}
+
+async function findBuiltBundleDir(targetTriple: string | null) {
+	for (const candidate of bundleDirsForTarget(targetTriple)) {
+		try {
+			const files = await listFiles(candidate);
+			if (files.length > 0) {
+				return candidate;
+			}
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+				throw error;
+			}
+		}
+	}
+
+	throw new Error("Tauri build completed but no bundle artifacts were found");
+}
+
+function bundleDirsForTarget(targetTriple: string | null) {
+	const dirs = [bundleDir];
+	if (targetTriple) {
+		dirs.push(path.join(targetDir, targetTriple, "release", "bundle"));
+	}
+
+	return dirs;
 }
 
 async function cleanupExcludedSidecars(extraArgs: string[]) {
@@ -366,6 +487,12 @@ async function loadReleaseNotes(version: string) {
 
 function resolveTargetTriple() {
 	const args = splitArgs(process.env.RELEASE_TAURI_ARGS);
+	return (
+		targetTripleFromArgs(args) ?? process.env.RELEASE_TARGET_TRIPLE ?? null
+	);
+}
+
+function targetTripleFromArgs(args: string[]) {
 	const targetIndex = args.findIndex(
 		(item) => item === "--target" || item === "-t",
 	);
@@ -373,7 +500,7 @@ function resolveTargetTriple() {
 		return args[targetIndex + 1];
 	}
 
-	return process.env.RELEASE_TARGET_TRIPLE ?? null;
+	return null;
 }
 
 async function collectArtifacts(input: {
@@ -572,8 +699,13 @@ function classifyArtifact(filePath: string, targetTriple: string | null) {
 	let arch = targetTriple
 		? archFromTargetTriple(targetTriple)
 		: archFromNode(process.arch);
-	if (fileName.includes("_x64") || fileName.includes("x86_64")) arch = "x86_64";
-	else if (fileName.includes("_aarch64") || fileName.includes("_arm64"))
+	const normalizedPath = filePath.replaceAll(path.sep, "/");
+	if (normalizedPath.includes("_x64") || normalizedPath.includes("x86_64"))
+		arch = "x86_64";
+	else if (
+		normalizedPath.includes("aarch64") ||
+		normalizedPath.includes("arm64")
+	)
 		arch = "aarch64";
 
 	const kind = fileName.endsWith(".AppImage")
