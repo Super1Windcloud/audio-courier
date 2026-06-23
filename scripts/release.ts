@@ -200,13 +200,6 @@ async function publishAppleSiliconMacosRelease(version: string) {
 		throw new Error("Apple Silicon macOS release must run on Apple Silicon");
 	}
 
-	await runCommand("rustup", [
-		"target",
-		"add",
-		"aarch64-apple-darwin",
-		"x86_64-apple-darwin",
-	]);
-
 	await rm(localMacosStagingDir, { recursive: true, force: true });
 	await mkdir(localMacosStagingDir, { recursive: true });
 
