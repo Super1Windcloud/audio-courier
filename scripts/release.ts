@@ -21,6 +21,7 @@ const bundleDir = path.join(
 	"bundle",
 );
 const releaseTargetDir = path.join(rootDir, "src-tauri", "target", "release");
+const tauriDir = path.join(rootDir, "src-tauri");
 const targetDir = path.join(rootDir, "src-tauri", "target");
 const macosBundleDir = path.join(bundleDir, "macos");
 const localMacosStagingDir = path.join(
@@ -219,16 +220,20 @@ async function resolveRustBuildEnv(targetTriple: string | null) {
 		return {};
 	}
 
-	const installedTargets = await readCommandOutput("rustup", [
-		"target",
-		"list",
-		"--installed",
-	]);
+	const installedTargets = await readCommandOutput(
+		"rustup",
+		["target", "list", "--installed"],
+		{ cwd: tauriDir },
+	);
 	if (!installedTargets?.split(/\s+/).includes(targetTriple)) {
 		return {};
 	}
 
-	const rustupCargo = (await readCommandOutput("rustup", ["which", "cargo"]))
+	const rustupCargo = (
+		await readCommandOutput("rustup", ["which", "cargo"], {
+			cwd: tauriDir,
+		})
+	)
 		?.trim()
 		.replace(/\n.*$/s, "");
 	if (!rustupCargo) {
@@ -261,7 +266,9 @@ async function ensureRustTargetAvailable(
 		rustcPath.includes(`${path.sep}rustup${path.sep}`);
 
 	if (rustupPath && isRustupToolchain) {
-		await runCommand("rustup", ["target", "add", targetTriple]);
+		await runCommand("rustup", ["target", "add", targetTriple], {
+			cwd: tauriDir,
+		});
 		if (await hasRustStdForTarget(targetTriple, env)) {
 			return;
 		}
@@ -1230,6 +1237,7 @@ async function runCommand(
 	command: string,
 	args: string[],
 	options: {
+		cwd?: string;
 		env?: NodeJS.ProcessEnv;
 	} = {},
 ) {
@@ -1237,7 +1245,8 @@ async function runCommand(
 		const child = spawn(command, args, {
 			stdio: "inherit",
 			shell: process.platform === "win32",
-			...options,
+			cwd: options.cwd,
+			env: options.env,
 		});
 
 		child.on("exit", (code) => {
@@ -1259,6 +1268,7 @@ async function readCommandOutput(
 	command: string,
 	args: string[],
 	options: {
+		cwd?: string;
 		env?: NodeJS.ProcessEnv;
 	} = {},
 ) {
@@ -1266,6 +1276,7 @@ async function readCommandOutput(
 		const child = spawn(command, args, {
 			stdio: ["ignore", "pipe", "pipe"],
 			shell: process.platform === "win32",
+			cwd: options.cwd,
 			env: {
 				...process.env,
 				...options.env,
