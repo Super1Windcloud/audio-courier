@@ -271,6 +271,7 @@ export function hasConfiguredValue(value: unknown) {
 
 export function hasAnyTranscriptApiKeyConfigured(
 	settings: TranscriptProviderSettings,
+	presets?: TranscriptProviderSettings,
 ) {
 	return [
 		settings.deepgramApiKey,
@@ -278,11 +279,27 @@ export function hasAnyTranscriptApiKeyConfigured(
 		settings.gladiaApiKey,
 		settings.speechmaticsApiKey,
 		settings.revaiApiKey,
+		presets?.deepgramApiKey,
+		presets?.assemblyApiKey,
+		presets?.gladiaApiKey,
+		presets?.speechmaticsApiKey,
+		presets?.revaiApiKey,
 	].some(hasConfiguredValue);
 }
 
-export function getTranscriptProviderStatus(apiKey: string) {
-	return hasConfiguredValue(apiKey) ? "已激活" : "未激活";
+export function getTranscriptProviderStatus(
+	localApiKey: string,
+	presetApiKey = "",
+) {
+	if (hasConfiguredValue(localApiKey)) {
+		return "已激活";
+	}
+
+	if (hasConfiguredValue(presetApiKey)) {
+		return "免费额度";
+	}
+
+	return "未激活";
 }
 
 export function getLlmProviderStatus(

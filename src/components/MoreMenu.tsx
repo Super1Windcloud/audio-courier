@@ -153,13 +153,22 @@ export function MoreMenu() {
 			return;
 		}
 
-		if (hasAnyTranscriptApiKeyConfigured(appState.transcriptProviderSettings)) {
+		if (
+			hasAnyTranscriptApiKeyConfigured(
+				appState.transcriptProviderSettings,
+				appState.envProviderPresets.transcript,
+			)
+		) {
 			return;
 		}
 
 		didAutoOpenTranscriptDialog.current = true;
 		setIsTranscriptConfigDialogOpen(true);
-	}, [appState.transcriptProviderSettings, isPromptDialogOpen]);
+	}, [
+		appState.envProviderPresets.transcript,
+		appState.transcriptProviderSettings,
+		isPromptDialogOpen,
+	]);
 
 	useEffect(() => {
 		if (!isMoreMenuOpen) {

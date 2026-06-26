@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::env;
 
+const BUILTIN_DEEPGRAM_API_KEY: Option<&str> = option_env!("BUILTIN_DEEPGRAM_API_KEY");
+
 pub const SILICONFLOW_ENV_KEYS: &[&str] = &["SILICONFLOW_API_KEY", "Siliconflow"];
 pub const DOUBAO_ENV_KEYS: &[&str] = &["DOUBAO_API_KEY", "DOUBAO"];
 pub const ZHIPU_ENV_KEYS: &[&str] = &["ZHIPU_API_KEY", "ZHIPU"];
@@ -80,6 +82,11 @@ pub fn resolve_optional_string(override_value: Option<&str>, env_keys: &[&str]) 
     })
 }
 
+pub fn resolve_deepgram_api_key(override_value: Option<&str>) -> Option<String> {
+    resolve_optional_string(override_value, DEEPGRAM_ENV_KEYS)
+        .or_else(|| normalize_optional_string(BUILTIN_DEEPGRAM_API_KEY))
+}
+
 pub fn resolve_required_string(
     override_value: Option<&str>,
     env_keys: &[&str],
@@ -119,7 +126,7 @@ pub fn llm_runtime_config_from_env() -> LlmRuntimeConfig {
 
 pub fn transcript_runtime_config_from_env() -> TranscriptRuntimeConfig {
     TranscriptRuntimeConfig {
-        deepgram_api_key: resolve_optional_string(None, DEEPGRAM_ENV_KEYS),
+        deepgram_api_key: resolve_deepgram_api_key(None),
         deepgram_language: resolve_optional_string(None, &["DEEPGRAM_LANGUAGE"]),
         assembly_api_key: resolve_optional_string(None, ASSEMBLY_ENV_KEYS),
         gladia_api_key: resolve_optional_string(None, GLADIA_ENV_KEYS),

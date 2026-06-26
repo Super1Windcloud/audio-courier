@@ -49,6 +49,9 @@ export function TranscriptProviderDialog({
 	const settings = useAppStateStore(
 		(state) => state.transcriptProviderSettings,
 	);
+	const presets = useAppStateStore(
+		(state) => state.envProviderPresets.transcript,
+	);
 	const updateSettings = useAppStateStore(
 		(state) => state.updateTranscriptProviderSettings,
 	);
@@ -71,9 +74,8 @@ export function TranscriptProviderDialog({
 					<DialogTitle>转录供应商 API 配置</DialogTitle>
 					<DialogDescription className="text-slate-300">
 						这里的配置只影响语音转录供应商，不影响大模型对话。API Key
-						留空时会回退到 dev 模式下的 `.env` 或 production 模式下内置的
-						`.env.local`
-						预设；语言、模型和实时地址会使用这里的值覆盖默认行为。每个字段右侧都可以直接打开对应供应商官网。
+						留空时会回退到 dev 模式下的环境变量或 production
+						模式下内置的预设；语言、模型和实时地址会使用这里的值覆盖默认行为。每个字段右侧都可以直接打开对应供应商官网。
 					</DialogDescription>
 				</DialogHeader>
 
@@ -123,8 +125,14 @@ export function TranscriptProviderDialog({
 								onChange={(value) =>
 									setDraft((current) => ({ ...current, deepgramApiKey: value }))
 								}
-								placeholder={getTranscriptProviderStatus(draft.deepgramApiKey)}
-								status={getTranscriptProviderStatus(draft.deepgramApiKey)}
+								placeholder={getTranscriptProviderStatus(
+									draft.deepgramApiKey,
+									presets.deepgramApiKey,
+								)}
+								status={getTranscriptProviderStatus(
+									draft.deepgramApiKey,
+									presets.deepgramApiKey,
+								)}
 								officialLink={transcriptProviderOfficialLinks.deepgramApiKey}
 							/>
 							<ProviderConfigField

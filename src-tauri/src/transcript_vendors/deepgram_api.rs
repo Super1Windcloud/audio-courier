@@ -2,7 +2,7 @@
 
 /// https://developers.deepgram.com/reference/speech-to-text-api/listen-streaming
 use crate::provider_config::{
-    TranscriptRuntimeConfig, resolve_optional_string, resolve_required_string,
+    TranscriptRuntimeConfig, resolve_deepgram_api_key, resolve_optional_string,
 };
 use crate::transcript_vendors::{
     PcmCallback, StatusCallback, StreamingTranscriber, emit_commit, emit_draft,
@@ -50,11 +50,10 @@ impl DeepgramApiTranscriber {
         status_callback: Option<StatusCallback>,
         transcript_config: TranscriptRuntimeConfig,
     ) -> Result<Self, String> {
-        let api_key = resolve_required_string(
-            transcript_config.deepgram_api_key.as_deref(),
-            &["DEEPGRAM_API_KEY"],
-            "DEEPGRAM_API_KEY",
-        )?;
+        let api_key = resolve_deepgram_api_key(transcript_config.deepgram_api_key.as_deref())
+            .ok_or_else(|| {
+                "缺少 DEEPGRAM_API_KEY 配置，请在前端填写或在环境变量中提供".to_string()
+            })?;
         let language = resolve_optional_string(
             transcript_config.deepgram_language.as_deref(),
             &["DEEPGRAM_LANGUAGE"],
