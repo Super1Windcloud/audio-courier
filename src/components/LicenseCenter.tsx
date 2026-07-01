@@ -260,7 +260,7 @@ export function LicenseCenter() {
 					<DialogDescription className="text-slate-300">
 						{isAuthorized
 							? "当前设备已完成授权校验，这里展示许可证和设备绑定信息。"
-							: "先生成设备请求码发给你自己签名，再把返回的许可证 JSON 粘贴到这里导入。"}
+							: "请往下滑点击生成设备请求码之后复制发给卖家进行签名，再把返回的许可证 JSON 粘贴到最底部许可证部分进行导入。"}
 					</DialogDescription>
 				</DialogHeader>
 
