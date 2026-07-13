@@ -35,3 +35,4 @@ assets
 .vite
 .cargo-target
 bundle
+.pnpm-store/v11/index.db

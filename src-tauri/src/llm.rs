@@ -80,7 +80,7 @@ pub async fn siliconflow_free_with_model(
     flow_args: FlowArgs,
     model: &str,
 ) -> Result<String, String> {
-    let api_key = get_env_key("Siliconflow");
+    let api_key = get_env_key("SILICONFLOW_API_KEY");
     let messages = vec![
         json!({"role":"system","content":flow_args.llm_prompt}),
         json!({"role":"user","content":flow_args.question}),

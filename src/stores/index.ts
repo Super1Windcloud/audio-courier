@@ -130,7 +130,7 @@ function isTranscribeVendor(target: unknown): target is TranscribeVendor {
 
 function createDefaultPersistedConfigState(): PersistedAppConfigState {
 	return {
-		currentSelectedModel: "siliconflow_pro",
+		currentSelectedModel: "gemini",
 		currentAudioChannel: "",
 		llmPrompt: DEFAULT_LLM_PROMPT,
 		interviewPrompt: DEFAULT_INTERVIEW_PROMPT,

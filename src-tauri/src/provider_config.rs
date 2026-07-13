@@ -3,7 +3,7 @@ use std::env;
 
 const BUILTIN_DEEPGRAM_API_KEY: Option<&str> = option_env!("BUILTIN_DEEPGRAM_API_KEY");
 
-pub const SILICONFLOW_ENV_KEYS: &[&str] = &["SILICONFLOW_API_KEY", "Siliconflow"];
+pub const SILICONFLOW_ENV_KEYS: &[&str] = &["SILICONFLOW_API_KEY"];
 pub const DOUBAO_ENV_KEYS: &[&str] = &["DOUBAO_API_KEY", "DOUBAO"];
 pub const ZHIPU_ENV_KEYS: &[&str] = &["ZHIPU_API_KEY", "ZHIPU"];
 pub const DEEPSEEK_ENV_KEYS: &[&str] = &["DEEPSEEK_API_KEY", "DEEPSEEK"];
