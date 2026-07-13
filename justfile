@@ -51,7 +51,7 @@ upgrade:
     cd src-tauri &&  cargo update && cargo upgrade
 
 nsis:
-    pnpm tb && pnpm release:publish && mv src-tauri/target/release/bundle/nsis ./bundle
+    pnpm tb && pnpm release:publish && mkdir -p ./bundle && rm -rf ./bundle/nsis && mv src-tauri/target/release/bundle/nsis ./bundle/nsis
 
 dmg:
-    pnpm tb && pnpm release:publish && mv src-tauri/target/release/bundle/dmg ./bundle
+    pnpm tb && pnpm release:publish && mkdir -p ./bundle && rm -rf ./bundle/dmg && mv src-tauri/target/release/bundle/dmg ./bundle/dmg
