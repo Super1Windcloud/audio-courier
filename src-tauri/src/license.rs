@@ -555,14 +555,14 @@ fn private_key_from_env() -> Result<String, String> {
 }
 
 pub fn ensure_signer_access() -> Result<(), String> {
-    let allowed_fingerprint = env::var("SIGNER_DEVICE_FINGERPRINT")
+    let allowed_fingerprints = env::var("SIGNER_DEVICE_FINGERPRINT")
         .map_err(|_| "未设置 SIGNER_DEVICE_FINGERPRINT，签名器默认禁用".to_string())?;
-    if allowed_fingerprint.trim().is_empty() {
+    if allowed_fingerprints.trim().is_empty() {
         return Err("SIGNER_DEVICE_FINGERPRINT 为空，签名器默认禁用".to_string());
     }
 
     let current_fingerprint = compute_device_fingerprint()?;
-    if allowed_fingerprint.trim() != current_fingerprint {
+    if !is_allowed_signer_fingerprint(&allowed_fingerprints, &current_fingerprint) {
         warn!("signer access fingerprint mismatch");
         return Err("当前机器未被授权打开签名器".to_string());
     }
@@ -571,9 +571,30 @@ pub fn ensure_signer_access() -> Result<(), String> {
     Ok(())
 }
 
+fn is_allowed_signer_fingerprint(allowed_fingerprints: &str, current_fingerprint: &str) -> bool {
+    allowed_fingerprints
+        .split(',')
+        .map(str::trim)
+        .any(|fingerprint| {
+            !fingerprint.is_empty() && fingerprint.eq_ignore_ascii_case(current_fingerprint.trim())
+        })
+}
+
 fn random_license_id() -> String {
     let suffix = Alphanumeric
         .sample_string(&mut rand::rng(), 10)
         .to_lowercase();
     format!("lic_{}", suffix)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_allowed_signer_fingerprint;
+
+    #[test]
+    fn matches_single_and_multiple_signer_fingerprints() {
+        assert!(is_allowed_signer_fingerprint("host-a", "host-a"));
+        assert!(is_allowed_signer_fingerprint("host-a, host-b", "host-b"));
+        assert!(!is_allowed_signer_fingerprint("host-a,host-b", "host-c"));
+    }
 }
