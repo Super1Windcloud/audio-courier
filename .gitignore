@@ -36,3 +36,5 @@ assets
 .cargo-target
 bundle
 .pnpm-store/v11/index.db
+.pnpm-store/v11/index.db-shm
+.pnpm-store/

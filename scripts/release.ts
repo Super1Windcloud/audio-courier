@@ -63,6 +63,12 @@ async function main() {
 		return;
 	}
 
+	if (mode === "macos") {
+		await publishMacosDualArchitectureRelease(versions.packageVersion);
+		await cleanupMacOsBundle();
+		return;
+	}
+
 	if (mode === "build") {
 		await buildRelease(versions.packageVersion);
 	}
@@ -83,8 +89,8 @@ function loadEnvFiles() {
 }
 
 function assertMode(value: string) {
-	if (!["all", "build", "publish"].includes(value)) {
-		throw new Error("usage: tsx scripts/release.ts [build|publish]");
+	if (!["all", "build", "publish", "macos"].includes(value)) {
+		throw new Error("usage: tsx scripts/release.ts [build|publish|macos]");
 	}
 }
 
@@ -326,7 +332,7 @@ async function hasRustStdForTarget(
 
 async function publishForCurrentPlatform(version: string) {
 	if (process.platform === "darwin" && process.arch === "arm64") {
-		await publishAppleSiliconMacosRelease(version);
+		await publishMacosDualArchitectureRelease(version);
 		return;
 	}
 
@@ -352,13 +358,15 @@ async function publishOnlyRelease(version: string) {
 	);
 }
 
-async function publishAppleSiliconMacosRelease(version: string) {
+async function publishMacosDualArchitectureRelease(version: string) {
 	if (process.platform !== "darwin") {
-		throw new Error("Apple Silicon macOS release can only run on macOS");
+		throw new Error("dual-architecture macOS release can only run on macOS");
 	}
 
 	if (process.arch !== "arm64") {
-		throw new Error("Apple Silicon macOS release must run on Apple Silicon");
+		throw new Error(
+			"dual-architecture macOS release must run on Apple Silicon",
+		);
 	}
 
 	await rm(localMacosStagingDir, { recursive: true, force: true });

@@ -33,6 +33,10 @@ build:
 apple_arm:
     RELEASE_TAURI_ARGS="--target aarch64-apple-darwin" just release
 
+release_apple:
+    pnpm bump
+    pnpm exec tsx scripts/release.ts macos
+
 release_windows:
     pnpm bump
     pnpm release
