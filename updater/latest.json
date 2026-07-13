@@ -1,7 +1,7 @@
 {
   "version": "1.1.10",
   "notes": "Release 1.1.10",
-  "pub_date": "2026-07-01T07:19:18.179Z",
+  "pub_date": "2026-07-13T08:53:23.277Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY3E3L0ducEp5QmxyaVBwVi9ZUHdCcVBzZG42dUNNRmoyL0g0bXlkSHZBcjZodzdKai8wY1FCZ0UzYUQrMVBiWFByOFhRZ3RsSkxJRjhwa0g3Y1VHNFdsdUlwUDhxZUFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyODkwMzQ3CWZpbGU6QXVkaW8gQ291cmllcl8xLjEuMTBfeDY0LXNldHVwLmV4ZQpwMEpHY3hDbVh6VWdURlcxMmFNM0p4WE9wVEN6MGN1Uy8za0ZobzQ1YjhzemhhQjRnNnJPT0dOMUcyZG9wN0dzZm9obkxVV2VsSzBXQi9lMm5tbVdBQT09Cg==",
@@ -9,11 +9,11 @@
     },
     "darwin-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY3E3L0ducEp5QnNGRWFaZXU1V3JvbCsyVnZRSkdOdXBadnNTbkw0QitMcUhJQjNoWGQrOGpDVUVuNVVOaE9ZUExPRjkxQmxlTUlPNmtSY1hXZFMrQlNtUWZqbE01cmdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMjA1NTU2CWZpbGU6QXVkaW8gQ291cmllci5hcHAudGFyLmd6CjBFL1JGQjFUdGxQQlZTR3lUbzkxWG5kS2ZvNjQ5YmYwYVcyREtNRFh1a29PYUQyM2l6MFg3NmRxY1MwaXpWUXFIRjNqMU9nZnJzQ3J3ZURiRkpsY0RBPT0K",
-      "url": "https://github.com/super1windcloud/audio-courier/releases/download/audio-courier-v1.1.8/Audio.Courier-darwin-x86_64.app.tar.gz"
+      "url": "https://github.com/super1windcloud/audio-courier/releases/download/audio-courier-v1.1.10/Audio.Courier-darwin-x86_64.app.tar.gz"
     },
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY3E3L0ducEp5QnZUVDJaM05JV2QxWnkzN25PNC8rUGF3VXYrcGZTWUFWbWxBUlNQZU9wbTZadE84YVN1d0dHblF3Znp0UHl1Tk0vWUVDTVloUk8zc1lrNVIzSlpqbVFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMjA1NDc5CWZpbGU6QXVkaW8gQ291cmllci5hcHAudGFyLmd6CjF6RlNNdTB6UG4vbnBQdWpkcjBOZVc5NytES2dyRkJpN3dQbjY3Z2VmREJDRTFOUDArR2ZqUGswS1hqRUZtQ2xia3ExNGJlNURBb0NWc1NkcmxLK0NBPT0K",
-      "url": "https://github.com/super1windcloud/audio-courier/releases/download/audio-courier-v1.1.8/Audio.Courier-darwin-aarch64.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY3E3L0ducEp5QnJiT0ZnYU9hQnA5OXFLdTI0TW1BMFNiMFlwajEwYWRUWEZlK25nWHVJWjh6b0JxelNycmFrd1BPc3hBMWZhSDFGR08zUFcrd1JJMXZ6Z2pJbGJyaVFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgzOTMyNzkwCWZpbGU6QXVkaW8gQ291cmllci5hcHAudGFyLmd6ClZ5aXphYktUSWFsaEljLzBSeENvZFRBRys1RWlXOWs0YlpYbTFKNXpWTzdRSzY4aHFCbUN4Q1poWklNWEg1SHhXejVnS3M2bE9wZGVOU0psSEJ3TkRRPT0K",
+      "url": "https://github.com/super1windcloud/audio-courier/releases/download/audio-courier-v1.1.10/Audio.Courier-darwin-aarch64.app.tar.gz"
     }
   }
 }
