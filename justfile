@@ -52,3 +52,6 @@ upgrade:
 
 nsis:
     pnpm tb && mv  src-tauri/target/release/bundle/nsis  ./bundle
+
+dmg:
+    pnpm tb && mv src-tauri/target/release/bundle/dmg ./bundle
