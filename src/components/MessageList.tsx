@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import useAppStateStore from "@/stores";
 import type { Message } from "./ChatContainer";
@@ -17,6 +17,9 @@ export const MessageList: React.FC<MessageListProps> = ({
 	onDeleteMessage,
 }) => {
 	const scrollAreaRef = useRef<HTMLDivElement>(null);
+	const [openContextMenuMessageId, setOpenContextMenuMessageId] = useState<
+		number | null
+	>(null);
 	const isScrolling = useAppStateStore((state) => state.isStartScrollToBottom);
 	const hasPendingRobotMessage = messages.some(
 		(message) => message.sender === "robot" && message.text.trim() === "",
@@ -46,12 +49,26 @@ export const MessageList: React.FC<MessageListProps> = ({
 					<MessageItem
 						key={message.id}
 						message={message}
+						contextMenuOpen={openContextMenuMessageId === message.id}
+						onContextMenuOpen={() => setOpenContextMenuMessageId(message.id)}
+						onContextMenuClose={() =>
+							setOpenContextMenuMessageId((currentId) =>
+								currentId === message.id ? null : currentId,
+							)
+						}
 						onDeleteMessage={onDeleteMessage}
 					/>
 				))}
 				{isTyping && !hasPendingRobotMessage && (
 					<MessageItem
 						message={{ id: -1, text: "", sender: "robot" }}
+						contextMenuOpen={openContextMenuMessageId === -1}
+						onContextMenuOpen={() => setOpenContextMenuMessageId(-1)}
+						onContextMenuClose={() =>
+							setOpenContextMenuMessageId((currentId) =>
+								currentId === -1 ? null : currentId,
+							)
+						}
 						onDeleteMessage={onDeleteMessage}
 					/>
 				)}

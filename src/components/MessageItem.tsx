@@ -9,6 +9,9 @@ import { TypingIndicator } from "./TypingIndicator";
 
 interface MessageItemProps {
 	message: Message;
+	contextMenuOpen: boolean;
+	onContextMenuOpen: () => void;
+	onContextMenuClose: () => void;
 	onDeleteMessage: (id: number) => void;
 }
 
@@ -19,6 +22,9 @@ interface ContextMenuPosition {
 
 export const MessageItem: React.FC<MessageItemProps> = ({
 	message,
+	contextMenuOpen,
+	onContextMenuOpen,
+	onContextMenuClose,
 	onDeleteMessage,
 }) => {
 	const isUser = message.sender === "user";
@@ -28,18 +34,32 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
 	const closeContextMenu = useCallback(() => {
 		setContextMenuPosition(null);
-	}, []);
+		onContextMenuClose();
+	}, [onContextMenuClose]);
 
 	const handleContextMenu = useCallback(
 		(event: React.MouseEvent<HTMLDivElement>) => {
 			event.preventDefault();
 			event.stopPropagation();
+			onContextMenuOpen();
 			setContextMenuPosition({
 				x: event.clientX,
 				y: event.clientY,
 			});
 		},
-		[],
+		[onContextMenuOpen],
+	);
+
+	const handleMessageClickCapture = useCallback(
+		(event: React.MouseEvent<HTMLElement>) => {
+			if (!contextMenuOpen) return;
+
+			event.preventDefault();
+			event.stopPropagation();
+			event.nativeEvent.stopImmediatePropagation();
+			closeContextMenu();
+		},
+		[closeContextMenu, contextMenuOpen],
 	);
 
 	const handleCopy = useCallback(async () => {
@@ -60,7 +80,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 	}, [closeContextMenu, message.id, onDeleteMessage]);
 
 	useEffect(() => {
-		if (!contextMenuPosition) return;
+		if (!contextMenuOpen) return;
 
 		window.addEventListener("click", closeContextMenu);
 		window.addEventListener("contextmenu", closeContextMenu);
@@ -73,7 +93,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 			window.removeEventListener("blur", closeContextMenu);
 			window.removeEventListener("scroll", closeContextMenu, true);
 		};
-	}, [closeContextMenu, contextMenuPosition]);
+	}, [closeContextMenu, contextMenuOpen]);
 
 	return (
 		<div
@@ -84,11 +104,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 		>
 			<article
 				className={cn(
-					"relative rounded-2xl px-4 py-2 shadow-sm backdrop-blur-md  bg-white/10 border border-white/10",
+					"relative rounded-2xl px-4 py-2 shadow-sm bg-white/10 border border-white/10",
 					isUser
 						? "max-w-[70%] text-white rounded-br-md"
 						: "w-full max-w-none text-white rounded-bl-md",
 				)}
+				onClickCapture={handleMessageClickCapture}
 				onContextMenu={handleContextMenu}
 			>
 				{isUser ? (
@@ -101,9 +122,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 					</div>
 				)}
 			</article>
-			{contextMenuPosition ? (
+			{contextMenuOpen && contextMenuPosition ? (
 				<div
-					className="fixed z-50 min-w-28 overflow-hidden rounded-xl border border-white/10 bg-slate-900/95 p-1 text-sm text-white shadow-2xl backdrop-blur-md"
+					className="fixed z-50 min-w-28 overflow-hidden rounded-xl border border-white/10 bg-slate-900/95 p-1 text-sm text-white shadow-2xl"
 					role="menu"
 					style={{
 						left: contextMenuPosition.x,

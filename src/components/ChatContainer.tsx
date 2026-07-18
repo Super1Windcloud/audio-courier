@@ -166,7 +166,7 @@ export const ChatContainer: React.FC = () => {
 	return (
 		<div className="flex h-full w-full overflow-hidden">
 			<div
-				className={`flex h-full w-full flex-col overflow-hidden border backdrop-blur-xl ${
+				className={`flex h-full w-full flex-col overflow-hidden border ${
 					uiTextTone === "dark" ? "ui-text-dark" : "ui-text-light"
 				}`}
 				style={panelStyle}

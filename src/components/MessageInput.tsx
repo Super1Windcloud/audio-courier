@@ -392,7 +392,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		<div
 			className="p-4
       relative   px-4 py-2 shadow-sm
-      backdrop-blur-xl  bg-white/10 border border-white/10"
+      bg-white/10 border border-white/10"
 		>
 			<div className="flex border-none items-center space-x-2">
 				<div className="relative flex-1">
