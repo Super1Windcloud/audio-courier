@@ -31,9 +31,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	onClearConversation,
 }) => {
 	const [inputText, setInputText] = useState("");
-	const [recordingTimerStamp, setRecordingTimerStamp] = useState(() =>
-		Date.now(),
-	);
 	const recordingState = useAppStateStore((state) => state.isRecording);
 	const captureInterval = useAppStateStore((state) => state.captureInterval);
 	const updateQuestionState = useAppStateStore((state) => state.updateQuestion);
@@ -67,11 +64,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 	const draftTranscriptRef = useRef("");
 	const MIN_RECORDING_DURATION = 3000;
 	const DUPLICATE_SEND_GUARD_MS = 2000;
-	const canStopRecording =
-		!recordingState ||
-		recordingStartedAt === null ||
-		recordingTimerStamp - recordingStartedAt >= MIN_RECORDING_DURATION;
-	const recordingTitle = canStopRecording ? "停止语音" : "录音中...3秒后可停止";
 
 	const resetTranscriptComposition = useCallback(() => {
 		recordingBaseInputRef.current = "";
@@ -316,24 +308,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 		};
 	}, [activateWindowAndFocusTextarea, focusTextarea]);
 
-	useEffect(() => {
-		if (!recordingState || recordingStartedAt === null) {
-			return () => undefined;
-		}
-
-		const remainingDuration = Math.max(
-			0,
-			recordingStartedAt + MIN_RECORDING_DURATION - Date.now(),
-		);
-		const timer = setTimeout(() => {
-			setRecordingTimerStamp(Date.now());
-		}, remainingDuration);
-
-		return () => {
-			clearTimeout(timer);
-		};
-	}, [recordingStartedAt, recordingState]);
-
 	const toggleRecording = () => {
 		if (!isAuthorized) {
 			toast.warning("未激活许可证，无法开始录音");
@@ -436,11 +410,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 								className="h-full w-full"
 								onToggle={toggleRecording}
 								scale={0.32}
-								title={recordingTitle}
 							/>
 						</div>
 					) : (
-						<span key="recording-mic" title={recordingTitle}>
+						<span key="recording-mic">
 							<Mic
 								onClick={toggleRecording}
 								className="cursor-pointer text-red-500"
@@ -448,7 +421,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 						</span>
 					)
 				) : (
-					<span key="idle-mic" title="开始语音">
+					<span key="idle-mic">
 						<Mic
 							onClick={toggleRecording}
 							className="cursor-pointer text-gray-400"
@@ -463,7 +436,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 					/>
 				</span>
 
-				<span title="发送消息">
+				<span title="">
 					<SendHorizontal
 						onClick={() => handleSend()}
 						className="text-gray-400 cursor-pointer"
