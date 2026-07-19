@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
 	isRegistered,
@@ -6,7 +7,7 @@ import {
 	unregister,
 } from "@tauri-apps/plugin-global-shortcut";
 import { toast } from "sonner";
-import { logError, logInfo } from "@/lib/logger.ts";
+import { logError } from "@/lib/logger.ts";
 import { setRecordingStateImmediately } from "@/lib/recordingState.ts";
 import useAppStateStore from "@/stores";
 
@@ -44,36 +45,32 @@ export async function toggleRecording() {
 }
 
 export async function registryGlobalShortCuts() {
-	const combo = "CommandOrControl+Shift+`";
-	if (await isRegistered(combo)) {
-		await unregister(combo);
-	}
+	const shortcuts = [
+		{
+			combo: "CommandOrControl+Shift+`",
+			handler: async () => {
+				const window = getCurrentWindow();
+				if (await window.isVisible()) {
+					await window.hide();
+				} else {
+					await showWindow();
+				}
+			},
+		},
+		{ combo: "Alt+Space", handler: toggleRecording },
+		{
+			combo: "Shift+Enter",
+			handler: async () => emit("global_send_shortcut"),
+		},
+		{
+			combo: "CommandOrControl+F12",
+			handler: async () => {
+				await invoke("toggle_devtools");
+			},
+		},
+	];
 
-	await register(combo, async (event) => {
-		if (event.state === "Released") {
-			const window = getCurrentWindow();
-
-			if (await window.isVisible()) {
-				await window.hide();
-			} else {
-				await showWindow();
-			}
-		}
-	});
-
-	const recordCombo = "Alt+Space";
-	if (await isRegistered(recordCombo)) {
-		await unregister(recordCombo);
-	}
-
-	await register(recordCombo, async (event) => {
-		if (event.state === "Released") {
-			await toggleRecording();
-		}
-	});
-
-	const devtoolsCombos = ["CommandOrControl+F12"];
-	for (const combo of devtoolsCombos) {
+	for (const { combo, handler } of shortcuts) {
 		try {
 			if (await isRegistered(combo)) {
 				await unregister(combo);
@@ -84,15 +81,17 @@ export async function registryGlobalShortCuts() {
 					return;
 				}
 				try {
-					await invoke("toggle_devtools");
-					logInfo(`toggle-devtools via ${combo}`);
+					await handler();
 				} catch (error) {
-					logError(`toggle-devtools failed via ${combo}`, error);
+					logError(`global shortcut handler failed for ${combo}`, error);
 					toast.error(String(error));
 				}
 			});
 		} catch (error) {
-			logError(`register devtools shortcut failed for ${combo}`, error);
+			logError(`register global shortcut failed for ${combo}`, error);
+			window.alert(
+				`快捷键 ${combo} 存在冲突，请关闭占用该快捷键的程序后重试。`,
+			);
 		}
 	}
 }

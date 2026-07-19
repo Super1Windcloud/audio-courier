@@ -24,12 +24,69 @@ pub use loopback::*;
 use provider_config::{ProviderEnvPresets, provider_env_presets_from_env};
 pub use provider_config::{TranscriptRuntimeConfig, transcript_runtime_config_from_env};
 use std::path::PathBuf;
+use std::process::Command;
 use tauri::LogicalSize;
-use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
-use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_log::{Target, TargetKind};
 pub use transcript_vendors::*;
 pub use utils::*;
+
+fn is_same_binary_already_running() -> bool {
+    let Ok(current_exe) = std::env::current_exe() else {
+        return false;
+    };
+    let Some(current_name) = current_exe.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+
+    #[cfg(target_os = "windows")]
+    let output = Command::new("tasklist")
+        .args([
+            "/FO",
+            "CSV",
+            "/NH",
+            "/FI",
+            &format!("IMAGENAME eq {current_name}"),
+        ])
+        .output();
+
+    #[cfg(not(target_os = "windows"))]
+    let output = Command::new("ps")
+        .args(["-A", "-o", "pid=", "-o", "comm="])
+        .output();
+
+    let Ok(output) = output else {
+        return false;
+    };
+    if !output.status.success() {
+        return false;
+    }
+
+    let current_pid = std::process::id();
+    let process_list = String::from_utf8_lossy(&output.stdout);
+
+    #[cfg(target_os = "windows")]
+    return process_list.lines().any(|line| {
+        let fields: Vec<_> = line.trim_matches('"').split("\",\"").collect();
+        fields
+            .first()
+            .is_some_and(|name| name.eq_ignore_ascii_case(current_name))
+            && fields
+                .get(1)
+                .and_then(|pid| pid.parse::<u32>().ok())
+                .is_some_and(|pid| pid != current_pid)
+    });
+
+    #[cfg(not(target_os = "windows"))]
+    return process_list.lines().any(|line| {
+        let mut fields = line.split_whitespace();
+        let pid = fields.next().and_then(|pid| pid.parse::<u32>().ok());
+        let name = fields
+            .next()
+            .and_then(|path| std::path::Path::new(path).file_name());
+        pid.is_some_and(|pid| pid != current_pid) && name.is_some_and(|name| name == current_name)
+    });
+}
 
 #[tauri::command]
 fn show_window(window: tauri::Window) -> Result<(), String> {
@@ -172,6 +229,11 @@ fn get_provider_env_presets() -> ProviderEnvPresets {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if is_same_binary_already_running() {
+        eprintln!("检测到同名应用进程，取消重复启动");
+        return;
+    }
+
     reset_app_log_files();
 
     let mut env_loaded = false;
@@ -229,30 +291,7 @@ pub fn run() {
             main.set_focus().unwrap();
             main.show().unwrap();
         }))
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcut("Shift+Enter")
-                .expect("failed to register rust global shortcut Shift+Enter")
-                .with_handler(|app, shortcut, event| {
-                    if event.state != ShortcutState::Pressed {
-                        return;
-                    }
-
-                    if !shortcut.matches(Modifiers::SHIFT, Code::Enter) {
-                        info!("ignored non-send global shortcut: {}", shortcut);
-                        return;
-                    }
-
-                    info!("global shortcut triggered: {}", shortcut);
-
-                    if let Some(main) = app.get_webview_window("main") {
-                        if let Err(err) = main.emit("global_send_shortcut", ()) {
-                            error!("emit global_send_shortcut failed: {}", err);
-                        }
-                    }
-                })
-                .build(),
-        )
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             show_window,
