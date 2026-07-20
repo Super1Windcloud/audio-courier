@@ -24,7 +24,7 @@ pub use loopback::*;
 use provider_config::{ProviderEnvPresets, provider_env_presets_from_env};
 pub use provider_config::{TranscriptRuntimeConfig, transcript_runtime_config_from_env};
 use std::path::PathBuf;
-use std::process::Command;
+use sysinfo::{ProcessesToUpdate, System};
 use tauri::LogicalSize;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_log::{Target, TargetKind};
@@ -39,53 +39,13 @@ fn is_same_binary_already_running() -> bool {
         return false;
     };
 
-    #[cfg(target_os = "windows")]
-    let output = Command::new("tasklist")
-        .args([
-            "/FO",
-            "CSV",
-            "/NH",
-            "/FI",
-            &format!("IMAGENAME eq {current_name}"),
-        ])
-        .output();
-
-    #[cfg(not(target_os = "windows"))]
-    let output = Command::new("ps")
-        .args(["-A", "-o", "pid=", "-o", "comm="])
-        .output();
-
-    let Ok(output) = output else {
-        return false;
-    };
-    if !output.status.success() {
-        return false;
-    }
-
     let current_pid = std::process::id();
-    let process_list = String::from_utf8_lossy(&output.stdout);
+    let mut system = System::new();
+    system.refresh_processes(ProcessesToUpdate::All, true);
 
-    #[cfg(target_os = "windows")]
-    return process_list.lines().any(|line| {
-        let fields: Vec<_> = line.trim_matches('"').split("\",\"").collect();
-        fields
-            .first()
-            .is_some_and(|name| name.eq_ignore_ascii_case(current_name))
-            && fields
-                .get(1)
-                .and_then(|pid| pid.parse::<u32>().ok())
-                .is_some_and(|pid| pid != current_pid)
-    });
-
-    #[cfg(not(target_os = "windows"))]
-    return process_list.lines().any(|line| {
-        let mut fields = line.split_whitespace();
-        let pid = fields.next().and_then(|pid| pid.parse::<u32>().ok());
-        let name = fields
-            .next()
-            .and_then(|path| std::path::Path::new(path).file_name());
-        pid.is_some_and(|pid| pid != current_pid) && name.is_some_and(|name| name == current_name)
-    });
+    system.processes().values().any(|process| {
+        process.pid().as_u32() != current_pid && process.name() == current_name
+    })
 }
 
 #[tauri::command]
