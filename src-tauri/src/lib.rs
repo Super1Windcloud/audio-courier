@@ -34,8 +34,8 @@ pub use transcript_vendors::*;
 pub use utils::*;
 
 fn terminate_same_binary_processes() -> Result<usize, String> {
-    let current_exe = std::env::current_exe()
-        .map_err(|error| format!("无法获取当前程序路径: {error}"))?;
+    let current_exe =
+        std::env::current_exe().map_err(|error| format!("无法获取当前程序路径: {error}"))?;
     let current_name = current_exe
         .file_name()
         .and_then(|name| name.to_str())
@@ -68,7 +68,10 @@ fn terminate_same_binary_processes() -> Result<usize, String> {
 
     for _ in 0..40 {
         system.refresh_processes(ProcessesToUpdate::Some(&matching_pids), true);
-        if matching_pids.iter().all(|pid| system.process(*pid).is_none()) {
+        if matching_pids
+            .iter()
+            .all(|pid| system.process(*pid).is_none())
+        {
             return Ok(matching_pids.len());
         }
         thread::sleep(Duration::from_millis(50));
