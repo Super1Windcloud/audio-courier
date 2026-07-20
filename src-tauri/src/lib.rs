@@ -24,69 +24,11 @@ pub use loopback::*;
 use provider_config::{ProviderEnvPresets, provider_env_presets_from_env};
 pub use provider_config::{TranscriptRuntimeConfig, transcript_runtime_config_from_env};
 use std::path::PathBuf;
-use std::thread;
-use std::time::Duration;
-use sysinfo::{ProcessesToUpdate, System};
 use tauri::LogicalSize;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_log::{Target, TargetKind};
 pub use transcript_vendors::*;
 pub use utils::*;
-
-fn terminate_same_binary_processes() -> Result<usize, String> {
-    let current_exe =
-        std::env::current_exe().map_err(|error| format!("无法获取当前程序路径: {error}"))?;
-    let current_name = current_exe
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| "当前程序文件名不是有效的 UTF-8".to_string())?;
-
-    let current_pid = std::process::id();
-    let mut system = System::new();
-    system.refresh_processes(ProcessesToUpdate::All, true);
-
-    let matching_pids: Vec<_> = system
-        .processes()
-        .iter()
-        .filter_map(|(pid, process)| {
-            let is_same_name = process
-                .name()
-                .to_str()
-                .is_some_and(|name| name.eq_ignore_ascii_case(current_name));
-            (pid.as_u32() != current_pid && is_same_name).then_some(*pid)
-        })
-        .collect();
-
-    for pid in &matching_pids {
-        let process = system
-            .process(*pid)
-            .ok_or_else(|| format!("进程 {pid} 在终止前已不可用"))?;
-        if !process.kill() {
-            return Err(format!("无法终止同名进程 {pid}"));
-        }
-    }
-
-    for _ in 0..40 {
-        system.refresh_processes(ProcessesToUpdate::Some(&matching_pids), true);
-        if matching_pids
-            .iter()
-            .all(|pid| system.process(*pid).is_none())
-        {
-            return Ok(matching_pids.len());
-        }
-        thread::sleep(Duration::from_millis(50));
-    }
-
-    Err(format!(
-        "等待同名进程退出超时: {}",
-        matching_pids
-            .iter()
-            .filter(|pid| system.process(**pid).is_some())
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join(", ")
-    ))
-}
 
 #[tauri::command]
 fn show_window(window: tauri::Window) -> Result<(), String> {
