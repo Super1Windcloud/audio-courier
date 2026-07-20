@@ -24,6 +24,8 @@ pub use loopback::*;
 use provider_config::{ProviderEnvPresets, provider_env_presets_from_env};
 pub use provider_config::{TranscriptRuntimeConfig, transcript_runtime_config_from_env};
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
 use sysinfo::{ProcessesToUpdate, System};
 use tauri::LogicalSize;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
@@ -31,21 +33,56 @@ use tauri_plugin_log::{Target, TargetKind};
 pub use transcript_vendors::*;
 pub use utils::*;
 
-fn is_same_binary_already_running() -> bool {
-    let Ok(current_exe) = std::env::current_exe() else {
-        return false;
-    };
-    let Some(current_name) = current_exe.file_name().and_then(|name| name.to_str()) else {
-        return false;
-    };
+fn terminate_same_binary_processes() -> Result<usize, String> {
+    let current_exe = std::env::current_exe()
+        .map_err(|error| format!("无法获取当前程序路径: {error}"))?;
+    let current_name = current_exe
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "当前程序文件名不是有效的 UTF-8".to_string())?;
 
     let current_pid = std::process::id();
     let mut system = System::new();
     system.refresh_processes(ProcessesToUpdate::All, true);
 
-    system.processes().values().any(|process| {
-        process.pid().as_u32() != current_pid && process.name() == current_name
-    })
+    let matching_pids: Vec<_> = system
+        .processes()
+        .iter()
+        .filter_map(|(pid, process)| {
+            let is_same_name = process
+                .name()
+                .to_str()
+                .is_some_and(|name| name.eq_ignore_ascii_case(current_name));
+            (pid.as_u32() != current_pid && is_same_name).then_some(*pid)
+        })
+        .collect();
+
+    for pid in &matching_pids {
+        let process = system
+            .process(*pid)
+            .ok_or_else(|| format!("进程 {pid} 在终止前已不可用"))?;
+        if !process.kill() {
+            return Err(format!("无法终止同名进程 {pid}"));
+        }
+    }
+
+    for _ in 0..40 {
+        system.refresh_processes(ProcessesToUpdate::Some(&matching_pids), true);
+        if matching_pids.iter().all(|pid| system.process(*pid).is_none()) {
+            return Ok(matching_pids.len());
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+
+    Err(format!(
+        "等待同名进程退出超时: {}",
+        matching_pids
+            .iter()
+            .filter(|pid| system.process(**pid).is_some())
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(", ")
+    ))
 }
 
 #[tauri::command]
@@ -189,9 +226,13 @@ fn get_provider_env_presets() -> ProviderEnvPresets {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    if is_same_binary_already_running() {
-        eprintln!("检测到同名应用进程，取消重复启动");
-        return;
+    match terminate_same_binary_processes() {
+        Ok(0) => {}
+        Ok(count) => eprintln!("已终止 {count} 个同名应用进程，继续启动"),
+        Err(error) => {
+            eprintln!("终止同名应用进程失败: {error}");
+            return;
+        }
     }
 
     reset_app_log_files();
