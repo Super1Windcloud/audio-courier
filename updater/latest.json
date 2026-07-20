@@ -1,11 +1,11 @@
 {
-  "version": "1.2.1",
-  "notes": "Release 1.2.1",
-  "pub_date": "2026-07-19T10:42:56.605Z",
+  "version": "1.2.2",
+  "notes": "Release 1.2.2",
+  "pub_date": "2026-07-20T13:58:45.124Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY3E3L0ducEp5Qm90WDhjSlp3bjdsRC80NlBmcS9uYWdTNEpDUUVsUGJXT1BleEU0OFdOTVBqdnF0eC9kZ2lnOUU2OVZpRFpXNWZuQUY5Q3hlaUF6TTBVR0JqRENPN1FRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NDU3NzY5CWZpbGU6QXVkaW8gQ291cmllcl8xLjIuMV94NjQtc2V0dXAuZXhlCnl2K3h4UUgrSzJ5R1hidkZqaXk2OGJpaDNoVThQTkNDWjhjUDJNK1ErUkxnQXpvVkpVRXpkWXlDUXNjcXZRYzZ6Vk9TR0h6RlVUT0NHV3lLYTY5ckN3PT0K",
-      "url": "https://github.com/super1windcloud/audio-courier/releases/download/audio-courier-v1.2.1/Audio.Courier_1.2.1_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY3E3L0ducEp5Qmh0T0JkNCtZOW9hTjJZbmFmL3AwZ1NpNHRRT0IwRmo3dzU4dXYrREcweUJSaXVRT1dxcW5DQkZ3QVhJbW1XWDFaL0IyaThHZU96S1piUldkU1FHbndFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NTU1OTA5CWZpbGU6QXVkaW8gQ291cmllcl8xLjIuMl94NjQtc2V0dXAuZXhlCmRlc0E5ZmVsRlN6VVdiZFNSZDZHc3p5a2VMeGR1VTVzQjZpR2pYK3NxMTZVZVg5YmhPRnMwbWRCNlN2Zm45QUEzUmNzam9jRkhvYlRPQXJpL0JKUUFBPT0K",
+      "url": "https://github.com/super1windcloud/audio-courier/releases/download/audio-courier-v1.2.2/Audio.Courier_1.2.2_x64-setup.exe"
     },
     "darwin-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSY3E3L0ducEp5QnNGRWFaZXU1V3JvbCsyVnZRSkdOdXBadnNTbkw0QitMcUhJQjNoWGQrOGpDVUVuNVVOaE9ZUExPRjkxQmxlTUlPNmtSY1hXZFMrQlNtUWZqbE01cmdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMjA1NTU2CWZpbGU6QXVkaW8gQ291cmllci5hcHAudGFyLmd6CjBFL1JGQjFUdGxQQlZTR3lUbzkxWG5kS2ZvNjQ5YmYwYVcyREtNRFh1a29PYUQyM2l6MFg3NmRxY1MwaXpWUXFIRjNqMU9nZnJzQ3J3ZURiRkpsY0RBPT0K",
