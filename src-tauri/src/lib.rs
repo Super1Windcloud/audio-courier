@@ -171,15 +171,6 @@ fn get_provider_env_presets() -> ProviderEnvPresets {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    match terminate_same_binary_processes() {
-        Ok(0) => {}
-        Ok(count) => eprintln!("已终止 {count} 个同名应用进程，继续启动"),
-        Err(error) => {
-            eprintln!("终止同名应用进程失败: {error}");
-            return;
-        }
-    }
-
     reset_app_log_files();
 
     let mut env_loaded = false;
